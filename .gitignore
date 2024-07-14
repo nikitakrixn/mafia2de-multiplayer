@@ -1,0 +1,31 @@
+# Rust build artifacts
+/target/
+**/target/
+
+# Cargo.lock for binary projects (uncomment for library projects)
+# Cargo.lock
+
+# IDEs and editors
+/.vscode/
+/.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Debug symbols
+*.pdb
+
+# Windows DLL files
+*.dll
+
+# Log files
+*.log
+
+# Environment variables
+.env
+
+# Any local configuration
+config.local.toml
