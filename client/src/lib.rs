@@ -14,18 +14,6 @@ fn initialize_tracing() {
 
 static mut CONSOLE_ALLOCATED: bool = false;
 
-fn show_error_message(error: &str) {
-    unsafe {
-        let caption = "Mafia II Multiplayer Mod Error";
-        MessageBoxA(
-            None,
-            PCSTR::from_raw(error.as_ptr()),
-            PCSTR::from_raw(caption.as_ptr()),
-            MB_OK,
-        );
-    }
-}
-
 #[no_mangle]
 pub extern "system" fn DllMain(
     dll_module: windows::Win32::Foundation::HINSTANCE,
@@ -40,7 +28,7 @@ pub extern "system" fn DllMain(
                     println!("Mafia II Multiplayer Mod Console");
                     println!("Type 'help' for a list of commands.");
                 } else {
-                    show_error_message("Failed to allocate console");
+                    error!("Failed to allocate console");
                     return windows::Win32::Foundation::BOOL::from(false);
                 }
             }
