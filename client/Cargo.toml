@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-windows =  { version = "0.58.0", features = [
+windows =  { workspace = true, features = [
     "Win32_Foundation",
     "Win32_System_Console",
     "Win32_System_LibraryLoader",

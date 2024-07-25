@@ -1,50 +1,43 @@
-use tracing::{info, error};
-use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan};
-use windows::Win32::System::Console::{AllocConsole, FreeConsole};
-use windows::Win32::System::LibraryLoader::GetModuleHandleA;
-use windows::Win32::UI::WindowsAndMessaging::{MessageBoxA, MB_OK};
-use windows::core::PCSTR;
-
-fn initialize_tracing() {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::CLOSE)
-        .init();
-}
-
-static mut CONSOLE_ALLOCATED: bool = false;
-
-#[no_mangle]
-pub extern "system" fn DllMain(
-    dll_module: windows::Win32::Foundation::HINSTANCE,
-    call_reason: u32,
-    _: *mut ::std::ffi::c_void,
-) -> windows::Win32::Foundation::BOOL {
+use windows::Win32::{
+    Foundation::{BOOL, HINSTANCE},
+    System::Console::AllocConsole,
+  };
+  
+  fn init_tracing() {
+    use tracing_error::ErrorLayer;
+    use tracing_subscriber::prelude::*;
+    use tracing_subscriber::{fmt, EnvFilter};
+  
+    let fmt_layer = fmt::layer().with_target(false);
+    let filter_layer = EnvFilter::try_from_default_env()
+      .or_else(|_| EnvFilter::try_new("info"))
+      .unwrap();
+  
+    tracing_subscriber::registry()
+      .with(filter_layer)
+      .with(fmt_layer)
+      .with(ErrorLayer::default())
+      .init();
+  
+    eyre_span::install().unwrap();
+  }
+  
+  fn dll_init() {
+    unsafe { AllocConsole() };
+    println!("Hello, world!");
+  }
+  
+  #[no_mangle]
+  #[allow(non_snake_case, unused_variables)]
+  extern "system" fn DllMain(dll_module: HINSTANCE, call_reason: u32, reserved: u32) -> BOOL {
+    const DLL_PROCESS_ATTACH: u32 = 1;
+    const DLL_PROCESS_DETACH: u32 = 0;
+  
     match call_reason {
-        windows::Win32::System::SystemServices::DLL_PROCESS_ATTACH => {
-            unsafe {
-                if AllocConsole().is_ok() {
-                    CONSOLE_ALLOCATED = true;
-                    println!("Mafia II Multiplayer Mod Console");
-                    println!("Type 'help' for a list of commands.");
-                } else {
-                    error!("Failed to allocate console");
-                    return windows::Win32::Foundation::BOOL::from(false);
-                }
-            }
-
-            initialize_tracing();
-            info!("DLL attached successfully");
-        }
-        windows::Win32::System::SystemServices::DLL_PROCESS_DETACH => {
-            unsafe {
-                if CONSOLE_ALLOCATED {
-                    FreeConsole();
-                }
-            }
-            info!("DLL detached successfully");
-        }
-        _ => {}
+      DLL_PROCESS_ATTACH => dll_init(),
+      DLL_PROCESS_DETACH => (),
+      _ => (),
     }
-    windows::Win32::Foundation::BOOL::from(true)
-}
+  
+    BOOL::from(true)
+  }
