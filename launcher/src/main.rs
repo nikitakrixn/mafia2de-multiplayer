@@ -175,7 +175,7 @@ fn read_registry_string(
         );
 
         // Close the handle to the registry key
-        let _ =RegCloseKey(handle);
+        let _ = RegCloseKey(handle);
 
         // Check if reading the value was successful
         if read_status != ERROR_SUCCESS {
@@ -188,3 +188,4 @@ fn read_registry_string(
         Ok(result.to_string())
     }
 }
+
