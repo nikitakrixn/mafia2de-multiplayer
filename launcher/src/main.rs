@@ -112,11 +112,11 @@ fn write_registry_string(
 
         // Write the string value to the registry
         let write_status = RegSetValueExA(
-            hkeylocation, 
+            handle, 
             PCSTR(sub_key_value.to_bytes().as_ptr()), 
             0, 
             REG_SZ, 
-            Some(value.as_bytes())
+            Some(value.to_bytes())
         );
 
         // Check if writing the value was successful
@@ -166,7 +166,7 @@ fn read_registry_string(
 
         // Read the value from the registry
         let read_status = RegQueryValueExA(
-            hkeylocation, 
+            handle, 
             PCSTR(value_name_cstr.to_bytes().as_ptr()), 
             None, 
             Some(&mut typ), 
@@ -175,7 +175,7 @@ fn read_registry_string(
         );
 
         // Close the handle to the registry key
-        RegCloseKey(handle);
+        let _ =RegCloseKey(handle);
 
         // Check if reading the value was successful
         if read_status != ERROR_SUCCESS {
