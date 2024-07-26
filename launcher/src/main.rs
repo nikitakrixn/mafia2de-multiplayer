@@ -1,14 +1,14 @@
 use std::{ffi::CString, path::PathBuf};
 
 use windows::{
-    core::{PCSTR, PSTR}, Win32::{Foundation::*, System::Registry::*, UI::Controls::Dialogs::*}
+    core::{PCSTR, PSTR}, Win32::{Foundation::*, System::{Registry::*, Threading::*}, UI::Controls::Dialogs::*}
 };
 
 
 const SUB_KEY: &str = "Software\\EmpireBay-Network";
 const SUB_KEY_VALUE: &str = "mafia2exepath";
 const CORE_DLL_NAME: &str = "ebn_client.dll";
-const GAME_NAME: &str = "Mafia 2";
+const GAME_NAME: &str = "Mafia II";
 const GAME_EXE_NAME: &str = "mafia2.exe";
 
 fn main() -> windows::core::Result<()>  {
@@ -30,7 +30,11 @@ fn main() -> windows::core::Result<()>  {
             println!("Не удалось прочитать путь из реестра: {:?}", e);
             let selected_path = folder_game_path(GAME_EXE_NAME)?;
             println!("Путь Mafia II (выбранный): {}", selected_path.display());
-            write_registry_string(HKEY_CURRENT_USER, SUB_KEY, SUB_KEY_VALUE, selected_path.to_str().unwrap());
+            write_registry_string(
+                HKEY_CURRENT_USER,
+                SUB_KEY, 
+                SUB_KEY_VALUE, 
+                selected_path.to_str().unwrap());
             selected_path
         },
     };
@@ -39,6 +43,12 @@ fn main() -> windows::core::Result<()>  {
 
     let dll_path = std::env::current_exe().unwrap().parent().unwrap().join(CORE_DLL_NAME);
     println!("DLL Path: {}", dll_path.display());
+
+    println!("Game Path: {}", game_path.display());
+
+    if let Err(e) = start_game_process(&game_path) {
+        eprintln!("Не удалось запустить процесс: {:?}", e);
+    }
 
     Ok(())
 }
@@ -189,3 +199,36 @@ fn read_registry_string(
     }
 }
 
+fn start_game_process(game_path: &PathBuf) -> windows::core::Result<()> {
+    unsafe {
+        let mut startup_info = STARTUPINFOA::default();
+        let mut process_info = PROCESS_INFORMATION::default();
+
+        let game_path_str = game_path.to_string_lossy().to_string();
+        let game_path_str_trimmed = game_path_str.trim_end_matches('\0');
+
+        let game_path_cstr = CString::new(game_path_str_trimmed).expect("CString::new failed");
+
+        let status = CreateProcessA(
+                PCSTR(game_path_cstr.to_bytes().as_ptr()), 
+                PSTR::null(), 
+                None, 
+                None, 
+                false, 
+                CREATE_SUSPENDED, 
+                None, 
+                None, 
+                &mut startup_info, 
+                &mut process_info,
+        );
+
+        if status.is_ok() {
+            ResumeThread(process_info.hThread);
+
+            Ok(())
+        } else {
+            eprintln!("Have Problem : {}", windows::core::Error::from_win32());
+            Err(windows::core::Error::from_win32())
+        }
+    }
+}
