@@ -1,7 +1,7 @@
 use std::{ffi::CString, path::PathBuf};
 
 use windows::{
-    core::{PCSTR, PSTR}, Win32::{Foundation::*, System::{Registry::*, Threading::*}, UI::Controls::Dialogs::*}
+    core::{PCSTR, PSTR}, Win32::{Foundation::*, System::{Diagnostics::Debug::WriteProcessMemory, LibraryLoader::{GetModuleHandleA, GetProcAddress}, Memory::*, Registry::*, Threading::*}, UI::Controls::Dialogs::*}
 };
 
 
@@ -12,45 +12,38 @@ const GAME_NAME: &str = "Mafia II";
 const GAME_EXE_NAME: &str = "mafia2.exe";
 
 fn main() -> windows::core::Result<()>  {
-    let game_path_result = read_registry_string(HKEY_CURRENT_USER, SUB_KEY, SUB_KEY_VALUE);
-
-    let game_path = match game_path_result {
-        Ok(path) => {
-            if path.is_empty() {
-                let selected_path = folder_game_path(GAME_EXE_NAME)?;
-                println!("Путь Mafia II (выбранный): {}", selected_path.display());
-                write_registry_string(HKEY_CURRENT_USER, SUB_KEY, SUB_KEY_VALUE, selected_path.to_str().unwrap());
-                selected_path
-            } else {
-                println!("Путь Mafia II (из реестра): {}", path);
-                PathBuf::from(path)
-            }
-        }
-        Err(e) => {
-            println!("Не удалось прочитать путь из реестра: {:?}", e);
-            let selected_path = folder_game_path(GAME_EXE_NAME)?;
-            println!("Путь Mafia II (выбранный): {}", selected_path.display());
-            write_registry_string(
-                HKEY_CURRENT_USER,
-                SUB_KEY, 
-                SUB_KEY_VALUE, 
-                selected_path.to_str().unwrap());
-            selected_path
-        },
-    };
-
-    //let dll_path = game_path.join(CORE_DLL_NAME);
+    let game_path = get_game_path()?;
 
     let dll_path = std::env::current_exe().unwrap().parent().unwrap().join(CORE_DLL_NAME);
     println!("DLL Path: {}", dll_path.display());
 
     println!("Game Path: {}", game_path.display());
 
-    if let Err(e) = start_game_process(&game_path) {
+    if let Err(e) = start_game_process(&game_path, &dll_path) {
         eprintln!("Не удалось запустить процесс: {:?}", e);
     }
 
     Ok(())
+}
+
+fn get_game_path() -> windows::core::Result<PathBuf> {
+    match read_registry_string(HKEY_CURRENT_USER, SUB_KEY, SUB_KEY_VALUE) {
+        Ok(path) if !path.is_empty() => {
+            println!("Путь Mafia II (из реестра): {}", path);
+            Ok(PathBuf::from(path))
+        }
+        _ => {
+            let selected_path = folder_game_path(GAME_EXE_NAME)?;
+            println!("Путь Mafia II (выбранный): {}", selected_path.display());
+            write_registry_string(
+                HKEY_CURRENT_USER,
+                SUB_KEY,
+                SUB_KEY_VALUE,
+                selected_path.to_str().unwrap(),
+            );
+            Ok(selected_path)
+        }
+    }
 }
 
 fn folder_game_path (game_exe_name: &str) -> Result<PathBuf, windows::core::Error> {
@@ -199,7 +192,7 @@ fn read_registry_string(
     }
 }
 
-fn start_game_process(game_path: &PathBuf) -> windows::core::Result<()> {
+fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core::Result<()> {
     unsafe {
         let mut startup_info = STARTUPINFOA::default();
         let mut process_info = PROCESS_INFORMATION::default();
@@ -209,26 +202,76 @@ fn start_game_process(game_path: &PathBuf) -> windows::core::Result<()> {
 
         let game_path_cstr = CString::new(game_path_str_trimmed).expect("CString::new failed");
 
-        let status = CreateProcessA(
-                PCSTR(game_path_cstr.to_bytes().as_ptr()), 
-                PSTR::null(), 
-                None, 
-                None, 
-                false, 
-                CREATE_SUSPENDED, 
-                None, 
-                None, 
-                &mut startup_info, 
-                &mut process_info,
+            
+        let create_result = CreateProcessA(
+            PCSTR(game_path_cstr.as_ptr() as *const u8),
+            PSTR::null(),
+            None,
+            None,
+            false,
+            CREATE_SUSPENDED,
+            None,
+            None,
+            &mut startup_info,
+            &mut process_info,
         );
 
-        if status.is_ok() {
-            ResumeThread(process_info.hThread);
-
-            Ok(())
-        } else {
-            eprintln!("Have Problem : {}", windows::core::Error::from_win32());
-            Err(windows::core::Error::from_win32())
+        if let Err(e) = create_result {
+            println!("Failed to create process: {:?}", e);
+            return Err(e);
         }
+
+        let process_handle = OpenProcess(PROCESS_ALL_ACCESS, false, process_info.dwProcessId)?;
+
+        let dll_path_cstring = CString::new(dll_path.to_str().ok_or(windows::core::Error::from_win32())?)
+            .map_err(|_| windows::core::Error::from_win32())?;
+        let dll_path_bytes = dll_path_cstring.as_bytes_with_nul();
+
+        let remote_memory = VirtualAllocEx(
+            process_handle,
+            None,
+            dll_path_bytes.len(),
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE,
+        );
+
+        if remote_memory.is_null() {
+            return Err(windows::core::Error::from_win32());
+        }
+
+        let mut bytes_written = 0;
+        WriteProcessMemory(
+            process_handle,
+            remote_memory,
+            dll_path_bytes.as_ptr() as _,
+            dll_path_bytes.len(),
+            Some(&mut bytes_written),
+        )?;
+
+        let kernel32 = GetModuleHandleA(PCSTR(b"kernel32.dll\0".as_ptr()))?;
+        let load_library_addr = GetProcAddress(kernel32, PCSTR(b"LoadLibraryA\0".as_ptr()))
+            .ok_or(windows::core::Error::from_win32())?;
+
+        let thread = CreateRemoteThread(
+            process_handle,
+            None,
+            0,
+            Some(std::mem::transmute(load_library_addr)),
+            Some(remote_memory),
+            0,
+            None,
+        )?;
+
+        println!("Waiting for DLL to load...");
+        WaitForSingleObject(thread, 10000);
+
+        CloseHandle(thread)?;
+        VirtualFreeEx(process_handle, remote_memory, 0, MEM_RELEASE)?;
+        CloseHandle(process_handle)?;
+        CloseHandle(process_info.hThread)?;
+
+        ResumeThread(process_info.hThread);
+
+        Ok(())
     }
 }
