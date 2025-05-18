@@ -3,7 +3,7 @@
 **/target/
 
 # Cargo.lock for binary projects (uncomment for library projects)
-# Cargo.lock
+Cargo.lock
 
 # IDEs and editors
 /.vscode/
@@ -29,3 +29,6 @@ Thumbs.db
 
 # Any local configuration
 config.local.toml
+
+# exe
+*.exe

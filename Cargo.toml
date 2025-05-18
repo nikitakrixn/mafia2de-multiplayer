@@ -1,8 +1,6 @@
 [workspace]
-members = ["client", "common", "server"]
+members = ["client", "common", "launcher", "server", "sdk"]
 resolver = "2"
 
 [workspace.dependencies]
-tokio = { version = "1.36.0", features = ["full"] }
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+windows = { version = "0.61.1" }
