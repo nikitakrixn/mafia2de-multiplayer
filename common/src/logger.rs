@@ -7,10 +7,12 @@ use chrono::Local;
 /// Уровни логирования
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
+    Trace = 0,
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Critical,
 }
 
 /// Цели логирования
@@ -48,7 +50,6 @@ impl Logger {
                 let now = Local::now();
                 let timestamp = now.format("%Y-%m-%d_%H-%M-%S").to_string();
                 
-                // Создаем директорию для логов, если ее нет
                 let path_obj = Path::new(&path);
                 if let Some(parent) = path_obj.parent() {
                     if !parent.exists() {
@@ -81,7 +82,8 @@ impl Logger {
             }
         }
 
-        let mut global_logger = LOGGER.lock().map_err(|_| io::Error::new(io::ErrorKind::Other, "Failed to lock logger"))?;
+        let mut global_logger = LOGGER.lock()
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Failed to lock logger"))?;
         *global_logger = Some(logger);
 
         Ok(())
@@ -93,11 +95,14 @@ impl Logger {
             return Ok(());
         }
 
+        // Строковое представление уровня логирования
         let level_str = match level {
+            LogLevel::Trace => "TRACE",
             LogLevel::Debug => "DEBUG",
             LogLevel::Info => "INFO",
             LogLevel::Warning => "WARNING",
             LogLevel::Error => "ERROR",
+            LogLevel::Critical => "CRITICAL",
         };
 
         // Получаем текущее время в формате ISO 8601
@@ -108,10 +113,11 @@ impl Logger {
 
         match self.target {
             LogTarget::Console => {
+                let colored_msg = Self::colorize(level, &log_message);
                 if level >= LogLevel::Error {
-                    eprint!("{}", log_message);
+                    eprint!("{}", colored_msg);
                 } else {
-                    print!("{}", log_message);
+                    print!("{}", colored_msg);
                 }
             }
             LogTarget::File => {
@@ -121,10 +127,11 @@ impl Logger {
                 }
             }
             LogTarget::Both => {
+                let colored_msg = Self::colorize(level, &log_message);
                 if level >= LogLevel::Error {
-                    eprint!("{}", log_message);
+                    eprint!("{}", colored_msg);
                 } else {
-                    print!("{}", log_message);
+                    print!("{}", colored_msg);
                 }
                 if let Some(file) = &mut self.file {
                     file.write_all(log_message.as_bytes())?;
@@ -135,16 +142,35 @@ impl Logger {
 
         Ok(())
     }
+
+    /// Функция для раскрашивания сообщения, добавляя ANSI escape-последовательности
+    fn colorize(level: LogLevel, message: &str) -> String {
+        const RESET: &str = "\x1b[0m";
+        match level {
+            LogLevel::Trace => format!("{}", message),
+            LogLevel::Debug => format!("\x1b[34m{}{}", message, RESET),
+            LogLevel::Info => format!("\x1b[32m{}{}", message, RESET),
+            LogLevel::Warning => format!("\x1b[33m{}{}", message, RESET),
+            LogLevel::Error => format!("\x1b[31m{}{}", message, RESET),
+            LogLevel::Critical => format!("\x1b[1;31m{}{}", message, RESET),
+        }
+    }
 }
 
 /// Получает глобальный экземпляр логгера
 fn get_logger() -> io::Result<MutexGuard<'static, Option<Logger>>> {
-    LOGGER
-        .lock()
-        .map_err(|_| io::Error::new(io::ErrorKind::Other, "Failed to lock logger"))
+    LOGGER.lock().map_err(|_| io::Error::new(io::ErrorKind::Other, "Failed to lock logger"))
 }
 
 /// Публичные функции для логирования
+
+pub fn trace(message: &str) -> io::Result<()> {
+    let mut guard = get_logger()?;
+    if let Some(logger) = guard.as_mut() {
+        logger.log(LogLevel::Trace, message)?;
+    }
+    Ok(())
+}
 
 pub fn debug(message: &str) -> io::Result<()> {
     let mut guard = get_logger()?;
@@ -176,4 +202,12 @@ pub fn error(message: &str) -> io::Result<()> {
         logger.log(LogLevel::Error, message)?;
     }
     Ok(())
-} 
+}
+
+pub fn critical(message: &str) -> io::Result<()> {
+    let mut guard = get_logger()?;
+    if let Some(logger) = guard.as_mut() {
+        logger.log(LogLevel::Critical, message)?;
+    }
+    Ok(())
+}

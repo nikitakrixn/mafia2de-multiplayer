@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "ebn_client"
+name = "m2de_network"
 crate-type = ["cdylib"]
 
 [dependencies]

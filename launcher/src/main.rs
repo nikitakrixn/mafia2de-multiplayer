@@ -8,7 +8,7 @@ use windows::{
 
 const SUB_KEY: &str = "Software\\Mafia2-Multiplayer";
 const SUB_KEY_VALUE: &str = "mafia2depath";
-const CLIENT_DLL_NAME: &str = "ebn_client.dll";
+const CLIENT_DLL_NAME: &str = "m2de_network.dll";
 const GAME_NAME: &str = "Mafia II Definitive Edition";
 const GAME_EXE_NAME: &str = "Mafia II Definitive Edition.exe";
 
@@ -22,18 +22,18 @@ fn main() -> windows::core::Result<()>  {
         eprintln!("Не удалось инициализировать логгер: {}", err);
     }
 
-    logger::info("Mafia II: Multiplayer Launcher starting...");
+    let _ = logger::info("Mafia II: Multiplayer Launcher starting...");
     
     // Получаем путь к игре
     let game_path = match get_game_path() {
         Ok(path) => {
             let msg = format!("Game path: {}", path.display());
-            logger::info(&msg);
+            let _ = logger::info(&msg);
             path
         },
         Err(e) => {
             let msg = format!("Error finding game path: {:?}", e);
-            logger::error(&msg);
+            let _ = logger::error(&msg);
             return Err(e);
         }
     };
@@ -41,7 +41,7 @@ fn main() -> windows::core::Result<()>  {
     // Проверяем существование исполняемого файла игры
     if !game_path.exists() {
         let msg = format!("Game executable not found: {}", game_path.display());
-        logger::error(&msg);
+        let _ = logger::error(&msg);
         return Err(windows::core::Error::from_win32());
     }
     
@@ -50,7 +50,7 @@ fn main() -> windows::core::Result<()>  {
         Some(dir) => dir.to_path_buf(),
         None => {
             let msg = "Could not determine game directory";
-            logger::error(msg);
+            let _ = logger::error(msg);
             return Err(windows::core::Error::from_win32());
         }
     };
@@ -60,12 +60,12 @@ fn main() -> windows::core::Result<()>  {
         Ok(exe_path) => {
             let dll_path = exe_path.parent().unwrap().join(CLIENT_DLL_NAME);
             let msg = format!("DLL Path: {}", dll_path.display());
-            logger::info(&msg);
+            let _ = logger::info(&msg);
             dll_path
         },
         Err(e) => {
             let msg = format!("Failed to get current executable path: {:?}", e);
-            logger::error(&msg);
+            let _ = logger::error(&msg);
             return Err(windows::core::Error::from_win32());
         }
     };
@@ -73,7 +73,7 @@ fn main() -> windows::core::Result<()>  {
     // Проверяем существование DLL
     if !dll_path.exists() {
         let msg = format!("Client DLL not found: {}", dll_path.display());
-        logger::error(&msg);
+        let _ = logger::error(&msg);
         return Err(windows::core::Error::from_win32());
     }
     
@@ -81,16 +81,16 @@ fn main() -> windows::core::Result<()>  {
     match start_game_process(&game_path, &dll_path) {
         Ok(process_id) => {
             let msg = format!("Game started successfully with PID: {}", process_id);
-            logger::info(&msg);
+            let _ = logger::info(&msg);
         },
         Err(e) => {
             let msg = format!("Failed to start game process: {:?}", e);
-            logger::error(&msg);
+            let _ = logger::error(&msg);
             return Err(e);
         }
     }
 
-    logger::info("Launcher completed successfully!");
+    let _ = logger::info("Launcher completed successfully!");
     
     Ok(())
 }
@@ -365,7 +365,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
             
         // Создаём процесс в приостановленном состоянии
         println!("Starting game process...");
-        logger::info("Запуск процесса игры...");
+        let _ =  logger::info("Запуск процесса игры...");
         let create_result = CreateProcessA(
             PCSTR(game_path_cstr.as_ptr() as *const u8),
             Some(PSTR::null()),
@@ -381,13 +381,13 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         if let Err(e) = create_result {
             println!("Failed to create process: {:?}", e);
-            logger::error(&format!("Не удалось создать процесс: {:?}", e));
+            let _ =  logger::error(&format!("Не удалось создать процесс: {:?}", e));
             return Err(e);
         }
 
         // Открываем процесс с полным доступом
         println!("Opening process with full access...");
-        logger::info("Открытие процесса с полным доступом...");
+        let _ =  logger::info("Открытие процесса с полным доступом...");
         let process_handle = OpenProcess(PROCESS_ALL_ACCESS, false, process_info.dwProcessId)?;
 
         // Конвертируем путь к DLL в CString
@@ -397,7 +397,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         // Выделяем память в удалённом процессе для пути к DLL
         println!("Allocating memory in target process...");
-        logger::info("Выделение памяти в целевом процессе...");
+        let _ =  logger::info("Выделение памяти в целевом процессе...");
         let remote_memory = VirtualAllocEx(
             process_handle,
             None,
@@ -408,7 +408,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         if remote_memory.is_null() {
             println!("Failed to allocate memory in target process");
-            logger::error("Не удалось выделить память в целевом процессе");
+            let _ =  logger::error("Не удалось выделить память в целевом процессе");
             // Завершаем процесс, так как не смогли выделить память
             let _ = TerminateProcess(process_handle, 1);
             return Err(windows::core::Error::from_win32());
@@ -416,7 +416,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         // Записываем путь к DLL в выделенную память
         println!("Writing DLL path to target process memory...");
-        logger::info("Запись пути DLL в память целевого процесса...");
+        let _ =  logger::info("Запись пути DLL в память целевого процесса...");
         let mut bytes_written = 0;
         let write_result = WriteProcessMemory(
             process_handle,
@@ -428,7 +428,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         if let Err(e) = write_result {
             println!("Failed to write process memory: {:?}", e);
-            logger::error(&format!("Не удалось записать память процесса: {:?}", e));
+            let _ =  logger::error(&format!("Не удалось записать память процесса: {:?}", e));
             // Освобождаем память и завершаем процесс
             let _ = VirtualFreeEx(process_handle, remote_memory, 0, MEM_RELEASE);
             let _ = TerminateProcess(process_handle, 1);
@@ -437,13 +437,13 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         // Получаем адрес функции LoadLibraryA
         println!("Getting LoadLibraryA address...");
-        logger::info("Получение адреса функции LoadLibraryA...");
+        let _ =  logger::info("Получение адреса функции LoadLibraryA...");
         let kernel32_handle = GetModuleHandleA(PCSTR(b"kernel32.dll\0".as_ptr())).unwrap();
         let load_library_addr = GetProcAddress(kernel32_handle, PCSTR(b"LoadLibraryA\0".as_ptr()));
 
         if load_library_addr.is_none() {
             println!("Failed to get LoadLibraryA address");
-            logger::error("Не удалось получить адрес LoadLibraryA");
+            let _ = logger::error("Не удалось получить адрес LoadLibraryA");
             // Освобождаем память и завершаем процесс
             let _ = VirtualFreeEx(process_handle, remote_memory, 0, MEM_RELEASE);
             let _ = TerminateProcess(process_handle, 1);
@@ -452,7 +452,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         // Создаём удалённый поток для загрузки нашей DLL
         println!("Creating remote thread to load DLL...");
-        logger::info("Создание удаленного потока для загрузки DLL...");
+        let _ = logger::info("Создание удаленного потока для загрузки DLL...");
         let thread_handle = CreateRemoteThread(
             process_handle,
             None,
@@ -465,7 +465,7 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         // Ждём, пока поток загрузки DLL завершится
         println!("Waiting for DLL to load...");
-        logger::info("Ожидание загрузки DLL...");
+        let _ = logger::info("Ожидание загрузки DLL...");
         WaitForSingleObject(thread_handle, 10000); // Ждём до 10 секунд
 
         // Получаем код возврата из удалённого потока
@@ -474,10 +474,10 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
 
         if exit_code == 0 {
             println!("WARNING: DLL load may have failed");
-            logger::warning("ВНИМАНИЕ: Загрузка DLL могла завершиться неудачей");
+            let _ = logger::warning("ВНИМАНИЕ: Загрузка DLL могла завершиться неудачей");
         } else {
             println!("DLL injected successfully (handle: 0x{:X})", exit_code);
-            logger::info(&format!("DLL успешно внедрена (handle: 0x{:X})", exit_code));
+            let _ = logger::info(&format!("DLL успешно внедрена (handle: 0x{:X})", exit_code));
         }
 
         // Освобождаем память и закрываем дескрипторы
@@ -486,10 +486,10 @@ fn start_game_process(game_path: &PathBuf, dll_path: &PathBuf) -> windows::core:
         
         // Возобновляем выполнение основного потока процесса
         println!("Resuming main thread...");
-        logger::info("Возобновление основного потока...");
+        let _ = logger::info("Возобновление основного потока...");
         let resume_result = ResumeThread(process_info.hThread);
         if resume_result == u32::MAX {
-            logger::error("Не удалось возобновить основной поток");
+            let _ = logger::error("Не удалось возобновить основной поток");
             return Err(windows::core::Error::from_win32());
         }
         

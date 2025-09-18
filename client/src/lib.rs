@@ -1,19 +1,25 @@
 use windows::core::BOOL;
+use windows::Win32::Foundation::HANDLE;
+use windows::Win32::System::Console::{GetConsoleMode, GetStdHandle, SetConsoleMode, CONSOLE_MODE, ENABLE_VIRTUAL_TERMINAL_PROCESSING, STD_OUTPUT_HANDLE};
 use windows::Win32::{
     Foundation::HINSTANCE,
     System::Console::AllocConsole,
 };
 use common::logger::{self, LogLevel, LogTarget};
-use mafia2de_sdk::globals;
 
 fn dll_init() {
-    unsafe { 
-        // Создаем консоль для отображения сообщений логгера
-        match AllocConsole() {
-            Ok(_) => (),
-            Err(e) => eprintln!("Ошибка при создании консоли: {:?}", e),
+    unsafe {
+        if AllocConsole().is_ok() {
+            let handle: HANDLE = GetStdHandle(STD_OUTPUT_HANDLE).unwrap();
+            let mut mode: CONSOLE_MODE = CONSOLE_MODE(0);
+
+            if GetConsoleMode(handle, &mut mode).is_ok() {
+                let new_mode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+                let _ = SetConsoleMode(handle, new_mode);
+            }
         }
-    };
+    }
+
     
     // Инициализируем логгер
     if let Err(err) = logger::Logger::init(
@@ -29,61 +35,12 @@ fn dll_init() {
     let _ = logger::info("====================================");
     let _ = logger::info("Клиент инициализирован");
     
-    // Проверяем доступ к глобальным объектам игры
-    if globals::is_game_initialized() {
-        let _ = logger::info("Игра обнаружена, получаем экземпляр игры");
-        
-        match globals::get_game() {
-            Ok(game) => {
-                let _ = logger::info("Экземпляр игры получен успешно");
-                
-                if let Some(map_name) = game.get_map_name() {
-                    let _ = logger::info(&format!("Текущая карта: {}", map_name));
-                } else {
-                    let _ = logger::warning("Не удалось получить имя карты");
-                }
-                
-                if let Some(_resource_manager) = game.get_resource_manager() {
-                    let _ = logger::info("Получен менеджер ресурсов");
-                    
-                    // TODO: Добавить путь к игре
-                    // if let Some(game_path) = resource_manager.get_game_path() {
-                    //     let _ = logger::info(&format!("Путь к игре: {}", game_path));
-                    // } else {
-                    //     let _ = logger::warning("Не удалось получить путь к игре");
-                    // }
-                    
-                    // if let Some(steam_path) = resource_manager.get_steam_path() {
-                    //     let _ = logger::info(&format!("Путь к Steam: {}", steam_path));
-                    // }
-                } else {
-                    let _ = logger::warning("Не удалось получить менеджер ресурсов");
-                }
-                
-                if let Some(physical_processor) = game.get_physical_processor() {
-                    let _ = logger::info("Физический процессор получен");
-                    
-                    if let Some(timer_name) = physical_processor.get_timer_name() {
-                        let _ = logger::info(&format!("Имя таймера: {}", timer_name));
-                    }
-                    
-                    if let Some(locale) = physical_processor.get_locale() {
-                        let _ = logger::info(&format!("Локаль игры: {}", locale));
-                    }
-                } else {
-                    let _ = logger::warning("Не удалось получить физический процессор");
-                }
-            },
-            Err(err) => {
-                let _ = logger::error(&format!("Ошибка доступа к игре: {}", err));
-            }
-        }
-    } else {
-        let _ = logger::warning("Игра не инициализирована или не обнаружена");
-    }
-    
-    let _ = logger::info("Клиент готов к работе");
-
+    let _ = logger::trace("trace message");
+    let _ = logger::debug("debug message");
+    let _ = logger::info("info message");
+    let _ = logger::warning("warning message");
+    let _ = logger::error("error message");
+    let _ = logger::critical("critical message");
 
 }
 
