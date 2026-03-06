@@ -1,6 +1,23 @@
 [workspace]
-members = ["client", "common", "launcher", "server", "sdk"]
+members = [
+    "common",
+    "sdk",
+    "protocol",
+    "client",
+    "launcher",
+    "server",
+]
 resolver = "2"
 
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
 [workspace.dependencies]
-windows = { version = "0.61.1" }
+windows = { version = "0.62.2" }
+chrono = "0.4.44"
+
+common   = { path = "common" }
+sdk      = { path = "sdk" }
+protocol = { path = "protocol" }
