@@ -25,6 +25,8 @@ const VK_F7: i32  = 0x76;  // +$1000 (HUD)
 const VK_F8: i32  = 0x77;  // -$500  (HUD)
 const VK_F9: i32  = 0x78;  // =$9999.99 (прямая запись)
 const VK_F10: i32 = 0x79;  // баланс
+const VK_F11: i32 = 0x7A;  // Дать Thompson + 200 патронов
+const VK_F12: i32 = 0x7B;  // Дать Colt 1911 + 50 патронов
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
@@ -108,6 +110,8 @@ fn initialize() {
     logger::info("    F8  — Remove $500 (with HUD)");
     logger::info("    F9  — Set $9999.99 (memory)");
     logger::info("    F10 — Show balance");
+    logger::info("    F11 — Give Thompson + 200 ammo");
+    logger::info("    F12 — Give Colt 1911 + 50 ammo");
     logger::info("======================================");
     logger::info("  Client initialized!");
     logger::info("======================================");
@@ -143,6 +147,20 @@ fn input_loop() {
         }
         if is_key_just_pressed(VK_F10) {
             log_balance(&player);
+        }
+
+        if is_key_just_pressed(VK_F11) {
+            logger::info("Adding Thompson 1928 + 200 ammo");
+            if player.add_weapon(sdk::addresses::constants::weapons::THOMPSON_1928, 200) {
+                logger::info("  → Thompson added!");
+            }
+        }
+
+        if is_key_just_pressed(VK_F12) {
+            logger::info("Adding Colt M1911A1 + 50 ammo");
+            if player.add_weapon(sdk::addresses::constants::weapons::COLT_M1911A1, 50) {
+                logger::info("  → Colt added!");
+            }
         }
     }
 }

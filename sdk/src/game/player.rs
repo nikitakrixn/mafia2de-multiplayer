@@ -195,6 +195,64 @@ impl Player {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    //  Оружие
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Добавить оружие с патронами.
+    ///
+    /// Если оружие уже есть — добавятся только патроны.
+    /// Патроны ограничиваются максимумом из weapons.tbl.
+    ///
+    /// ```ignore
+    /// use sdk::addresses::constants::weapons;
+    /// player.add_weapon(weapons::THOMPSON_1928, 200);
+    /// ```
+    pub fn add_weapon(&self, weapon_id: u32, ammo: u32) -> bool {
+        let Some(inv) = self.inventory_ptr() else {
+            logger::error("add_weapon: inventory NULL");
+            return false;
+        };
+
+        type AddWeaponFn = unsafe extern "C" fn(usize, u32, i32) -> u8;
+        let func: AddWeaponFn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player::INVENTORY_ADD_WEAPON_CORE)
+        };
+
+        logger::debug(&format!(
+            "M2DE_Inventory_AddWeapon_Core(0x{:X}, weapon={}, ammo={})",
+            inv, weapon_id, ammo,
+        ));
+
+        let result = unsafe { func(inv, weapon_id, ammo as i32) };
+        if result != 0 {
+            logger::debug("  → weapon added/ammo updated");
+            true
+        } else {
+            logger::warn("  → add_weapon returned 0 (slots full or invalid ID)");
+            false
+        }
+    }
+
+    /// Добавить только патроны (без оружия).
+    ///
+    /// Патроны попадают в slot[4]. Если оружия нет — не упадёт,
+    /// но патроны будут "висеть" до получения оружия.
+    pub fn add_ammo(&self, weapon_id: u32, ammo: u32) -> bool {
+        let Some(inv) = self.inventory_ptr() else {
+            logger::error("add_ammo: inventory NULL");
+            return false;
+        };
+
+        type AddAmmoFn = unsafe extern "C" fn(usize, u32, u32);
+        let func: AddAmmoFn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player::INVENTORY_ADD_AMMO)
+        };
+
+        unsafe { func(inv, weapon_id, ammo) };
+        true
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     //  Внутренние хелперы
     // ═══════════════════════════════════════════════════════════════════
 

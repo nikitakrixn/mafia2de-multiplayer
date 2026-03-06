@@ -111,6 +111,35 @@ pub mod player {
     pub const GET_MONEY: usize = 0x10C_96B0;
     #[deprecated = "Use INVENTORY_ADD_MONEY_NOTIFY from game thread"]
     pub const ADD_MONEY: usize = 0x10C_9520;
+
+    // ── Weapon — inventory-level ────────────────────────────────────
+
+    /// `char(Inventory*, u32 weapon_id, i32 ammo)` — добавить оружие.
+    ///
+    /// Логика:
+    /// - Если оружие уже есть → добавляет только патроны
+    /// - Если нового типа → создаёт WeaponItem, пробует slot[2] и slot[3]
+    /// - Патроны капаются на max из tables/weapons.tbl
+    ///
+    /// Строка: `"C_HumanInventory::AddWeapon(int, int)"`
+    ///
+    /// IDA: `0x140D7EF30`
+    pub const INVENTORY_ADD_WEAPON_CORE: usize = 0xD7_EF30;
+
+    /// `void(Inventory*, u32 weapon_id, u32 ammo)` — добавить патроны.
+    ///
+    /// Оперирует на slot[4] (ammo slot).
+    /// Строка: `"C_HumanInventory::AddAmmo()"`
+    ///
+    /// IDA: `0x140D7D590`
+    pub const INVENTORY_ADD_AMMO: usize = 0xD7_D590;
+
+    /// Проверяет, ограничено ли оружие для игрока.
+    ///
+    /// `bool(u32 weapon_id)` — true = нельзя добавить в главе.
+    ///
+    /// IDA: `0x1410C9FD0`
+    pub const IS_WEAPON_RESTRICTED: usize = 0x10C_9FD0;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

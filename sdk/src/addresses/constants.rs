@@ -30,6 +30,11 @@ pub mod weapons {
 
 /// Индексы слотов инвентаря.
 pub mod slots {
+    /// Слоты оружия (weapon item попадает в один из них).
+    pub const WEAPON_1: usize = 2;
+    pub const WEAPON_2: usize = 3;
+    /// Слот боеприпасов (отдельно от оружия).
+    pub const AMMO: usize = 4;
     /// Слот с деньгами.
     pub const MONEY: usize = 5;
 }
