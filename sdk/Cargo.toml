@@ -1,14 +1,13 @@
 [package]
-name = "mafia2de_sdk"
-version = "0.1.0"
-edition = "2024"
-description = "SDK для Mafia II Definitive Edition"
+name = "sdk"
+version.workspace = true
+edition.workspace = true
+description = "Game SDK for Mafia II: Definitive Edition — memory tools, patterns, addresses"
 
 [dependencies]
 windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_System_LibraryLoader",
-    "Win32_System_SystemServices",
-    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Memory",
 ]}
-common = { path = "../common" }
+common = { workspace = true }

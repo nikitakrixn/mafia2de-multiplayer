@@ -1,19 +1,17 @@
 [package]
 name = "client"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [lib]
-name = "m2de_network"
+name = "m2mp_client"
 crate-type = ["cdylib"]
 
 [dependencies]
-windows =  { workspace = true, features = [
+windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_System_Console",
-    "Win32_System_LibraryLoader",
-    "Win32_System_SystemServices",
-    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
 ]}
-common = { path = "../common" }
-mafia2de_sdk = { path = "../sdk" }
+common = { workspace = true }
+sdk    = { workspace = true }
