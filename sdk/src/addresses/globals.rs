@@ -64,3 +64,26 @@ pub const DEFAULT_VEHICLE_TRANSFORM: usize = 0x1CB_C0D0;
 ///
 /// IDA: `0x141CA52B8`
 pub const RESOURCE_LOADER: usize = 0x1CA_52B8;
+
+/// HUD Manager (управление отображением денег, иконок).
+///
+/// IDA: `qword_143138FA8`
+/// Доступ: `sub_140D01600()` возвращает этот глобал.
+///
+/// `+0x98` → Money display component (для popup)
+pub const HUD_MANAGER: usize = 0x313_8FA8;
+
+/// Notify Manager (система нотификаций).
+///
+/// IDA: `qword_141CABBE0`
+pub const NOTIFY_MANAGER: usize = 0x1CA_BBE0;
+
+/// Stats Tracker 1 (отслеживание доходов).
+///
+/// IDA: `qword_1431464A0`
+pub const STATS_TRACKER_1: usize = 0x314_64A0;
+
+/// Stats Tracker 2 (отслеживание расходов).
+///
+/// IDA: `qword_143140BD0`
+pub const STATS_TRACKER_2: usize = 0x314_0BD0;

@@ -142,6 +142,32 @@ pub mod player {
     pub const IS_WEAPON_RESTRICTED: usize = 0x10C_9FD0;
 }
 
+pub mod player_control {
+    /// `bool(PlayerControlRef*)`
+    /// IDA: `0x140D809C0`
+    pub const IS_LOCKED: usize = 0xD8_09C0;
+
+    /// `bool(PlayerControlRef*, u8 locked, u8 play_anim_flag)`
+    /// IDA: `0x140DB1B40`
+    pub const SET_LOCKED: usize = 0xDB_1B40;
+
+    /// `const char*(PlayerControlRef*)`
+    /// IDA: `0x140DCCEB0`
+    pub const GET_STYLE_STR: usize = 0xDC_CEB0;
+
+    /// `bool(PlayerControlRef*, const char* style)`
+    /// IDA: `0x140DCD0B0`
+    pub const SET_STYLE_STR: usize = 0xDC_D0B0;
+
+    /// `bool(PlayerControlRef*, u32 style_id)`
+    /// IDA: `0x140DCD0D0`
+    pub const SET_FIGHT_CONTROL_STYLE: usize = 0xDC_D0D0;
+
+    /// `bool(PlayerControlRef*, u8 enabled, u32 hint_id)`
+    /// IDA: `0x140DCD0F0`
+    pub const SET_FIGHT_HINT: usize = 0xDC_D0F0;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  Garage
 // ═══════════════════════════════════════════════════════════════════════════
@@ -222,15 +248,47 @@ pub mod managers {
 // ═══════════════════════════════════════════════════════════════════════════
 
 pub mod hud {
-    /// Показать уведомление о деньгах (± $).
+    /// Показать popup "± $ X.XX" на экране.
     ///
-    /// IDA: `0x140D_45B50` (`M2DE_HUD_ShowMoneyNotification`)
-    pub const SHOW_MONEY_NOTIFICATION: usize = 0xD4_5B50;
+    /// `void(HudMoneyComponent*, i64 cents, char flag)`
+    /// IDA: `0x140D45B50`
+    pub const SHOW_MONEY_POPUP: usize = 0xD4_5B50;
 
-    /// Загрузить иконку HUD.
+    /// Обновить счётчик денег в HUD + вызвать popup.
     ///
-    /// IDA: `0x140A_76940` (`M2DE_HUD_LoadIcon`)
+    /// `i64(HudMoneyDisplay*, i64 cents_delta, i64 unused)`
+    /// Popup показывается только если `*(component + 0x5C) <= 0.0`
+    ///
+    /// IDA: `0x140D23600`
+    pub const UPDATE_MONEY_COUNTER: usize = 0xD2_3600;
+
+    /// Загрузить иконку HUD (также используется как FNV-1a хеш).
+    ///
+    /// IDA: `0x140A76940`
     pub const LOAD_ICON: usize = 0xA7_6940;
+}
+
+pub mod entity {
+    /// Получить текущую мировую позицию entity.
+    ///
+    /// Сигнатура:
+    /// `Vec3* (Entity* entity, Vec3* out)`
+    ///
+    /// Что делает функция:
+    /// - если у entity есть physics/provider по `entity + 0x258`,
+    ///   вызывает его virtual method (`vtable + 0xA8`) и пишет позицию в `out`
+    /// - иначе использует fallback через frame/transform node:
+    ///   `entity + 0x78` → frame
+    ///   - `frame + 0x64` = x
+    ///   - `frame + 0x74` = y
+    ///   - `frame + 0x84` = z
+    ///
+    /// Важно:
+    /// это именно getter текущего состояния.
+    /// Функция не "двигает" entity и не участвует в tick update.
+    ///
+    /// IDA: `0x140DA7630`
+    pub const GET_POS: usize = 0xDA_7630;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

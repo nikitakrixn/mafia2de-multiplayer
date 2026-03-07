@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+use std::ffi::{CStr, CString};
 
 use common::logger;
 use crate::addresses;
@@ -10,6 +11,21 @@ use super::base;
 #[derive(Debug, Clone, Copy)]
 pub struct Player {
     ptr: usize, // C_Human*
+}
+
+/// 3D позиция в игровом мире.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Vec3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+impl std::fmt::Display for Vec3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:.2}, {:.2}, {:.2})", self.x, self.y, self.z)
+    }
 }
 
 unsafe impl Send for Player {}
@@ -140,58 +156,155 @@ impl Player {
     //  Деньги — через игровые функции (с HUD уведомлением)
     // ═══════════════════════════════════════════════════════════════════
 
-    /// Добавить деньги с HUD уведомлением (зелёный/красный popup).
+    /// Добавить деньги через игровую функцию (тихо, без HUD).
     ///
-    /// Вызывает `M2DE_Inventory_AddMoneyNotify` напрямую.
-    /// Перед вызовом проверяет что inventory и parent_ref валидны.
-    ///
-    /// Возвращает `false` если структуры не инициализированы.
-    pub fn add_money_with_hud(&self, cents: i64) -> bool {
+    /// Использует `M2DE_Inventory_ModifyMoney(inv, cents, do_apply=1)`.
+    /// Гарантировано добавляет деньги если inventory валиден.
+    pub fn add_money_game(&self, cents: i64) -> bool {
         let Some(inv) = self.inventory_ptr() else {
-            logger::error("add_money_with_hud: inventory NULL");
+            logger::error("add_money_game: inventory NULL");
             return false;
         };
 
-        // Проверяем parent_ref — функция читает [inv+0x170]
-        // и проверяет byte [parent+0x24] == 16
+        type ModifyMoneyFn = unsafe extern "C" fn(usize, i64, u8) -> u8;
+        let func: ModifyMoneyFn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY)
+        };
+
+        unsafe { func(inv, cents, 1) };
+        true
+    }
+
+    /// Показать HUD popup о деньгах (± $X.XX).
+    ///
+    /// **Не добавляет деньги** — только визуальный эффект.
+    /// Обходит проверку entity type через прямой доступ к g_HUDManager.
+    ///
+    /// Безопасно вызывать если HUD не инициализирован — просто ничего не произойдёт.
+    fn show_money_notification(&self, cents: i64) {
         unsafe {
-            let parent = match memory::read_ptr(inv + fields::inventory::PARENT_REF) {
+            // g_HUDManager → +0x98 → money display component
+            let hud_mgr = match memory::read_ptr(
+                base() + addresses::globals::HUD_MANAGER
+            ) {
                 Some(p) => p,
                 None => {
-                    logger::warn("add_money_with_hud: parent_ref NULL, fallback to direct write");
-                    return self.add_money(cents).is_some();
+                    logger::debug("show_money_notification: HUD manager not initialized");
+                    return;
                 }
             };
 
-            // Проверяем тип (должен быть 16 для player inventory)
-            let inv_type = memory::read_value::<u8>(parent + 0x24).unwrap_or(0);
-            if inv_type != 16 {
-                logger::warn(&format!(
-                    "add_money_with_hud: inv_type={} (need 16), fallback to direct write",
-                    inv_type
-                ));
-                return self.add_money(cents).is_some();
-            }
+            let money_display = match memory::read_ptr(
+                hud_mgr + addresses::fields::hud_manager::MONEY_DISPLAY
+            ) {
+                Some(p) => p,
+                None => {
+                    logger::debug("show_money_notification: money display component NULL");
+                    return;
+                }
+            };
 
-            // Всё валидно — вызываем игровую функцию
-            type AddMoneyNotifyFn = unsafe extern "C" fn(usize, i64) -> u8;
-            let func: AddMoneyNotifyFn = std::mem::transmute(
-                base() + addresses::functions::player::INVENTORY_ADD_MONEY_NOTIFY
+            std::ptr::write((money_display + addresses::fields::hud_money_display::ANIM_TIMER) as *mut f32, 0.0f32);
+
+            type UpdateFn = unsafe extern "C" fn(usize, i64, i64) -> i64;
+            let update: UpdateFn = std::mem::transmute(
+                base() + addresses::functions::hud::UPDATE_MONEY_COUNTER
             );
 
-            logger::debug(&format!(
-                "Calling M2DE_Inventory_AddMoneyNotify(0x{:X}, {})",
-                inv, cents
-            ));
-
-            func(inv, cents);
-            true
+            update(money_display, cents, 0);
         }
+    }
+
+    /// Добавить деньги + показать HUD уведомление (зелёный/красный popup).
+    ///
+    /// Двухэтапный процесс:
+    /// 1. Добавляет деньги через игровую функцию (гарантировано)
+    /// 2. Показывает HUD popup через g_HUDManager (обходит проверку type==16)
+    pub fn add_money_with_hud(&self, cents: i64) -> bool {
+        // 1. Добавить деньги
+        if !self.add_money_game(cents) {
+            return false;
+        }
+
+        // 2. Показать HUD popup
+        self.show_money_notification(cents);
+
+        true
     }
 
     /// Добавить деньги с HUD (в долларах).
     pub fn add_money_dollars_with_hud(&self, dollars: i32) -> bool {
         self.add_money_with_hud(dollars as i64 * 100)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Позиция
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Получить текущую мировую позицию игрока через игровую функцию.
+    ///
+    /// Это основной и самый надёжный способ чтения позиции.
+    ///
+    /// Внутри игра делает так:
+    /// - сначала пробует physics/provider по `C_Human + 0x258`
+    /// - если его нет, берёт позицию из frame node по `C_Human + 0x78`
+    ///
+    /// Таким образом мы повторяем "официальный" путь самой игры,
+    /// а не читаем координаты наугад из памяти.
+    ///
+    /// Подтверждено:
+    /// - IDA: `sub_140DA7630`
+    /// - runtime проверкой против Lua `GetPos()`
+    pub fn get_position(&self) -> Option<Vec3> {
+        unsafe {
+            let mut out = Vec3::default();
+
+            type GetPosFn = unsafe extern "C" fn(usize, *mut Vec3) -> *mut Vec3;
+            let func: GetPosFn =
+                std::mem::transmute(base() + addresses::functions::entity::GET_POS);
+
+            let ret = func(self.ptr, &mut out as *mut Vec3);
+            if ret.is_null() {
+                return None;
+            }
+
+            if out.x.is_finite() && out.y.is_finite() && out.z.is_finite() {
+                Some(out)
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Получить позицию напрямую из frame/transform node.
+    ///
+    /// Это fallback/debug-метод.
+    /// Он полезен для сверки реверса и диагностики, потому что
+    /// `M2DE_Entity_GetPos` в своём fallback-path читает те же поля:
+    ///
+    /// - `frame + 0x64` = x
+    /// - `frame + 0x74` = y
+    /// - `frame + 0x84` = z
+    ///
+    /// В отличие от `get_position()`, этот метод обходит physics/provider
+    /// и читает только transform-node.
+    pub fn get_position_from_frame(&self) -> Option<Vec3> {
+        unsafe {
+            let frame = memory::read_ptr_raw(self.ptr + fields::player::FRAME_NODE)?;
+            if frame == 0 || !memory::is_valid_ptr(frame) {
+                return None;
+            }
+
+            let x = memory::read_value::<f32>(frame + fields::entity_frame::POS_X)?;
+            let y = memory::read_value::<f32>(frame + fields::entity_frame::POS_Y)?;
+            let z = memory::read_value::<f32>(frame + fields::entity_frame::POS_Z)?;
+
+            if x.is_finite() && y.is_finite() && z.is_finite() {
+                Some(Vec3 { x, y, z })
+            } else {
+                None
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -252,6 +365,90 @@ impl Player {
         true
     }
 
+     pub fn control_component_ptr(&self) -> Option<usize> {
+        unsafe { memory::read_ptr(self.ptr + fields::player::CONTROL_COMPONENT) }
+    }
+    
+    // ══════════════════════════════════════════════════════════════════
+    //  Контроль игрока (стиль управления, блокировка и т.д.)
+    // ══════════════════════════════════════════════════════════════════
+
+    pub fn are_controls_locked(&self) -> Option<bool> {
+        let control = self.control_component_ptr()?;
+
+        type Fn = unsafe extern "C" fn(usize) -> i64;
+        let func: Fn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player_control::IS_LOCKED)
+        };
+
+        Some(unsafe { func(control) != 0 })
+    }
+
+    pub fn lock_controls(&self, locked: bool) -> bool {
+        let Some(control) = self.control_component_ptr() else {
+            logger::error("lock_controls: control component is NULL");
+            return false;
+        };
+
+        type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
+        let func: Fn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player_control::SET_LOCKED)
+        };
+
+        unsafe { func(control, locked as u8, 0) };
+        true
+    }
+
+    pub fn lock_controls_to_play_anim(&self) -> bool {
+        let Some(control) = self.control_component_ptr() else {
+            logger::error("lock_controls_to_play_anim: control component is NULL");
+            return false;
+        };
+
+        type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
+        let func: Fn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player_control::SET_LOCKED)
+        };
+
+        unsafe { func(control, 1, 1) };
+        true
+    }
+
+    pub fn get_control_style_str(&self) -> Option<String> {
+        let control = self.control_component_ptr()?;
+
+        type Fn = unsafe extern "C" fn(usize) -> *const i8;
+        let func: Fn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player_control::GET_STYLE_STR)
+        };
+
+        let ptr = unsafe { func(control) };
+        if ptr.is_null() {
+            return None;
+        }
+
+        Some(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned())
+    }
+
+    pub fn set_control_style_str(&self, style: &str) -> bool {
+        let Some(control) = self.control_component_ptr() else {
+            logger::error("set_control_style_str: control component is NULL");
+            return false;
+        };
+
+        let Ok(c_style) = CString::new(style) else {
+            logger::error("set_control_style_str: style contains interior NUL");
+            return false;
+        };
+
+        type Fn = unsafe extern "C" fn(usize, *const i8) -> i64;
+        let func: Fn = unsafe {
+            std::mem::transmute(base() + addresses::functions::player_control::SET_STYLE_STR)
+        };
+
+        unsafe { func(control, c_style.as_ptr()) != 0 }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  Внутренние хелперы
     // ═══════════════════════════════════════════════════════════════════
@@ -300,7 +497,7 @@ impl Player {
                         logger::debug(&format!("  Slots: {count}"));
                     }
                     // Parent ref (нужен для HUD)
-                    match memory::read_ptr(inv + fields::inventory::PARENT_REF) {
+                    match memory::read_ptr(inv + fields::inventory::OWNER_ENTITY_REF) {
                         Some(pr) => {
                             let ptype = memory::read_value::<u8>(pr + 0x24).unwrap_or(0);
                             logger::debug(&format!("  Parent ref: 0x{pr:X} (type={ptype})"));
