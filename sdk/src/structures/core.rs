@@ -1,4 +1,4 @@
-use super::Player;
+use super::CHuman;
 
 /// Глобальный менеджер игры.
 ///
@@ -6,7 +6,7 @@ use super::Player;
 #[repr(C)]
 pub struct GameManager {
     _pad: [u8; 0x180],
-    pub active_player: *mut Player,
+    pub active_player: *mut CHuman,
 }
 
 const _: () = {

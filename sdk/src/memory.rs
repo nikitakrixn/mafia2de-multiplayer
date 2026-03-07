@@ -51,7 +51,7 @@ const MAX_VALID_ADDR: usize = 0x7FFF_FFFF_FFFF;
 
 /// Проверяет, выглядит ли адрес как валидный user-mode указатель.
 pub fn is_valid_ptr(addr: usize) -> bool {
-    (MIN_VALID_ADDR..=MAX_VALID_ADDR).contains(&addr) && addr.is_multiple_of(4)
+    (MIN_VALID_ADDR..=MAX_VALID_ADDR).contains(&addr) && addr.is_multiple_of(8)
 }
 
 /// Безопасно читает указатель. Проверяет и адрес, и результат.

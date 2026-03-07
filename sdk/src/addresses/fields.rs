@@ -7,10 +7,23 @@ pub mod game_manager {
 
 pub mod player {
     /// `+0xE8` → `Inventory*`
-    ///
-    /// IDA: `a1[2] + 232` где `a1[2]` = entity ptr
-    /// 232 decimal = 0xE8 hex
     pub const INVENTORY: usize = 0xE8;
+
+    /// `+0xF0` → `PlayerControl*` / control component
+    pub const CONTROL_COMPONENT: usize = 0xF0;
+
+    /// `+0x78` → Frame/transform node pointer
+    ///
+    /// Contains 4x4 transformation matrix.
+    /// Position: frame+0x64 (X), frame+0x74 (Y), frame+0x84 (Z)
+    ///
+    /// IDA: `0x140DA7630` fallback path reads `[rcx+0x78]`
+    pub const FRAME_NODE: usize = 0x78;
+
+    /// `+0x258` → Physics body handler (optional, may be NULL)
+    ///
+    /// When present, position is read via vtable[0xA8] instead of frame node.
+    pub const PHYSICS_HANDLER: usize = 0x258;
 }
 
 pub mod inventory {
@@ -19,9 +32,12 @@ pub mod inventory {
     pub const SLOTS_END: usize = 0x58;
     pub const WEAPONS: usize = 0xE8;
     
-    /// `+0x170` → parent/manager ref (проверяется для HUD: type==16)
-    /// IDA: `M2DE_Inventory_AddMoneyNotify` читает `[inv+0x170]`
-    pub const PARENT_REF: usize = 0x170;
+    /// `+0x170` → back-pointer на entity-владельца (C_Human* для игрока)
+    ///
+    /// Проверка `*(parent + 0x24) == 16` в игре определяет
+    /// показывать ли HUD popup. Для player это значение = 0,
+    /// поэтому HUD вызывается через g_HUDManager напрямую.
+    pub const OWNER_ENTITY_REF: usize = 0x170;
 }
 
 pub mod money_item {
@@ -94,6 +110,36 @@ pub mod money_container {
     ///
     /// AOB: `48 8B 41 10 48 8B 40 10 C3`
     pub const VALUE: usize = 0x10;
+}
+
+pub mod hud_manager {
+    /// `+0x98` → Money display component (HudMoneyDisplay*)
+    pub const MONEY_DISPLAY: usize = 0x98;
+}
+
+pub mod hud_money_display {
+    /// `+0x48` → displayed/animated value (i64)
+    pub const ANIMATED_VALUE: usize = 0x48;
+    /// `+0x50` → actual target value (i64)
+    pub const TARGET_VALUE: usize = 0x50;
+    /// `+0x5C` → animation timer (f32, popup shows only when <= 0)
+    pub const ANIM_TIMER: usize = 0x5C;
+    /// `+0x78` → popup enabled flag (bool)
+    pub const POPUP_ENABLED: usize = 0x78;
+}
+
+pub mod entity_frame {
+    /// `+0x64` → Position X (f32)
+    ///
+    /// Part of 4x4 transform matrix starting at +0x58.
+    /// Position is in the last column of each row (stride 0x10).
+    ///
+    /// IDA: `0x140DA7630` reads `[frame+0x64]`, `[frame+0x74]`, `[frame+0x84]`
+    pub const POS_X: usize = 0x64;
+    /// `+0x74` → Position Y (f32)
+    pub const POS_Y: usize = 0x74;
+    /// `+0x84` → Position Z (f32)
+    pub const POS_Z: usize = 0x84;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -19,6 +19,10 @@ const MONITOR_INTERVAL: u64 = 5;
 const INPUT_POLL_MS: u64 = 100;
 
 // Клавиши
+const VK_F1: i32  = 0x70;  // Lock controls
+const VK_F2: i32  = 0x71;  // Unlock controls
+const VK_F3: i32  = 0x72;  // Check lock state + position
+const VK_F4: i32  = 0x73;  // Teleport need
 const VK_F5: i32  = 0x74;  // +$100  (HUD)
 const VK_F6: i32  = 0x75;  // +$500  (HUD)
 const VK_F7: i32  = 0x76;  // +$1000 (HUD)
@@ -104,6 +108,10 @@ fn initialize() {
 
     logger::info("======================================");
     logger::info("  Keybinds:");
+    logger::info("    F1  — Lock controls");
+    logger::info("    F2  — Unlock controls");
+    logger::info("    F3  — Status (controls + position)");
+    logger::info("    F4  — Teleport to need");
     logger::info("    F5  — Add $100  (with HUD)");
     logger::info("    F6  — Add $500  (with HUD)");
     logger::info("    F7  — Add $1000 (with HUD)");
@@ -127,6 +135,45 @@ fn input_loop() {
         std::thread::sleep(Duration::from_millis(INPUT_POLL_MS));
 
         let Some(player) = Player::get_active() else { continue };
+
+        if is_key_just_pressed(VK_F1) {
+            logger::info("Locking controls...");
+            if player.lock_controls(true) {
+                logger::info("  → Controls LOCKED");
+            } else {
+                logger::error("  → Failed to lock");
+            }
+        }
+
+        if is_key_just_pressed(VK_F2) {
+            logger::info("Unlocking controls...");
+            if player.lock_controls(false) {
+                logger::info("  → Controls UNLOCKED");
+            } else {
+                logger::error("  → Failed to unlock");
+            }
+        }
+
+        if is_key_just_pressed(VK_F3) {
+            match player.are_controls_locked() {
+                Some(locked) => logger::info(&format!("Controls locked: {locked}")),
+                None => logger::error("Failed to read control state"),
+            }
+
+            match player.get_control_style_str() {
+                Some(style) => logger::info(&format!("Control style: \"{style}\"")),
+                None => logger::error("Control style: unavailable"),
+            }
+
+            match player.get_position() {
+                Some(pos) => logger::info(&format!("Position: {pos}")),
+                None => logger::error("Position: unavailable"),
+            }
+        }
+
+        if is_key_just_pressed(VK_F4) {
+            logger::info("Teleport is not implemented yet");
+        }
 
         if is_key_just_pressed(VK_F5) {
             do_add_money(&player, 100);
