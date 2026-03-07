@@ -289,6 +289,29 @@ pub mod entity {
     ///
     /// IDA: `0x140DA7630`
     pub const GET_POS: usize = 0xDA_7630;
+
+    /// `void(Entity*, const Vec3*)` — установить мировую позицию entity.
+    ///
+    /// Это high-level setter движка:
+    /// - пишет позицию в frame node
+    /// - синкает physics (`entity + 0x258`) если есть
+    /// - обновляет вспомогательные transform/cache структуры
+    /// - выставляет dirty/invalid flags
+    ///
+    /// Цепочка подтверждения:
+    /// `Lua SetPos -> wrapper thunk -> wrapper impl (0x1410ADC60)
+    ///  -> entity vtable +0x100 -> thunk 0x1400C9950 -> this function`
+    ///
+    /// IDA: `0x140DD1000`
+    pub const SET_POS: usize = 0xDD_1000;
+
+    /// Низкоуровневая запись позиции только в frame/transform node.
+    ///
+    /// Обычно напрямую вызывать не нужно.
+    /// Для SDK предпочтителен `SET_POS`, так как он обновляет и другие подсистемы.
+    ///
+    /// IDA: `0x1403B9660`
+    pub const SET_POS_RAW: usize = 0x3B_9660;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
