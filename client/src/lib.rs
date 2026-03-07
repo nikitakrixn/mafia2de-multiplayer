@@ -172,7 +172,19 @@ fn input_loop() {
         }
 
         if is_key_just_pressed(VK_F4) {
-            logger::info("Teleport is not implemented yet");
+            match player.get_position() {
+                Some(mut pos) => {
+                    logger::info(&format!("Current position: {pos}"));
+                    pos.z += 10.0;
+
+                    if player.set_position(&pos) {
+                        logger::info(&format!("Teleported to: {pos}"));
+                    } else {
+                        logger::error("Teleport failed");
+                    }
+                }
+                None => logger::error("Position unavailable"),
+            }
         }
 
         if is_key_just_pressed(VK_F5) {

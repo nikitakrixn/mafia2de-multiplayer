@@ -276,18 +276,18 @@ impl Player {
         }
     }
 
-    /// Получить позицию напрямую из frame/transform node.
+    /// Прямое чтение позиции из frame/transform node.
     ///
-    /// Это fallback/debug-метод.
-    /// Он полезен для сверки реверса и диагностики, потому что
-    /// `M2DE_Entity_GetPos` в своём fallback-path читает те же поля:
+    /// Это debug/fallback-метод.
+    /// Он полезен для сверки реверса, потому что `M2DE_Entity_GetPos`
+    /// в fallback-path читает те же поля:
     ///
     /// - `frame + 0x64` = x
     /// - `frame + 0x74` = y
     /// - `frame + 0x84` = z
     ///
-    /// В отличие от `get_position()`, этот метод обходит physics/provider
-    /// и читает только transform-node.
+    /// По факту это и есть реальные world coordinates, что было подтверждено
+    /// сравнением с Lua `GetPos()`.
     pub fn get_position_from_frame(&self) -> Option<Vec3> {
         unsafe {
             let frame = memory::read_ptr_raw(self.ptr + fields::player::FRAME_NODE)?;
@@ -304,6 +304,32 @@ impl Player {
             } else {
                 None
             }
+        }
+    }
+
+    /// Установить мировую позицию игрока через штатный engine-level setter.
+    ///
+    /// Почему так, а не прямой записью в память:
+    /// игра хранит позицию не только в одном месте. Помимо frame node,
+    /// при перемещении обновляются physics и внутренние dirty/cached state.
+    ///
+    /// Поэтому используется `M2DE_Entity_SetPos`, который делает полный
+    /// корректный путь обновления движка.
+    ///
+    /// Возвращает `false`, если переданы некорректные координаты.
+    pub fn set_position(&self, pos: &Vec3) -> bool {
+        if !pos.x.is_finite() || !pos.y.is_finite() || !pos.z.is_finite() {
+            logger::error("set_position: non-finite coordinate");
+            return false;
+        }
+
+        unsafe {
+            type SetPosFn = unsafe extern "C" fn(usize, *const Vec3);
+            let func: SetPosFn =
+                std::mem::transmute(base() + addresses::functions::entity::SET_POS);
+
+            func(self.ptr, pos as *const Vec3);
+            true
         }
     }
 
