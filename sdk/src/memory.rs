@@ -164,7 +164,18 @@ pub unsafe fn write_value<T: Copy>(addr: usize, value: T) -> bool {
     true
 }
 
+/// Преобразует абсолютный адрес функции в typed function pointer.
+///
+/// Использовать только для адресов кода, например:
+/// `unsafe extern "C" fn(...) -> ...`.
+///
+/// # Safety
+///
+/// Вызывающий обязан гарантировать, что:
+/// - `addr` указывает на корректную функцию
+/// - сигнатура `T` точно соответствует реальной calling convention и параметрам
 pub unsafe fn fn_at<T: Copy>(addr: usize) -> T {
+    debug_assert!(is_valid_ptr(addr), "fn_at: invalid function address 0x{addr:X}");
     let ptr = addr as *const ();
     unsafe { std::mem::transmute_copy(&ptr) }
 }

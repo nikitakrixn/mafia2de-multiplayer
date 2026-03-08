@@ -51,7 +51,7 @@ fn lua_loadstring() -> LuaLoadStringFn {
 }
 
 fn lua_pcall() -> LuaPcallFn {
-    unsafe { std::mem::transmute(base() + addresses::functions::lua::PCALL) }
+    unsafe { crate::memory::fn_at(base() + addresses::functions::lua::PCALL) }
 }
 
 fn lua_tolstring() -> LuaTolStringFn {
