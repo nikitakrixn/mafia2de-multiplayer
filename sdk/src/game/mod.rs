@@ -1,5 +1,6 @@
 //! Высокоуровневый API для работы с игрой.
 
+pub mod callbacks;
 pub mod player;
 pub mod lua;
 

@@ -168,7 +168,7 @@ impl Player {
 
         type ModifyMoneyFn = unsafe extern "C" fn(usize, i64, u8) -> u8;
         let func: ModifyMoneyFn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY)
+            crate::memory::fn_at(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY)
         };
 
         unsafe { func(inv, cents, 1) };

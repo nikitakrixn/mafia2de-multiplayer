@@ -1,0 +1,124 @@
+//! Main-thread service loop клиента.
+//!
+//! Вызывается из detour на `Game Tick Always`.
+//! Здесь безопасно выполнять то, что должно жить на главном игровом потоке:
+//! - drain очереди Lua
+//! - refresh state fallback
+//! - PlayerTracker
+
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Instant;
+
+use common::logger;
+use sdk::game::lua;
+
+use crate::lua_queue::{self, QueuedLuaCommand};
+
+const MAX_LUA_PER_TICK: usize = 8;
+const STATE_REFRESH_INTERVAL_MS: u64 = 250;
+
+static IN_DRAIN: AtomicBool = AtomicBool::new(false);
+static LAST_STATE_REFRESH_MS: AtomicU64 = AtomicU64::new(0);
+static START_TIME: OnceLock<Instant> = OnceLock::new();
+
+fn uptime_ms() -> u64 {
+    START_TIME
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis() as u64
+}
+
+struct ReentrancyGuard;
+
+impl Drop for ReentrancyGuard {
+    fn drop(&mut self) {
+        IN_DRAIN.store(false, Ordering::Release);
+    }
+}
+
+enum ExecResult {
+    Ok,
+    NotReady(QueuedLuaCommand),
+    Failed,
+}
+
+/// Главная точка обслуживания main-thread логики клиента.
+///
+/// Сейчас делает три вещи:
+/// - исполняет queued Lua команды
+/// - обновляет lifecycle state polling fallback
+/// - обновляет PlayerTracker
+pub fn on_main_thread_tick() {
+    drain_lua_queue(MAX_LUA_PER_TICK);
+    refresh_state_if_needed();
+    crate::player_tracker::update_main_thread();
+}
+
+fn refresh_state_if_needed() {
+    let now = uptime_ms();
+    let last = LAST_STATE_REFRESH_MS.load(Ordering::Acquire);
+
+    if now.saturating_sub(last) < STATE_REFRESH_INTERVAL_MS {
+        return;
+    }
+
+    LAST_STATE_REFRESH_MS.store(now, Ordering::Release);
+    let _ = crate::state::refresh_from_runtime();
+}
+
+pub fn drain_lua_queue(max_per_tick: usize) -> usize {
+    if max_per_tick == 0 {
+        return 0;
+    }
+
+    if IN_DRAIN.swap(true, Ordering::AcqRel) {
+        return 0;
+    }
+
+    let _guard = ReentrancyGuard;
+    let mut processed = 0usize;
+
+    for _ in 0..max_per_tick {
+        let Some(cmd) = lua_queue::pop_front() else {
+            break;
+        };
+
+        match exec_one(cmd) {
+            ExecResult::Ok => processed += 1,
+            ExecResult::NotReady(cmd) => {
+                lua_queue::push_front(cmd);
+                break;
+            }
+            ExecResult::Failed => processed += 1,
+        }
+    }
+
+    if processed != 0 {
+        logger::debug(&format!(
+            "[main-thread] processed {processed} queued Lua command(s)"
+        ));
+    }
+
+    processed
+}
+
+fn exec_one(cmd: QueuedLuaCommand) -> ExecResult {
+    match lua::exec_named(&cmd.code, &cmd.chunk_name) {
+        Ok(()) => {
+            logger::info(&format!("[lua-main] ok: {}", cmd.chunk_name));
+            ExecResult::Ok
+        }
+        Err(err) => {
+            if err.contains("Lua VM not ready") {
+                ExecResult::NotReady(cmd)
+            } else {
+                logger::error(&format!(
+                    "[lua-main] failed: {} -> {}",
+                    cmd.chunk_name, err
+                ));
+                ExecResult::Failed
+            }
+        }
+    }
+}
