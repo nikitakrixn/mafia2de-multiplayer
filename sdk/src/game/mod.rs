@@ -1,6 +1,7 @@
 //! Высокоуровневый API для работы с игрой.
 
 pub mod player;
+pub mod lua;
 
 pub use player::Player;
 

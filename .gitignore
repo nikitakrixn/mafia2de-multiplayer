@@ -17,6 +17,9 @@ Thumbs.db
 # Logs
 logs/
 
+# Docs
+docs/
+
 # Build artifacts
 *.dll
 *.exe

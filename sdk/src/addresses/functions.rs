@@ -422,3 +422,56 @@ pub mod garage_manager_methods {
     /// IDA: `0x1410_272D0`
     pub const METHOD1: usize = 0x102_72D0;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Raw Lua API (Mafia II: DE Lua 5.1.2, modified)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod lua {
+    /// `int(lua_State* L, const char* buff, size_t sz, const char* name, int extra)`
+    ///
+    /// В этой игре wrapper не стандартный: есть 5-й параметр.
+    /// Всегда передаём `0`.
+    ///
+    /// IDA: `0x1405CD470`
+    pub const LOADBUFFER: usize = 0x5CD_470;
+
+    /// `int(lua_State* L, const char* s)`
+    ///
+    /// IDA: `0x1405CD6A0`
+    pub const LOADSTRING: usize = 0x5CD_6A0;
+
+    /// `int(lua_State* L, int nargs, int nresults, int errfunc)`
+    ///
+    /// IDA: `0x1405CB600`
+    pub const PCALL: usize = 0x5CB_600;
+
+    /// `const char*(lua_State* L, int idx, size_t* len)`
+    ///
+    /// IDA: `0x1405CC130`
+    pub const TOLSTRING: usize = 0x5CC_130;
+
+    /// `void(lua_State* L, int idx)`
+    ///
+    /// IDA: `0x1405CBF50`
+    pub const SETTOP: usize = 0x5CB_F50;
+
+    /// `int(lua_State* L)`
+    ///
+    /// IDA: `0x1405CB230`
+    pub const GETTOP: usize = 0x5CB_230;
+
+    /// `void(lua_State* L, const char* s)`
+    ///
+    /// IDA: `0x1405CB8D0`
+    pub const PUSHSTRING: usize = 0x5CB_8D0;
+}
+
+pub mod script_machine {
+    /// `bool ScriptMachine::CallString(this, code_like_input)`
+    ///
+    /// Для Lua-консоли лучше НЕ использовать как основной путь.
+    ///
+    /// IDA: `0x140A1C530`
+    pub const CALL_STRING: usize = 0xA1C_530;
+}

@@ -87,3 +87,14 @@ pub const STATS_TRACKER_1: usize = 0x314_64A0;
 ///
 /// IDA: `qword_143140BD0`
 pub const STATS_TRACKER_2: usize = 0x314_0BD0;
+
+/// `C_ScriptMachineManager*` — singleton менеджер Lua script machines.
+///
+/// IDA: `qword_141CB1238`
+///
+/// Цепочка:
+/// `manager + 0x08 -> vector*`
+/// `vector + 0x00 -> ScriptMachine**`
+/// `array[0] -> Main Game Script Machine`
+/// `script_machine + 0x70 -> lua_State*`
+pub const SCRIPT_MACHINE_MANAGER: usize = 0x1CB_1238;
