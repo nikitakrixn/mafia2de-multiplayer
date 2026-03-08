@@ -85,6 +85,7 @@ fn initialize() {
     };
 
     player.log_debug_info();
+    sdk::game::lua::log_chain();
 
     if !player.is_wallet_ready() {
         logger::info("Wallet not ready, waiting...");
@@ -175,7 +176,9 @@ fn input_loop() {
             match player.get_position() {
                 Some(mut pos) => {
                     logger::info(&format!("Current position: {pos}"));
-                    pos.z += 10.0;
+                    pos.x = 1261.0;
+                    pos.y = 1169.0;
+                    pos.z = 0.5;
 
                     if player.set_position(&pos) {
                         logger::info(&format!("Teleported to: {pos}"));
@@ -188,10 +191,16 @@ fn input_loop() {
         }
 
         if is_key_just_pressed(VK_F5) {
-            do_add_money(&player, 100);
+            match sdk::game::lua::exec("game.game:GetActivePlayer():InventoryAddMoney(10000)") {
+                Ok(()) => logger::info("[lua] exec ok"),
+                Err(e) => logger::error(&format!("[lua] exec failed: {e}")),
+            }
         }
         if is_key_just_pressed(VK_F6) {
-            do_add_money(&player, 500);
+            match sdk::game::lua::eval_expression("game.gfx:GetDayTime()") {
+                Ok(v) => logger::info(&format!("[lua] day time = {v}")),
+                Err(e) => logger::error(&format!("[lua] eval failed: {e}")),
+            }
         }
         if is_key_just_pressed(VK_F7) {
             do_add_money(&player, 1000);
