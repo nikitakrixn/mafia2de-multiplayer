@@ -475,3 +475,126 @@ pub mod script_machine {
     /// IDA: `0x140A1C530`
     pub const CALL_STRING: usize = 0xA1C_530;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Callbacks
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod callbacks {
+    /// Регистрирует новый тип callback-события в `GameCallbackManager`.
+    ///
+    /// Аргументы:
+    /// - `this`
+    /// - `event_id`
+    /// - `event_name`
+    ///
+    /// Отклоняет дубликаты по ID и имени.
+    ///
+    /// IDA: `0x1403A08F0`
+    pub const REGISTER_EVENT_TYPE: usize = 0x3A_08F0;
+
+    /// Регистрирует callback function на событие.
+    ///
+    /// Аргументы примерно такие:
+    /// - `this`
+    /// - `event_id`
+    /// - `priority`
+    /// - `callback_object`
+    /// - `callback_function`
+    /// - `float_param`
+    /// - `config_mask`
+    /// - `int_param`
+    ///
+    /// IDA: `0x1403A06D0`
+    pub const REGISTER_FUNCTION: usize = 0x3A_06D0;
+
+    /// Public fire path: запускает одно событие по `event_id`.
+    ///
+    /// Используется как удобная lifecycle hook-точка, потому что через неё
+    /// проходят такие события как:
+    /// - `No Game Start`
+    /// - `Mission Before Open`
+    /// - `Mission After Open`
+    /// - `Game Paused`
+    /// - `Game Unpaused`
+    ///
+    /// IDA: `0x1403A15E0`
+    pub const FIRE_EVENT_BY_ID: usize = 0x3A_15E0;
+
+    /// Внутренний dispatcher одного события по уже найденному индексу descriptor’а.
+    ///
+    /// Делает:
+    /// - lock `in_dispatch`
+    /// - строит временный список callback’ов
+    /// - вызывает callback’и
+    /// - flush pending ops
+    ///
+    /// IDA: `0x1403A16A0`
+    pub const DISPATCH_SINGLE_EVENT_BY_INDEX: usize = 0x3A_16A0;
+
+    /// Внутренний multi-event dispatcher.
+    ///
+    /// В runtime чаще всего видны batch'и:
+    /// - `Game Tick Always`
+    /// - `Game Render`
+    ///
+    /// IDA: `0x1403A1A00`
+    pub const DISPATCH_EVENTS_INTERNAL: usize = 0x3A_1A00;
+
+    /// Добавляет отложенную операцию в pending queue callback manager’а.
+    ///
+    /// Используется, когда callback list нельзя менять прямо сейчас,
+    /// потому что событие уже dispatch’ится.
+    ///
+    /// IDA: `0x1403A0A90`
+    pub const QUEUE_PENDING_FUNCTION_OP: usize = 0x3A_0A90;
+
+    /// Снимает один callback:
+    /// - по `event_id`
+    /// - `callback_object`
+    /// - `callback_function`
+    ///
+    /// Специальный случай: `event_id == -1` → удалить из всех событий.
+    ///
+    /// IDA: `0x1403A55A0`
+    pub const UNREGISTER_FUNCTION: usize = 0x3A_55A0;
+
+    /// Снимает все callback’и, принадлежащие одному `callback_object`.
+    ///
+    /// IDA: `0x1403A57E0`
+    pub const UNREGISTER_FUNCTIONS_BY_OBJECT: usize = 0x3A_57E0;
+
+    /// Изменяет флаги callback entry.
+    ///
+    /// Находит callback по:
+    /// - `event_id`
+    /// - `callback_object`
+    /// - `callback_function`
+    ///
+    /// Затем обновляет байт флагов.
+    ///
+    /// IDA: `0x1403A64F0`
+    pub const SET_FUNCTION_FLAGS: usize = 0x3A_64F0;
+
+    /// Ищет `event_id` по имени события (case-insensitive).
+    ///
+    /// Возвращает `-1`, если имя не найдено.
+    ///
+    /// IDA: `0x1403AD080`
+    pub const GET_EVENT_ID_BY_NAME: usize = 0x3A_D080;
+
+    /// Flush deferred add/remove операций после завершения dispatch.
+    ///
+    /// IDA: `0x1403B4AD0`
+    pub const FLUSH_PENDING_FUNCTION_OPS: usize = 0x3B_4AD0;
+
+    /// Удобная main-thread hook-точка:
+    /// существующий callback из события `Game Tick Always`.
+    ///
+    /// Runtime подтверждение:
+    /// - event id = 5
+    /// - callback вызывается на главном игровом потоке
+    ///
+    /// IDA: `0x14015B5F0`
+    pub const GAME_TICK_ALWAYS_CB_CANDIDATE: usize = 0x15_B5F0;
+}

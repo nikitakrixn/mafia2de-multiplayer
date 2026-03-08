@@ -163,3 +163,8 @@ pub unsafe fn write_value<T: Copy>(addr: usize, value: T) -> bool {
     unsafe { std::ptr::write(addr as *mut T, value) };
     true
 }
+
+pub unsafe fn fn_at<T: Copy>(addr: usize) -> T {
+    let ptr = addr as *const ();
+    unsafe { std::mem::transmute_copy(&ptr) }
+}

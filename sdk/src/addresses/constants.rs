@@ -141,3 +141,47 @@ impl GarageVehicleId {
         }
     }
 }
+
+/// Подтверждённые ID событий GameCallbackManager.
+/// Получены из runtime-дампа (39 событий).
+pub mod game_events {
+    pub const SYSTEM_INIT: i32 = 1;
+    pub const SYSTEM_DONE: i32 = 2;
+    pub const GAME_TICK: i32 = 3;
+    pub const GAME_TICK_PAUSED: i32 = 4;
+    pub const GAME_TICK_ALWAYS: i32 = 5;
+    pub const GAME_RENDER: i32 = 7;
+    pub const MISSION_QUIT: i32 = 8;
+    pub const MISSION_BEFORE_OPEN: i32 = 9;
+    pub const MISSION_AFTER_OPEN: i32 = 10;
+    pub const MISSION_BEFORE_CLOSE: i32 = 11;
+    pub const MISSION_AFTER_CLOSE: i32 = 12;
+    pub const GAME_INIT: i32 = 13;
+    pub const GAME_DONE: i32 = 14;
+    pub const INVALIDATE_ENTITY: i32 = 15;
+    pub const INVALIDATE_FRAME: i32 = 16;
+    pub const WRITE_GAME_INFO: i32 = 17;
+    pub const READ_GAME_INFO: i32 = 18;
+    pub const GAME_RESTORE: i32 = 19;
+    pub const NO_GAME_START: i32 = 20;
+    pub const NO_GAME_END: i32 = 21;
+    pub const NO_GAME_TICK: i32 = 22;
+    pub const NO_GAME_RENDER: i32 = 23;
+    pub const NO_GAME_AFTER_GAME_LOOP: i32 = 24;
+    pub const COLLISIONS_LOADED: i32 = 25;
+    pub const APACK_FROM_SDS_LOADED: i32 = 26;
+    pub const REGISTER_GAME_SAVE_CB: i32 = 27;
+    pub const GAMEPARAMS_CHANGED: i32 = 28;
+    pub const GAMEPARAMS_PRESAVE: i32 = 29;
+    pub const APP_DEACTIVATE: i32 = 30;
+    pub const APP_ACTIVATE: i32 = 31;
+    pub const LOADING_PROCESS_STARTED: i32 = 32;
+    pub const LOADING_PROCESS_FINISHED: i32 = 33;
+    pub const GAME_PAUSED: i32 = 34;
+    pub const GAME_UNPAUSED: i32 = 35;
+    pub const LOADING_FADE_FINISHED: i32 = 36;
+    pub const SLOT_WAITING_TICK: i32 = 37;
+    pub const SLOT_WAITING_RENDER: i32 = 38;
+    pub const SHUTDOWN: i32 = 40;
+    pub const WEATHER_MANAGER_CREATED: i32 = 4097;
+}
