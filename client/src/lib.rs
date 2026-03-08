@@ -1,4 +1,11 @@
 //! Клиентская DLL для Mafia II: DE Multiplayer.
+mod events;
+mod hooks;
+mod lua_queue;
+mod main_thread;
+mod runtime;
+mod state;
+mod player_tracker;
 
 use std::ffi::c_void;
 use std::time::Duration;
@@ -9,28 +16,34 @@ use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 
 use common::logger;
 use sdk::game::{self, Player};
+use state::GameSessionState;
 
 const DLL_PROCESS_ATTACH: u32 = 1;
 const DLL_PROCESS_DETACH: u32 = 0;
 const TRUE: i32 = 1;
 
-const GAME_LOAD_TIMEOUT: u64 = 180;
 const MONITOR_INTERVAL: u64 = 5;
 const INPUT_POLL_MS: u64 = 100;
 
+const DUMP_CALLBACK_REGISTRY_ON_START: bool = false;
+const DUMP_CALLBACK_EVENTS_ON_START: bool = true;
+
 // Клавиши
-const VK_F1: i32  = 0x70;  // Lock controls
-const VK_F2: i32  = 0x71;  // Unlock controls
-const VK_F3: i32  = 0x72;  // Check lock state + position
-const VK_F4: i32  = 0x73;  // Teleport need
-const VK_F5: i32  = 0x74;  // +$100  (HUD)
-const VK_F6: i32  = 0x75;  // +$500  (HUD)
-const VK_F7: i32  = 0x76;  // +$1000 (HUD)
-const VK_F8: i32  = 0x77;  // -$500  (HUD)
-const VK_F9: i32  = 0x78;  // =$9999.99 (прямая запись)
-const VK_F10: i32 = 0x79;  // баланс
-const VK_F11: i32 = 0x7A;  // Дать Thompson + 200 патронов
-const VK_F12: i32 = 0x7B;  // Дать Colt 1911 + 50 патронов
+const VK_INSERT: i32 = 0x2D; // Queue Lua command on main thread
+const VK_DELETE: i32 = 0x2E; // Shutdown runtime/hooks
+
+const VK_F1: i32  = 0x70;
+const VK_F2: i32  = 0x71;
+const VK_F3: i32  = 0x72;
+const VK_F4: i32  = 0x73;
+const VK_F5: i32  = 0x74;
+const VK_F6: i32  = 0x75;
+const VK_F7: i32  = 0x76;
+const VK_F8: i32  = 0x77;
+const VK_F9: i32  = 0x78;
+const VK_F10: i32 = 0x79;
+const VK_F11: i32 = 0x7A;
+const VK_F12: i32 = 0x7B;
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
@@ -46,6 +59,7 @@ extern "system" fn DllMain(
         }
         DLL_PROCESS_DETACH => {
             logger::info("Client shutting down...");
+            runtime::shutdown();
             TRUE
         }
         _ => TRUE,
@@ -58,7 +72,9 @@ fn is_key_just_pressed(vk: i32) -> bool {
 }
 
 fn initialize() {
-    unsafe { let _ = AllocConsole(); }
+    unsafe {
+        let _ = AllocConsole();
+    }
 
     if let Err(e) = logger::init(
         logger::Level::Debug,
@@ -74,41 +90,35 @@ fn initialize() {
     logger::info("======================================");
 
     game::log_module_info();
-    logger::info("Waiting for game to fully load...");
 
-    let player = match Player::wait_until_ready(GAME_LOAD_TIMEOUT) {
-        Some(p) => p,
-        None => {
-            logger::error(&format!("Timeout ({GAME_LOAD_TIMEOUT}s)"));
-            return;
-        }
-    };
+    lua_queue::init();
+    player_tracker::init();
+    let _ = state::refresh_from_runtime();
 
-    player.log_debug_info();
     sdk::game::lua::log_chain();
 
-    if !player.is_wallet_ready() {
-        logger::info("Wallet not ready, waiting...");
-        let deadline = std::time::Instant::now() + Duration::from_secs(30);
-        loop {
-            std::thread::sleep(Duration::from_millis(500));
-            if let Some(p) = Player::get_active() {
-                if p.is_wallet_ready() {
-                    logger::info("Wallet initialized!");
-                    break;
-                }
-            }
-            if std::time::Instant::now() > deadline {
-                logger::warn("Wallet timeout — will work once money appears in-game");
-                break;
-            }
-        }
+    if DUMP_CALLBACK_EVENTS_ON_START {
+        sdk::game::callbacks::dump_interesting_events();
     }
 
-    log_balance(&player);
+    if DUMP_CALLBACK_REGISTRY_ON_START {
+        sdk::game::callbacks::dump_registry();
+    }
+
+    logger::info("Installing hooks...");
+    if let Err(e) = hooks::install() {
+        logger::error(&format!("Failed to install hooks: {e}"));
+        return;
+    }
+
+    logger::info("Runtime services online");
+    logger::info("Client now starts immediately after injection");
+    logger::info("Waiting for world/player state...");
 
     logger::info("======================================");
     logger::info("  Keybinds:");
+    logger::info("    INSERT — Queue Lua +$100 via main-thread dispatcher");
+    logger::info("    DELETE — Shutdown hook/runtime");
     logger::info("    F1  — Lock controls");
     logger::info("    F2  — Unlock controls");
     logger::info("    F3  — Status (controls + position)");
@@ -133,9 +143,32 @@ fn input_loop() {
     logger::debug("[input] Input loop started");
 
     loop {
+        if runtime::is_shutting_down() {
+            logger::debug("[input] stopping");
+            break;
+        }
+
         std::thread::sleep(Duration::from_millis(INPUT_POLL_MS));
 
-        let Some(player) = Player::get_active() else { continue };
+        if is_key_just_pressed(VK_INSERT) {
+            logger::info("Queueing Lua command on main thread...");
+            lua_queue::queue_exec_named(
+                "game.game:GetActivePlayer():InventoryAddMoney(10000)",
+                "=m2mp_insert_test",
+            );
+        }
+
+        if is_key_just_pressed(VK_DELETE) {
+            logger::info("Manual shutdown requested...");
+            runtime::shutdown();
+            break;
+        }
+
+        let player = Player::get_active();
+
+        let Some(player) = player else {
+            continue;
+        };
 
         if is_key_just_pressed(VK_F1) {
             logger::info("Locking controls...");
@@ -156,6 +189,10 @@ fn input_loop() {
         }
 
         if is_key_just_pressed(VK_F3) {
+            logger::info(&format!("Hooks installed: {}", hooks::is_installed()));
+            logger::info(&format!("App focus: {:?}", crate::events::app_focus_state()));
+            logger::info(&format!("Session state: {}", crate::state::get().as_str()));
+
             match player.are_controls_locked() {
                 Some(locked) => logger::info(&format!("Controls locked: {locked}")),
                 None => logger::error("Failed to read control state"),
@@ -191,16 +228,10 @@ fn input_loop() {
         }
 
         if is_key_just_pressed(VK_F5) {
-            match sdk::game::lua::exec("game.game:GetActivePlayer():InventoryAddMoney(10000)") {
-                Ok(()) => logger::info("[lua] exec ok"),
-                Err(e) => logger::error(&format!("[lua] exec failed: {e}")),
-            }
+            do_add_money(&player, 100);
         }
         if is_key_just_pressed(VK_F6) {
-            match sdk::game::lua::eval_expression("game.gfx:GetDayTime()") {
-                Ok(v) => logger::info(&format!("[lua] day time = {v}")),
-                Err(e) => logger::error(&format!("[lua] eval failed: {e}")),
-            }
+            do_add_money(&player, 500);
         }
         if is_key_just_pressed(VK_F7) {
             do_add_money(&player, 1000);
@@ -233,16 +264,13 @@ fn input_loop() {
     }
 }
 
-/// Добавляет деньги с HUD. Если HUD недоступен — прямая запись.
 fn do_add_money(player: &Player, dollars: i32) {
     let sign = if dollars >= 0 { "Adding" } else { "Removing" };
     logger::info(&format!("{sign} ${}", dollars.abs()));
 
-    // Пробуем с HUD уведомлением
     if player.add_money_dollars_with_hud(dollars) {
         log_balance(player);
     } else {
-        // Fallback — прямая запись
         logger::warn("HUD unavailable, using direct write");
         match player.add_money_dollars(dollars) {
             Some(new) => logger::info(&format!(
@@ -263,16 +291,91 @@ fn log_balance(player: &Player) {
     }
 }
 
+fn log_player_snapshot(player: &Player) {
+    player.log_debug_info();
+
+    if player.is_wallet_ready() {
+        log_balance(player);
+    } else {
+        logger::info("Wallet not ready yet");
+    }
+}
+
 fn monitor_loop() {
+    logger::debug("[monitor] started");
+
+    let mut last_state = state::get();
+    let mut snapshot_done = false;
+
     loop {
+        if runtime::is_shutting_down() {
+            logger::debug("[monitor] stopping");
+            break;
+        }
+
         std::thread::sleep(Duration::from_secs(MONITOR_INTERVAL));
 
-        let Some(player) = Player::get_active() else {
-            logger::debug("[monitor] Player not available");
-            continue;
-        };
+        let current = state::refresh_from_runtime();
 
-        let money = player.get_money_formatted().unwrap_or_else(|| "N/A".into());
-        logger::debug(&format!("[monitor] {money}"));
+        if current != last_state {
+            match current {
+                GameSessionState::InGame => {
+                    if let Some(player) = Player::get_active() {
+                        logger::info("[monitor] entered in-game state");
+                        log_player_snapshot(&player);
+                        snapshot_done = true;
+                    }
+                }
+                GameSessionState::FrontendMenu => {
+                    logger::info("[monitor] frontend/menu state");
+                    snapshot_done = false;
+                }
+                GameSessionState::Loading => {
+                    logger::info("[monitor] loading state");
+                    snapshot_done = false;
+                }
+                GameSessionState::Paused => {
+                    logger::info("[monitor] paused state");
+                }
+                GameSessionState::Boot => {
+                    logger::info("[monitor] boot state");
+                    snapshot_done = false;
+                }
+                GameSessionState::ShuttingDown => {}
+            }
+
+            last_state = current;
+        }
+
+        match current {
+            GameSessionState::InGame => {
+                if let Some(player) = Player::get_active() {
+                    if !snapshot_done && player.is_ready() {
+                        log_player_snapshot(&player);
+                        snapshot_done = true;
+                    }
+
+                    let money = player
+                        .get_money_formatted()
+                        .unwrap_or_else(|| "wallet-not-ready".into());
+                    logger::debug(&format!("[monitor] in-game | {money}"));
+                } else {
+                    logger::debug("[monitor] in-game but player pointer missing");
+                }
+            }
+            GameSessionState::FrontendMenu => {
+                logger::debug("[monitor] frontend/menu");
+            }
+            GameSessionState::Loading => {
+                logger::debug("[monitor] loading");
+            }
+            GameSessionState::Paused => {
+                logger::debug("[monitor] paused");
+            }
+            GameSessionState::Boot => {
+                logger::debug("[monitor] boot");
+            }
+            GameSessionState::ShuttingDown => break,
+        }
     }
 }
