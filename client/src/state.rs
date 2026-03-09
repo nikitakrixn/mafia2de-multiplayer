@@ -1,7 +1,7 @@
-//! Session state machine клиента.
+//! Состояние игровой сессии клиента.
 //!
 //! Работает в смешанном режиме:
-//! - lifecycle callback events через FireEventById
+//! - callback lifecycle события через FireEventById
 //! - polling fallback через refresh_from_runtime()
 
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -70,7 +70,9 @@ pub fn set(next: GameSessionState) -> GameSessionState {
 }
 
 pub fn mark_paused() {
-    set(GameSessionState::Paused);
+    if matches!(get(), GameSessionState::InGame) {
+        set(GameSessionState::Paused);
+    }
 }
 
 pub fn mark_unpaused() {
@@ -83,7 +85,7 @@ pub fn mark_shutting_down() {
     set(GameSessionState::ShuttingDown);
 }
 
-/// Lifecycle event → state transition.
+/// Lifecycle event -> state transition.
 pub fn on_event(event_id: i32) {
     match event_id {
         ev::LOADING_PROCESS_STARTED
@@ -121,18 +123,19 @@ pub fn on_event(event_id: i32) {
     }
 }
 
-/// Polling fallback.
-///
-/// Нужен как страховка, если какое-то событие не пришло или пришло не там.
+/// Polling fallback на случай, если какое-то lifecycle-событие не пришло.
 pub fn refresh_from_runtime() -> GameSessionState {
-    if matches!(get(), GameSessionState::ShuttingDown) {
+    let current = get();
+
+    if matches!(current, GameSessionState::ShuttingDown) {
         return GameSessionState::ShuttingDown;
     }
 
-    let current = get();
-
     let next = if !game::is_game_initialized() {
-        GameSessionState::Boot
+        match current {
+            GameSessionState::Boot => GameSessionState::Boot,
+            _ => GameSessionState::FrontendMenu,
+        }
     } else if let Some(player) = Player::get_active() {
         if player.is_ready() {
             match current {
@@ -146,6 +149,7 @@ pub fn refresh_from_runtime() -> GameSessionState {
         match current {
             GameSessionState::Loading => GameSessionState::Loading,
             GameSessionState::Paused => GameSessionState::FrontendMenu,
+            GameSessionState::Boot => GameSessionState::Boot,
             _ => GameSessionState::FrontendMenu,
         }
     };

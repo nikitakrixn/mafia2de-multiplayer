@@ -1,26 +1,22 @@
 //! Обработка lifecycle-событий игры.
 //!
-//! Этот модуль работает поверх hook на `GameCallbackManager::FireEventById`
-//! и переводит сырой `event_id` в:
-/// - логируемые события
-/// - изменение session state
-/// - изменение app focus state
+//! Этот модуль питается от hook'а на `M2DE_GameCallbackManager_FireEventById`
+//! и переводит сырые `event_id` в:
+//! - логи жизненного цикла
+//! - состояние сессии
+//! - состояние фокуса окна игры
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use common::logger;
 use sdk::addresses::constants::game_events as ev;
 
-/// Текущее состояние фокуса окна игры.
-///
-/// Используется для определения alt-tab / возврата в игру.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppFocusState {
     Active,
     Inactive,
 }
 
-/// true = окно игры активно, false = игра потеряла фокус.
 static APP_ACTIVE: AtomicBool = AtomicBool::new(true);
 
 pub fn app_focus_state() -> AppFocusState {
@@ -31,7 +27,7 @@ pub fn app_focus_state() -> AppFocusState {
     }
 }
 
-/// Обновляет focus state и пишет лог только если состояние реально изменилось.
+/// Меняем focus state и логируем только реальное изменение.
 fn set_app_focus(active: bool) {
     let old = APP_ACTIVE.swap(active, Ordering::AcqRel);
     if old != active {
@@ -42,7 +38,6 @@ fn set_app_focus(active: bool) {
     }
 }
 
-/// Человекочитаемое имя event_id.
 pub fn event_name(event_id: i32) -> &'static str {
     match event_id {
         ev::SYSTEM_INIT => "System Init",
@@ -88,7 +83,8 @@ pub fn event_name(event_id: i32) -> &'static str {
     }
 }
 
-/// Возвращает true только для реально значимых lifecycle-событий.
+/// Логируем только действительно важные lifecycle-события.
+/// Частые технические события специально пропускаем.
 fn should_log_event(event_id: i32) -> bool {
     matches!(
         event_id,
@@ -111,10 +107,14 @@ fn should_log_event(event_id: i32) -> bool {
     )
 }
 
-/// Основная обработка одного fired event.
-///
-/// Вызывается из hook на `FireEventById`.
+/// Главная обработка одного fired lifecycle event.
 pub fn process_fired_event(event_id: i32) {
+    match event_id {
+        ev::APP_ACTIVATE => set_app_focus(true),
+        ev::APP_DEACTIVATE => set_app_focus(false),
+        _ => {}
+    }
+
     if should_log_event(event_id) {
         logger::info(&format!(
             "[events] {} ({})",
@@ -123,13 +123,5 @@ pub fn process_fired_event(event_id: i32) {
         ));
     }
 
-    // Обработка фокуса окна игры
-    match event_id {
-        ev::APP_ACTIVATE => set_app_focus(true),
-        ev::APP_DEACTIVATE => set_app_focus(false),
-        _ => {}
-    }
-
-    // Передаём lifecycle-событие в state machine
     crate::state::on_event(event_id);
 }

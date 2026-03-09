@@ -598,3 +598,216 @@ pub mod callbacks {
     /// IDA: `0x14015B5F0`
     pub const GAME_TICK_ALWAYS_CB_CANDIDATE: usize = 0x15_B5F0;
 }
+
+pub mod human_messages {
+    /// Lua-диспетчер метода:
+    /// `C_WrapperEntity:RegisterToMessages(...)`
+    ///
+    /// Поддерживает overload'ы:
+    /// - `RegisterToMessages(guid)`
+    /// - `RegisterToMessages(guid, event_type)`
+    /// - `RegisterToMessages(guid, event_type, message_id)`
+    ///
+    /// IDA: `0x1410AD030`
+    pub const LUA_REGISTER_TO_MESSAGES: usize = 0x10A_D030;
+
+    /// Lua-диспетчер метода:
+    /// `C_WrapperEntity:UnregisterFromMessages(...)`
+    ///
+    /// Поддерживает overload'ы:
+    /// - `UnregisterFromMessages(guid)`
+    /// - `UnregisterFromMessages(guid, event_type)`
+    /// - `UnregisterFromMessages(guid, event_type, message_id)`
+    ///
+    /// IDA: `0x1410AD410`
+    pub const LUA_UNREGISTER_FROM_MESSAGES: usize = 0x10A_D410;
+
+    /// Lua-overload helper:
+    /// `RegisterToMessages(guid)`
+    ///
+    /// Читает `C_EntityGuid` из Lua аргумента #2 и
+    /// форвардит в native wrapper path.
+    ///
+    /// IDA: `0x1410BB620`
+    pub const LUA_REGISTER_GUID: usize = 0x10B_B620;
+
+    /// Lua-overload helper:
+    /// `RegisterToMessages(guid, event_type)`
+    ///
+    /// Читает:
+    /// - `guid` из Lua arg #2
+    /// - `event_type` из Lua arg #3
+    ///
+    /// Затем форвардит в wrapper-side register helper,
+    /// где `message_id = 0`.
+    ///
+    /// IDA: `0x1410BB6E0`
+    pub const LUA_REGISTER_GUID_EVENT_TYPE: usize = 0x10B_B6E0;
+
+    /// Lua-overload helper:
+    /// `RegisterToMessages(guid, event_type, message_id)`
+    ///
+    /// Читает:
+    /// - `guid` из Lua arg #2
+    /// - `event_type` из Lua arg #3
+    /// - `message_id` из Lua arg #4
+    ///
+    /// IDA: `0x1410BB820`
+    pub const LUA_REGISTER_GUID_EVENT_TYPE_MESSAGE: usize = 0x10B_B820;
+
+    /// Wrapper-side helper:
+    /// `RegisterToMessages(guid, 0, 0)`
+    ///
+    /// То есть подписка на все сообщения выбранной сущности.
+    ///
+    /// IDA: `0x1410CDE70`
+    pub const WRAPPER_REGISTER_GUID: usize = 0x10C_DE70;
+
+    /// Wrapper-side helper:
+    /// `RegisterToMessages(guid, event_type, 0)`
+    ///
+    /// То есть подписка на все сообщения конкретного event_type
+    /// для выбранной сущности.
+    ///
+    /// IDA: `0x1410CDE80`
+    pub const WRAPPER_REGISTER_GUID_EVENT_TYPE: usize = 0x10C_DE80;
+
+    /// Native wrapper-side register implementation.
+    ///
+    /// Проверяет валидность wrapper object, затем форвардит
+    /// в engine-level entity message registry registration path.
+    ///
+    /// IDA: `0x1410CDE90`
+    pub const WRAPPER_REGISTER_IMPL: usize = 0x10C_DE90;
+
+    /// Engine-level регистрация подписки в entity message registry.
+    ///
+    /// Логическая сигнатура:
+    /// - listener_owner
+    /// - target_entity_guid
+    /// - event_type  (`0 = любой`)
+    /// - message_id  (`0 = любой`)
+    ///
+    /// Перегрузки по смыслу:
+    /// - `guid only`                    -> подписка на все сообщения сущности
+    /// - `guid + event_type`           -> подписка на все сообщения данного типа
+    /// - `guid + event_type + message` -> подписка на одно конкретное сообщение
+    ///
+    /// IDA: `0x1403B7420`
+    pub const REGISTRY_REGISTER: usize = 0x3B_7420;
+
+    /// Вспомогательная функция обратного учёта target guid.
+    ///
+    /// Добавляет или увеличивает refcount для target_entity_guid
+    /// во вторичном дереве учёта у listener owner.
+    ///
+    /// IDA: `0x1403A0D30`
+    pub const ADD_TARGET_GUID_REF: usize = 0x3A_0D30;
+
+    /// Lua-overload helper:
+    /// `UnregisterFromMessages(guid)`
+    ///
+    /// Удаляет все подписки на сообщения выбранной сущности.
+    ///
+    /// IDA: `0x1410BB680`
+    pub const LUA_UNREGISTER_GUID: usize = 0x10B_B680;
+
+    /// Lua-overload helper:
+    /// `UnregisterFromMessages(guid, event_type)`
+    ///
+    /// Удаляет все подписки на сообщения данного event_type
+    /// для выбранной сущности.
+    ///
+    /// IDA: `0x1410BB780`
+    pub const LUA_UNREGISTER_GUID_EVENT_TYPE: usize = 0x10B_B780;
+
+    /// Lua-overload helper:
+    /// `UnregisterFromMessages(guid, event_type, message_id)`
+    ///
+    /// Удаляет подписку на одно конкретное сообщение.
+    ///
+    /// IDA: `0x1410BB910`
+    pub const LUA_UNREGISTER_GUID_EVENT_TYPE_MESSAGE: usize = 0x10B_B910;
+
+    /// Wrapper-side helper:
+    /// `UnregisterFromMessages(guid, 0, 0)`
+    ///
+    /// То есть снятие всех подписок для target guid.
+    ///
+    /// IDA: `0x1410D2320`
+    pub const WRAPPER_UNREGISTER_GUID: usize = 0x10D_2320;
+
+    /// Wrapper-side helper:
+    /// `UnregisterFromMessages(guid, event_type, 0)`
+    ///
+    /// То есть снятие всех подписок одного event_type
+    /// для target guid.
+    ///
+    /// IDA: `0x1410D2330`
+    pub const WRAPPER_UNREGISTER_GUID_EVENT_TYPE: usize = 0x10D_2330;
+
+    /// Native wrapper-side unregister implementation.
+    ///
+    /// Проверяет валидность wrapper object, затем форвардит
+    /// в engine-level unregister path.
+    ///
+    /// IDA: `0x1410D2340`
+    pub const WRAPPER_UNREGISTER_IMPL: usize = 0x10D_2340;
+
+    /// Engine-level вход в unregister path.
+    ///
+    /// Ищет world/entity registry и передаёт управление
+    /// в low-level unregister implementation.
+    ///
+    /// IDA: `0x1403BCCF0`
+    pub const REGISTRY_UNREGISTER: usize = 0x3B_CCF0;
+
+    /// Низкоуровневая реализация снятия подписки.
+    ///
+    /// Поддерживает варианты:
+    /// - guid only
+    /// - guid + event_type
+    /// - guid + event_type + message_id
+    ///
+    /// При необходимости удаляет пустые внутренние узлы дерева.
+    ///
+    /// IDA: `0x1403BFA90`
+    pub const REGISTRY_UNREGISTER_IMPL: usize = 0x3B_FA90;
+
+    /// Путь десериализации / загрузки entity message registry из потока.
+    ///
+    /// Сначала очищает существующие подписки,
+    /// затем восстанавливает guid -> event_type -> message tree.
+    ///
+    /// IDA: `0x1403A9D00`
+    pub const REGISTRY_LOAD_FROM_STREAM: usize = 0x3A_9D00;
+}
+
+pub mod entity_messages {
+    /// Центральный путь широковещательной доставки entity/human сообщений.
+    ///
+    /// Это основной delivery path, через который движок рассылает
+    /// уже сконструированные сообщения подписчикам.
+    ///
+    /// Именно эту функцию удобно hook'ать для runtime-анализа
+    /// сообщений локального игрока.
+    ///
+    /// IDA: `0x1403A6DB0`
+    pub const BROADCAST: usize = 0x3A_6DB0;
+
+    /// Включает или выключает entity-message listener object.
+    ///
+    /// По факту пишет bool-флаг в `listener + 0x3D8`.
+    ///
+    /// IDA: `0x1403B7110`
+    pub const LISTENER_SET_ENABLED: usize = 0x3B_7110;
+
+    /// Один из подтверждённых sender-path'ов human-сообщения,
+    /// связанного с входом в транспорт / use-vehicle сценарием.
+    ///
+    /// По текущему reverse'у:
+    /// конструирует и рассылает сообщение `ENTER_VEHICLE` (`0xD001B`).
+    ///
+    /// IDA: `0x140DA4C80`
+    pub const HUMAN_SEND_ENTER_VEHICLE_LIKE: usize = 0xDA_4C80;
+}

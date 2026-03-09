@@ -6,6 +6,8 @@ mod main_thread;
 mod runtime;
 mod state;
 mod player_tracker;
+mod human_messages;
+mod player_events;
 
 use std::ffi::c_void;
 use std::time::Duration;
@@ -93,6 +95,7 @@ fn initialize() {
 
     lua_queue::init();
     player_tracker::init();
+    player_events::init();
     let _ = state::refresh_from_runtime();
 
     sdk::game::lua::log_chain();
@@ -153,7 +156,7 @@ fn input_loop() {
         if is_key_just_pressed(VK_INSERT) {
             logger::info("Queueing Lua command on main thread...");
             lua_queue::queue_exec_named(
-                "game.game:GetActivePlayer():InventoryAddMoney(10000)",
+                "game.navigation:DisableFarVisibility(game.navigation:RegisterIconPos('-284.647','1148.50',0,3,'2155010008',true))",
                 "=m2mp_insert_test",
             );
         }
@@ -376,6 +379,32 @@ fn monitor_loop() {
                 logger::debug("[monitor] boot");
             }
             GameSessionState::ShuttingDown => break,
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn dump_human_message_ids() {
+    let items = [
+        "enums.EventType.HUMAN",
+        "enums.HumanMessages.DAMAGE",
+        "enums.HumanMessages.DEATH",
+        "enums.HumanMessages.ANIM_NOTIFY",
+        "enums.HumanMessages.ENTER_VEHICLE",
+        "enums.HumanMessages.LEAVE_VEHICLE",
+        "enums.HumanMessages.ENTER_VEHICLE_DONE",
+        "enums.HumanMessages.LEAVE_VEHICLE_DONE",
+        "enums.HumanMessages.PLAYER_WEAPON_SELECT",
+        "enums.HumanMessages.PLAYER_WEAPON_HIDE",
+        "enums.HumanMessages.SHOT",
+    ];
+
+    for expr in items {
+        let code = format!("return tostring({expr})");
+        match sdk::game::lua::eval_chunk_named(&code, "=dump_human_message_ids") {
+            Ok(Some(v)) => logger::info(&format!("[human-msg] {expr} = {v}")),
+            Ok(None) => logger::warn(&format!("[human-msg] {expr} = <nil>")),
+            Err(e) => logger::error(&format!("[human-msg] failed for {expr}: {e}")),
         }
     }
 }
