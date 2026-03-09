@@ -6,6 +6,8 @@ mod main_thread;
 mod runtime;
 mod state;
 mod player_tracker;
+mod human_messages;
+mod player_events;
 
 use std::ffi::c_void;
 use std::time::Duration;
@@ -93,6 +95,7 @@ fn initialize() {
 
     lua_queue::init();
     player_tracker::init();
+    player_events::init();
     let _ = state::refresh_from_runtime();
 
     sdk::game::lua::log_chain();
@@ -380,6 +383,7 @@ fn monitor_loop() {
     }
 }
 
+#[allow(dead_code)]
 fn dump_human_message_ids() {
     let items = [
         "enums.EventType.HUMAN",

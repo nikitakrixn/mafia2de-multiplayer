@@ -1,10 +1,11 @@
 //! Main-thread service loop клиента.
 //!
 //! Вызывается из detour на `Game Tick Always`.
-//! Здесь безопасно выполнять то, что должно жить на главном игровом потоке:
-//! - drain очереди Lua
-//! - refresh state fallback
+//! Здесь живут:
+//! - queued Lua команды
+//! - fallback refresh state
 //! - PlayerTracker
+//! - обработка PlayerEventBus
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -43,16 +44,11 @@ enum ExecResult {
     Failed,
 }
 
-/// Главная точка обслуживания main-thread логики клиента.
-///
-/// Сейчас делает три вещи:
-/// - исполняет queued Lua команды
-/// - обновляет lifecycle state polling fallback
-/// - обновляет PlayerTracker
 pub fn on_main_thread_tick() {
     drain_lua_queue(MAX_LUA_PER_TICK);
     refresh_state_if_needed();
     crate::player_tracker::update_main_thread();
+    crate::player_events::process_pending();
 }
 
 fn refresh_state_if_needed() {
