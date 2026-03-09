@@ -185,3 +185,54 @@ pub mod game_events {
     pub const SHUTDOWN: i32 = 40;
     pub const WEATHER_MANAGER_CREATED: i32 = 4097;
 }
+
+pub mod event_types {
+    /// enums.EventType.HUMAN
+    pub const HUMAN: i32 = 3;
+}
+
+pub mod human_messages {
+    pub const DAMAGE: u32                = 851_984;  // 0xD0010
+    pub const DEATH: u32                 = 851_988;  // 0xD0014
+    pub const ANIM_NOTIFY: u32           = 851_989;  // 0xD0015
+    pub const ENTER_VEHICLE: u32         = 851_995;  // 0xD001B
+    pub const LEAVE_VEHICLE: u32         = 851_996;  // 0xD001C
+    pub const ENTER_VEHICLE_DONE: u32    = 851_997;  // 0xD001D
+    pub const LEAVE_VEHICLE_DONE: u32    = 851_998;  // 0xD001E
+    pub const PLAYER_WEAPON_SELECT: u32  = 852_004;  // 0xD0024
+    pub const PLAYER_WEAPON_HIDE: u32    = 852_005;  // 0xD0025
+    pub const SHOT: u32                  = 852_071;  // 0xD0057
+
+    pub const WEAPON_HOLSTER: u32        = 851_999;  // 0xD001F  conf 78%
+    pub const WEAPON_DRAW: u32           = 852_000;  // 0xD0020  conf 80%
+    pub const STANCE_CHANGE: u32         = 852_001;  // 0xD0021  conf 72%
+    pub const STANCE_CLEANUP: u32        = 852_002;  // 0xD0022  conf 68%
+    pub const STANCE_SECONDARY: u32      = 852_003;  // 0xD0023  conf 68%
+    pub const HEAD_DAMAGE: u32           = 852_033;  // 0xD0041  conf 85%
+    pub const BODY_DAMAGE: u32           = 852_034;  // 0xD0042  conf 85%
+    pub const KILL_DAMAGE: u32           = 852_035;  // 0xD0043  conf 80%
+
+    pub const HUMAN_MODE_CHANGE: u32     = 851_972;  // 0xD0004  conf 70%
+    pub const HUMAN_TICK: u32            = 851_985;  // 0xD0011  conf 78%
+    pub const HUMAN_SETTLED: u32         = 851_994;  // 0xD001A  conf 72%
+}
+
+/// Диапазоны event_type для быстрой классификации message_id.
+pub mod message_ranges {
+    /// Event type 5: low-level entity messages.
+    /// message_id & 0xFFFF0000 == 0x50000
+    pub const LOW_LEVEL_BASE: u32 = 0x50000;
+
+    /// Event type 3: HUMAN messages.
+    /// message_id & 0xFFFF0000 == 0xD0000
+    pub const HUMAN_BASE: u32 = 0xD0000;
+
+    /// Event type 18: traffic/AI messages.
+    /// message_id & 0xFFFF0000 == 0x120000
+    pub const TRAFFIC_BASE: u32 = 0x120000;
+
+    /// Быстрая классификация по event_type.
+    pub fn event_type_of(msg_id: u32) -> u32 {
+        msg_id >> 16
+    }
+}
