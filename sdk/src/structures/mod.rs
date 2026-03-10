@@ -7,6 +7,7 @@ mod garage;
 mod tables;
 mod callbacks;
 mod messages;
+mod render;
 
 pub use core::*;
 pub use player::*;
@@ -17,3 +18,4 @@ pub use garage::*;
 pub use tables::*;
 pub use callbacks::*;
 pub use messages::*;
+pub use render::*;

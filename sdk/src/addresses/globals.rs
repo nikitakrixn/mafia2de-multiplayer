@@ -98,3 +98,40 @@ pub const STATS_TRACKER_2: usize = 0x314_0BD0;
 /// `array[0] -> Main Game Script Machine`
 /// `script_machine + 0x70 -> lua_State*`
 pub const SCRIPT_MACHINE_MANAGER: usize = 0x1CB_1238;
+
+/// `M2DE_C_RenderDeviceD3D11*` — глобальный singleton рендер-устройства.
+///
+/// Это главный объект DX11 backend'а игры.
+/// Через него можно получить:
+/// - `IDXGIFactory*`
+/// - `ID3D11Device*`
+/// - `ID3D11DeviceContext*`
+/// - текущий `M2DE_SwapChainWrapper*`
+///
+/// Цепочка до raw swapchain:
+/// `RENDER_DEVICE -> current_swapchain -> swapchain`
+///
+/// IDA: `qword_141CD5D18`
+pub const RENDER_DEVICE: usize = 0x1CD_5D18;
+
+/// Флаг особого режима окружения / remote session.
+///
+/// Используется рендером при выборе ограничения на размер текстур.
+///
+/// IDA: `byte_141CD5CF2`
+pub const RENDER_IS_REMOTE_SESSION: usize = 0x1CD_5CF2;
+
+/// Базовый лимит размеров текстур.
+///
+/// IDA: `dword_141C34DD0`
+pub const RENDER_DEFAULT_MAX_TEXTURE_SIZE: usize = 0x1C3_4DD0;
+
+/// Лимит размеров текстур для обычного локального запуска.
+///
+/// IDA: `dword_141C3589C`
+pub const RENDER_MAX_TEXTURE_SIZE_LOCAL: usize = 0x1C3_589C;
+
+/// Лимит размеров текстур для special/remote режима.
+///
+/// IDA: `dword_141C358A0`
+pub const RENDER_MAX_TEXTURE_SIZE_REMOTE: usize = 0x1C3_58A0;

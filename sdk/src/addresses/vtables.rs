@@ -57,3 +57,35 @@ pub mod misc {
     /// IDA: `0x1418E9198`
     pub const CRASH_OBJ_MGR: usize = 0x18E_9198;
 }
+
+pub mod render_device {
+    /// Самая базовая abstract vtable render-device.
+    ///
+    /// IDA: `0x14189AF80`
+    pub const ABSTRACT: usize = 0x189_AF80;
+
+    /// Промежуточная vtable в ctor-цепочке.
+    ///
+    /// IDA: `0x1418A2F80`
+    pub const MID: usize = 0x18A_2F80;
+
+    /// Базовая vtable `C_RenderDevice`.
+    ///
+    /// IDA: `0x1418A3310`
+    pub const BASE: usize = 0x18A_3310;
+
+    /// Финальная vtable `M2DE_C_RenderDeviceD3D11`.
+    ///
+    /// IDA: `0x1418A38C0`
+    pub const D3D11: usize = 0x18A_38C0;
+
+    /// Временная vtable state-tracker объекта.
+    ///
+    /// IDA: `0x1418A2870`
+    pub const STATE_TRACKER_INITIAL: usize = 0x18A_2870;
+
+    /// Финальная vtable state-tracker объекта.
+    ///
+    /// IDA: `0x1418A2960`
+    pub const STATE_TRACKER_FINAL: usize = 0x18A_2960;
+}

@@ -3,6 +3,7 @@
 pub mod callbacks;
 pub mod player;
 pub mod lua;
+pub mod render;
 
 pub use player::Player;
 

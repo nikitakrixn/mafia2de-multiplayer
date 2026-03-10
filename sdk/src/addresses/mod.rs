@@ -7,6 +7,7 @@
 //! runtime_address = module_base + RVA
 //! ```
 
+pub mod data;
 pub mod globals;
 pub mod functions;
 pub mod vtables;

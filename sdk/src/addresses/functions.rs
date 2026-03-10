@@ -811,3 +811,106 @@ pub mod entity_messages {
     /// IDA: `0x140DA4C80`
     pub const HUMAN_SEND_ENTER_VEHICLE_LIKE: usize = 0xDA_4C80;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Render Device
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod render {
+    /// Полный конструктор `M2DE_C_RenderDeviceD3D11`.
+    ///
+    /// IDA: `0x1409C36A0`
+    pub const RENDER_DEVICE_D3D11_CTOR: usize = 0x9C_36A0;
+
+    /// Промежуточный конструктор render-device цепочки.
+    ///
+    /// IDA: `0x1409C3E20`
+    pub const RENDER_DEVICE_MID_CTOR: usize = 0x9C_3E20;
+
+    /// Базовый конструктор render-device.
+    ///
+    /// Именно здесь игра сохраняет глобальный singleton
+    /// в `qword_141CD5D18`.
+    ///
+    /// IDA: `0x1408CA120`
+    pub const RENDER_DEVICE_BASE_CTOR: usize = 0x8C_A120;
+
+    /// Teardown / cleanup path для `M2DE_C_RenderDeviceD3D11`.
+    ///
+    /// IDA: `0x1409C5040`
+    pub const RENDER_DEVICE_D3D11_TEARDOWN: usize = 0x9C_5040;
+
+    /// Scalar deleting destructor.
+    ///
+    /// IDA: `0x1409C60D0`
+    pub const RENDER_DEVICE_D3D11_SCALAR_DTOR: usize = 0x9C_60D0;
+
+    /// Возвращает строку `"D3D11 Rendering Device"`.
+    ///
+    /// IDA: `0x1409CBEA0`
+    pub const RENDER_DEVICE_D3D11_GET_NAME: usize = 0x9C_BEA0;
+
+    /// Основная DX11 инициализация.
+    ///
+    /// Создаёт:
+    /// - `ID3D11Device`
+    /// - `ID3D11DeviceContext`
+    /// - DXGI factory
+    /// - swapchain wrapper
+    /// - базовые render states
+    ///
+    /// IDA: `0x1409CC4B0`
+    pub const RENDER_DEVICE_D3D11_INIT: usize = 0x9C_C4B0;
+
+    /// Создание swapchain wrapper и raw `IDXGISwapChain1`.
+    ///
+    /// Внутри вызывает `IDXGIFactory4::CreateSwapChainForHwnd`.
+    ///
+    /// IDA: `0x1409C9EE0`
+    pub const CREATE_SWAPCHAIN: usize = 0x9C_9EE0;
+
+    /// Создание RTV / SRV / depth texture / DSV для swapchain wrapper.
+    ///
+    /// IDA: `0x1409CD1A0`
+    pub const SWAPCHAIN_WRAPPER_CREATE_VIEWS: usize = 0x9C_D1A0;
+
+    /// Recreate/resize path для swapchain.
+    ///
+    /// Если HWND тот же — идёт resize path.
+    /// Если HWND другой — создаётся новый wrapper/swapchain.
+    ///
+    /// IDA: `0x1409CE650`
+    pub const RENDER_DEVICE_D3D11_RECREATE_SWAPCHAIN: usize = 0x9C_E650;
+
+    /// Установка default render states.
+    ///
+    /// IDA: `0x14098E620`
+    pub const RENDER_DEVICE_D3D11_SET_DEFAULT_STATES: usize = 0x98_E620;
+
+    /// Создание dynamic VB/IB буферов.
+    ///
+    /// IDA: `0x140A12FC0`
+    pub const RENDER_DEVICE_D3D11_CREATE_DYNAMIC_BUFFERS: usize = 0xA1_2FC0;
+
+    /// Проверка debug device режима.
+    ///
+    /// В retail-сборке возвращает 0.
+    ///
+    /// IDA: `0x140A13AE0`
+    pub const IS_DEBUG_DEVICE: usize = 0xA1_3AE0;
+
+    /// Перечисление адаптеров DXGI.
+    ///
+    /// IDA: `0x1409CD2B0`
+    pub const RENDER_DEVICE_D3D11_ENUM_ADAPTERS: usize = 0x9C_D2B0;
+
+    /// Thunk на `D3D11CreateDevice`.
+    ///
+    /// IDA: `0x14153F09D`
+    pub const D3D11_CREATE_DEVICE_THUNK: usize = 0x153_F09D;
+
+    /// Thunk на `CreateDXGIFactory1`.
+    ///
+    /// IDA: `0x14153F0B5`
+    pub const CREATE_DXGI_FACTORY1_THUNK: usize = 0x153_F0B5;
+}

@@ -44,3 +44,10 @@ pub mod garage_strings {
     /// "SpikeStrip"
     pub const SPIKE_STRIP: usize = 0x190_D470;
 }
+
+pub mod render_strings {
+    /// `"D3D11 Rendering Device"`
+    ///
+    /// IDA: `0x1418A3C88`
+    pub const D3D11_RENDERING_DEVICE: usize = 0x18A_3C88;
+}
