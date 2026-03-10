@@ -211,3 +211,161 @@ pub mod callback_entry {
     pub const CONTEXT: usize = 0x30;
     pub const SIZE: usize = 64;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RenderDevice и swapchain (новые)
+// ═══════════════════════════════════════════════════════════════════════
+
+pub mod render_device {
+    /// `+0x2008` → начало блока init-параметров рендера.
+    ///
+    /// Внутри этого блока лежат:
+    /// - `+0x18` от блока → текущая ширина
+    /// - `+0x1C` от блока → текущая высота
+    /// - `+0x20` от блока → указатель на window/config структуру
+    pub const INIT_CONFIG: usize = 0x2008;
+
+    /// `+0x2020` → текущая ширина рендера.
+    ///
+    /// Поле обновляется и в recreate/resize path.
+    pub const RENDER_WIDTH: usize = 0x2020;
+
+    /// `+0x2024` → текущая высота рендера.
+    pub const RENDER_HEIGHT: usize = 0x2024;
+
+    /// `+0x2028` → указатель на window/config структуру из init params.
+    pub const WINDOW_CONFIG_PTR: usize = 0x2028;
+
+    /// `+0x2032` → поддержка feature level 10.0.
+    pub const SUPPORTS_FL_10_0: usize = 0x2032;
+
+    /// `+0x2033` → дополнительный флаг поддержки FL10.0.
+    pub const SUPPORTS_FL_10_0_DUP: usize = 0x2033;
+
+    /// `+0x2034` → поддержка feature level 10.1.
+    pub const SUPPORTS_FL_10_1: usize = 0x2034;
+
+    /// `+0x2035` → флаг завершённой DX-инициализации.
+    pub const DX_INITIALIZED: usize = 0x2035;
+
+    /// `+0x203C` → количество выходов текущего адаптера.
+    pub const ADAPTER_OUTPUT_COUNT: usize = 0x203C;
+
+    /// `+0x2040` → максимальный размер текстур.
+    pub const MAX_TEXTURE_SIZE: usize = 0x2040;
+
+    /// `+0x2044` → настройка фильтрации / aniso-related state.
+    pub const ANISO_FILTER_SETTING: usize = 0x2044;
+
+    /// `+0x2050` → shader/resource cache из базового конструктора.
+    pub const SHADER_CACHE: usize = 0x2050;
+
+    /// `+0x2070` → dynamic vertex buffer resource.
+    ///
+    /// Строка: `"RenderDeviceBase::DynamicVB"`
+    pub const DYNAMIC_VB: usize = 0x2070;
+
+    /// `+0x2078` → dynamic index buffer resource.
+    ///
+    /// Строка: `"RenderDeviceBase::DynamicIB"`
+    pub const DYNAMIC_IB: usize = 0x2078;
+
+    /// `+0x21A8` → текущий режим/профиль рендера.
+    ///
+    /// Используется в switch внутри init.
+    pub const CURRENT_STATE_MODE: usize = 0x21A8;
+
+    /// `+0x21AC` → вторичный state mode.
+    pub const CURRENT_STATE_MODE_B: usize = 0x21AC;
+
+    /// `+0x2780` → `IDXGIFactory1*`
+    pub const DXGI_FACTORY: usize = 0x2780;
+
+    /// `+0x2788` → `D3D_FEATURE_LEVEL`
+    pub const FEATURE_LEVEL: usize = 0x2788;
+
+    /// `+0x2790` → `ID3D11Device*`
+    pub const D3D_DEVICE: usize = 0x2790;
+
+    /// `+0x2798` → `ID3D11DeviceContext*`
+    pub const D3D_CONTEXT: usize = 0x2798;
+
+    /// `+0x27A0` → `M2DE_SwapChainManager*`
+    pub const SWAPCHAIN_MANAGER: usize = 0x27A0;
+
+    /// `+0x27A8` → `M2DE_SwapChainWrapper*`
+    ///
+    /// Это основной путь к текущему DXGI swapchain.
+    pub const CURRENT_SWAPCHAIN: usize = 0x27A8;
+
+    /// `+0x27B0` → дополнительный указатель на активный swapchain wrapper.
+    pub const ACTIVE_SWAPCHAIN: usize = 0x27B0;
+
+    /// `+0x510C` → флаги адаптера / init flags.
+    ///
+    /// Влияют на выбор режима swapchain.
+    pub const ADAPTER_FLAGS: usize = 0x510C;
+
+    /// `+0x5110` → `ID3DUserDefinedAnnotation*` или NULL.
+    pub const DEBUG_ANNOTATION: usize = 0x5110;
+}
+
+pub mod swapchain_manager {
+    /// `+0x00` → root/sentinel узел RB-дерева.
+    ///
+    /// Ключ дерева: `HWND`
+    /// Значение: `M2DE_SwapChainWrapper*`
+    pub const TREE_ROOT: usize = 0x00;
+
+    /// `+0x08` → количество элементов в дереве.
+    pub const TREE_SIZE: usize = 0x08;
+
+    /// `+0x10` → `IDXGIFactory4*`
+    pub const FACTORY: usize = 0x10;
+
+    /// `+0x18` → `ID3D11Device*`
+    pub const DEVICE: usize = 0x18;
+
+    /// `+0x20` → `ID3D11DeviceContext*`
+    pub const CONTEXT: usize = 0x20;
+
+    /// `+0x28` → поддерживается ли `DXGI_FEATURE_PRESENT_ALLOW_TEARING`.
+    pub const TEARING_SUPPORTED: usize = 0x28;
+
+    /// `+0x29` → debug mode флаг.
+    pub const DEBUG_MODE: usize = 0x29;
+}
+
+pub mod swapchain_wrapper {
+    /// `+0x00` → ширина swapchain.
+    pub const WIDTH: usize = 0x00;
+
+    /// `+0x04` → высота swapchain.
+    pub const HEIGHT: usize = 0x04;
+
+    /// `+0x08` → режим / флаг swapchain.
+    pub const SWAPCHAIN_MODE: usize = 0x08;
+
+    /// `+0x10` → HWND окна.
+    pub const HWND: usize = 0x10;
+
+    /// `+0x18` → `IDXGISwapChain1*`
+    ///
+    /// Это raw DXGI swapchain, который нужен для hook'а `Present`.
+    pub const SWAPCHAIN: usize = 0x18;
+
+    /// `+0x20` → `ID3D11Texture2D*` back buffer.
+    pub const BACK_BUFFER: usize = 0x20;
+
+    /// `+0x28` → `ID3D11Texture2D*` depth texture.
+    pub const DEPTH_TEXTURE: usize = 0x28;
+
+    /// `+0x30` → `ID3D11DepthStencilView*`
+    pub const DSV: usize = 0x30;
+
+    /// `+0x38` → `ID3D11RenderTargetView*`
+    pub const RTV: usize = 0x38;
+
+    /// `+0x40` → `ID3D11ShaderResourceView*`
+    pub const SRV: usize = 0x40;
+}
