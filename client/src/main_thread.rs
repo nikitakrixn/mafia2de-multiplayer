@@ -47,6 +47,7 @@ enum ExecResult {
 pub fn on_main_thread_tick() {
     drain_lua_queue(MAX_LUA_PER_TICK);
     refresh_state_if_needed();
+    crate::camera_state::update_main_thread();
     crate::player_tracker::update_main_thread();
     crate::player_events::process_pending();
 }

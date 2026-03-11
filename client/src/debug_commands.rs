@@ -113,22 +113,22 @@ pub fn give_weapon(player: &Player, weapon_id: u32, ammo: u32, name: &str) {
 /// Показать текущий FOV.
 pub fn show_fov() {
     sdk::game::camera::log_status();
+    logger::info(&format!(
+        "[camera-state] desired FOV = {:.1}",
+        crate::camera_state::get_desired_fov()
+    ));
 }
 
 /// Изменить FOV на delta.
 pub fn adjust_fov(delta: f32) {
-    let current = sdk::game::camera::get_interier_fov().unwrap_or(65.0);
+    let current = crate::camera_state::get_desired_fov();
     let new_fov = (current + delta).clamp(30.0, 150.0);
     logger::info(&format!("FOV: {current:.1} → {new_fov:.1}"));
-    sdk::game::camera::set_all_fov(new_fov);
+    crate::camera_state::set_desired_fov(new_fov);
 }
 
 /// Установить FOV для ВСЕХ камер (player + car).
 pub fn set_fov(fov: f32) {
     logger::info(&format!("Устанавливаю FOV для всех камер: {fov:.1}"));
-    if sdk::game::camera::set_all_fov(fov) {
-        logger::info(&format!("  → FOV = {fov:.1} (player + car)"));
-    } else {
-        logger::error("  → Не удалось установить FOV");
-    }
+    crate::camera_state::set_desired_fov(fov);
 }

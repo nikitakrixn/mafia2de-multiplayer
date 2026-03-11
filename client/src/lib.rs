@@ -3,6 +3,7 @@
 //! Инжектится лаунчером в процесс игры.
 //! Точка входа — DllMain → initialize() в отдельном потоке.
 
+mod camera_state;
 mod debug_commands;
 mod events;
 mod hooks;

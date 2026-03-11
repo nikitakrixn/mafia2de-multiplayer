@@ -115,6 +115,18 @@ pub fn process_fired_event(event_id: i32) {
         _ => {}
     }
 
+    // События, после которых камеры часто уже готовы
+    match event_id {
+        ev::MISSION_AFTER_OPEN
+        | ev::GAME_INIT
+        | ev::LOADING_PROCESS_FINISHED
+        | ev::LOADING_FADE_FINISHED
+        | ev::GAME_UNPAUSED => {
+            crate::camera_state::request_apply();
+        }
+        _ => {}
+    }
+
     if should_log_event(event_id) {
         logger::info(&format!(
             "[events] {} ({})",
