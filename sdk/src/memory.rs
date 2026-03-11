@@ -50,13 +50,22 @@ const MIN_VALID_ADDR: usize = 0x10000;
 const MAX_VALID_ADDR: usize = 0x7FFF_FFFF_FFFF;
 
 /// Проверяет, выглядит ли адрес как валидный user-mode указатель.
+///
+/// Не проверяет выравнивание — это зависит от типа данных.
+/// Для указателей на 8-байтные структуры используй is_aligned_ptr.
 pub fn is_valid_ptr(addr: usize) -> bool {
-    (MIN_VALID_ADDR..=MAX_VALID_ADDR).contains(&addr) && addr.is_multiple_of(8)
+    (MIN_VALID_ADDR..=MAX_VALID_ADDR).contains(&addr)
 }
 
-/// Безопасно читает указатель. Проверяет и адрес, и результат.
-///
-/// Возвращает `None` если адрес или прочитанное значение невалидны.
+/// Проверка с учётом выравнивания.
+/// Полезно для указателей на vtable, структуры, COM-объекты.
+pub fn is_aligned_ptr(addr: usize, align: usize) -> bool {
+    is_valid_ptr(addr) && addr.is_multiple_of(align)
+}
+
+/// Безопасно читает указатель (8 байт).
+/// Проверяет что и адрес чтения, и прочитанное значение —
+/// валидные user-mode адреса.
 pub unsafe fn read_ptr(addr: usize) -> Option<usize> {
     if !is_valid_ptr(addr) {
         return None;

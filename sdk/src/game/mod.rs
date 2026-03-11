@@ -25,13 +25,10 @@ pub(crate) fn base() -> usize {
     })
 }
 
-/// Проверяет инициализацию GameManager.
+/// Проверяет что GameManager проинициализирован.
+/// Используем собственный read_ptr для единообразия.
 pub fn is_game_initialized() -> bool {
-    unsafe {
-        let addr = base() + addresses::globals::GAME_MANAGER;
-        let mgr: *const u8 = *(addr as *const *const u8);
-        !mgr.is_null()
-    }
+    unsafe { memory::read_ptr(base() + addresses::globals::GAME_MANAGER).is_some() }
 }
 
 /// Логирует информацию о модуле.

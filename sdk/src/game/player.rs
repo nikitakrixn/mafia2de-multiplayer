@@ -10,7 +10,10 @@ use super::base;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Player {
-    ptr: usize, // C_Human*
+    /// Указатель на C_Human в памяти игры.
+    /// ВАЖНО: этот указатель валиден только в потоке,
+    /// где он был получен. Движок Mafia II не потокобезопасен.
+    ptr: usize,
 }
 
 /// 3D позиция в игровом мире.
@@ -27,8 +30,6 @@ impl std::fmt::Display for Vec3 {
         write!(f, "({:.2}, {:.2}, {:.2})", self.x, self.y, self.z)
     }
 }
-
-unsafe impl Send for Player {}
 
 impl Player {
     // ═══════════════════════════════════════════════════════════════════
