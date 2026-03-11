@@ -14,7 +14,6 @@ pub mod vtables;
 pub mod strings;
 pub mod fields;
 pub mod constants;
-pub mod sigs;
 
 /// Имя основного исполняемого модуля.
 pub const GAME_MODULE: &str = "Mafia II Definitive Edition.exe";

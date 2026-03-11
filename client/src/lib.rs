@@ -10,7 +10,6 @@ mod human_messages;
 mod input;
 mod lua_queue;
 mod main_thread;
-mod monitor;
 mod player_events;
 mod player_tracker;
 mod runtime;
