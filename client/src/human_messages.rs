@@ -70,10 +70,21 @@ pub fn message_name(id: u32) -> &'static str {
 
 /// Обработать одно broadcast-сообщение.
 ///
-/// `entity_ptr` — указатель на сущность, через которую идёт broadcast  
-/// `msg_ptr` — указатель на заголовок сообщения
+/// Вызывается из detour'а на EntityMessageRegistry_Broadcast.
+/// entity_ptr и msg_ptr приходят из движка — обычно валидны,
+/// но лучше перестраховаться, чем ловить access violation в хуке.
 pub fn process_broadcast(entity_ptr: usize, msg_ptr: usize) {
+    // Быстрая отсечка по состоянию сессии — не тратим время
+    // на разбор сообщений в меню/загрузке
     if !matches!(state::get(), GameSessionState::InGame | GameSessionState::Paused) {
+        return;
+    }
+
+    // Проверяем оба указателя перед разыменованием.
+    // В теории движок не должен давать мусор сюда,
+    // но мы в чужом процессе — осторожность не помешает.
+    // К тому же, если msg_ptr невалидный, то разыменование
+    if !sdk::memory::is_valid_ptr(msg_ptr) || !sdk::memory::is_valid_ptr(entity_ptr) {
         return;
     }
 
