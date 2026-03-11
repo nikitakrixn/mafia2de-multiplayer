@@ -103,15 +103,6 @@ pub mod player {
     /// IDA: `0x140DCE920`
     pub const MONEY_CORE_SET: usize = 0xDC_E920;
 
-    // ── Deprecated ──────────────────────────────────────────────────
-
-    #[deprecated = "Use WRAPPER_ADD_WEAPON — needs WrapperPlayer*"]
-    pub const ADD_WEAPON: usize = 0x10C_9560;
-    #[deprecated = "Use get_money_cents() with direct memory read"]
-    pub const GET_MONEY: usize = 0x10C_96B0;
-    #[deprecated = "Use INVENTORY_ADD_MONEY_NOTIFY from game thread"]
-    pub const ADD_MONEY: usize = 0x10C_9520;
-
     // ── Weapon — inventory-level ────────────────────────────────────
 
     /// `char(Inventory*, u32 weapon_id, i32 ammo)` — добавить оружие.
@@ -344,11 +335,6 @@ pub mod tables {
     /// IDA: `0x1400_DC490`
     pub const LOAD_ATTACK_PARAMS: usize = 0xD_C490;
 
-    /// Парсинг name_or_id (число или FNV-1a хеш).
-    ///
-    /// IDA: `0x140A_76940`
-    pub const PARSE_NAME_OR_ID: usize = 0xA7_6940;
-
     /// Получить загрузчик ресурсов.
     ///
     /// IDA: `0x1401_85480`
@@ -396,9 +382,6 @@ pub mod callback_manager {
     /// GetSize() → 8.
     /// IDA: `0x1403_AC3D0`
     pub const GET_SIZE: usize = 0x3A_C3D0;
-    /// RegisterCallback.
-    /// IDA: `0x1403_A08F0`
-    pub const REGISTER_CALLBACK: usize = 0x3A_08F0;
     /// RegisterFunction.
     /// IDA: `0x1403_A06D0`
     pub const REGISTER_FUNCTION: usize = 0x3A_06D0;

@@ -369,3 +369,38 @@ pub mod swapchain_wrapper {
     /// `+0x40` → `ID3D11ShaderResourceView*`
     pub const SRV: usize = 0x40;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  Script Machine (Lua VM)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Менеджер скриптовых машин.
+///
+/// Цепочка до lua_State*:
+/// `g_ScriptMachineManager + 0x08` → vector
+/// `vector + 0x00` → begin (ScriptMachine**)
+/// `array[0]` → Main Game Script Machine
+/// `machine + 0x70` → lua_State*
+pub mod script_machine_manager {
+    /// +0x08 → указатель на std::vector<ScriptMachine*>
+    pub const VECTOR: usize = 0x08;
+}
+
+/// Внутренний std::vector (begin/end/capacity).
+///
+/// Используется для vector'а script machines и других
+/// std::vector в структурах движка.
+pub mod std_vector {
+    /// +0x00 → первый элемент
+    pub const BEGIN: usize = 0x00;
+    /// +0x08 → один за последним
+    pub const END: usize = 0x08;
+    /// +0x10 → конец выделенной памяти
+    pub const CAPACITY: usize = 0x10;
+}
+
+/// Одна ScriptMachine.
+pub mod script_machine {
+    /// +0x70 → lua_State*
+    pub const LUA_STATE: usize = 0x70;
+}

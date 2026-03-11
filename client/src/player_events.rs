@@ -75,22 +75,16 @@ pub fn push(event: PlayerEvent) {
 }
 
 pub fn process_pending() {
-    let mut drained = Vec::new();
-
-    match queue().lock() {
-        Ok(mut q) => {
-            while let Some(ev) = q.pop_front() {
-                drained.push(ev);
-            }
-        }
+    let drained: Vec<_> = match queue().lock() {
+        Ok(mut q) => q.drain(..).collect(),
         Err(_) => {
-            logger::error("[player-events] mutex poisoned in process_pending");
+            logger::error("[player-events] mutex poisoned");
             return;
         }
-    }
-
-    for ev in drained {
-        log_event(&ev);
+    };
+    
+    for ev in &drained {
+        log_event(ev);
     }
 }
 

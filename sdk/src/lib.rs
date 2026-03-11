@@ -19,6 +19,8 @@
 //! player.add_money(10_000);
 //! ```
 
+pub(crate) mod macros;
+
 pub mod addresses;
 pub mod structures;
 pub mod game;
