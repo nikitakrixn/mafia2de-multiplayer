@@ -1,13 +1,14 @@
-//! High-level API для доступа к DX11 render path игры.
+//! Доступ к DX11 render path игры.
 //!
-//! Этот модуль нужен injected-клиенту, чтобы без pattern-scan и без догадок:
-//! - получить `ID3D11Device*`
-//! - получить `ID3D11DeviceContext*`
-//! - получить текущий `IDXGISwapChain1*`
-//! - получить `ID3D11RenderTargetView*` текущего backbuffer
-//! - получить HWND и размеры рендера
+//! Через этот модуль injected-клиент получает:
+//! - ID3D11Device* / ID3D11DeviceContext*
+//! - IDXGISwapChain1* (для Present hook и overlay)
+//! - ID3D11RenderTargetView* текущего backbuffer
+//! - HWND и размеры рендера
 //!
-//! Это удобно и для overlay/debug UI, и для диагностики render lifecycle.
+//! Все функции читают данные из глобального singleton'а
+//! M2DE_C_RenderDeviceD3D11. Если рендер ещё не инициализирован —
+//! возвращают None.
 
 use common::logger;
 
@@ -23,9 +24,10 @@ use crate::{
 
 use super::base;
 
-/// Снимок текущего runtime-состояния рендера.
+/// Снимок текущего состояния рендера.
 ///
-/// Это просто удобная структура для логов и overlay-диагностики.
+/// Удобно для логов, диагностики и проверки готовности overlay.
+/// Все поля — копии на момент вызова, не живые указатели.
 #[derive(Debug, Clone, Copy)]
 pub struct RenderRuntimeInfo {
     pub render_device_ptr: usize,
@@ -47,123 +49,143 @@ pub struct RenderRuntimeInfo {
     pub back_buffer_ptr: usize,
 }
 
-/// Возвращает указатель на глобальный `M2DE_C_RenderDeviceD3D11`.
+// ═══════════════════════════════════════════════════════════════════
+//  Чтение основных объектов
+// ═══════════════════════════════════════════════════════════════════
+
+/// Указатель на глобальный M2DE_C_RenderDeviceD3D11.
 pub fn get_render_device_ptr() -> Option<usize> {
     unsafe { memory::read_ptr(base() + addresses::globals::RENDER_DEVICE) }
 }
 
-/// Читает snapshot структуры `C_RenderDeviceD3D11`.
+/// Прочитать копию структуры C_RenderDeviceD3D11.
+/// Структура большая (~20KB) — не вызывать в горячем пути.
 pub fn get_render_device() -> Option<CRenderDeviceD3D11> {
     let ptr = get_render_device_ptr()?;
     unsafe { memory::read_value::<CRenderDeviceD3D11>(ptr) }
 }
 
-/// Возвращает указатель на `SwapChainManager`.
+/// Указатель на SwapChainManager.
 pub fn get_swapchain_manager_ptr() -> Option<usize> {
     let rd = get_render_device()?;
     let ptr = rd.swapchain_manager as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Читает `SwapChainManager`.
+/// Прочитать SwapChainManager.
 pub fn get_swapchain_manager() -> Option<SwapChainManager> {
     let ptr = get_swapchain_manager_ptr()?;
     unsafe { memory::read_value::<SwapChainManager>(ptr) }
 }
 
-/// Возвращает указатель на текущий `SwapChainWrapper`.
+/// Указатель на текущий SwapChainWrapper.
 pub fn get_swapchain_wrapper_ptr() -> Option<usize> {
     let rd = get_render_device()?;
     let ptr = rd.current_swapchain as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Читает текущий `SwapChainWrapper`.
+/// Прочитать текущий SwapChainWrapper.
 pub fn get_swapchain_wrapper() -> Option<SwapChainWrapper> {
     let ptr = get_swapchain_wrapper_ptr()?;
     unsafe { memory::read_value::<SwapChainWrapper>(ptr) }
 }
 
-/// Возвращает raw `IDXGISwapChain1*`.
+// ═══════════════════════════════════════════════════════════════════
+//  Отдельные указатели на DX-объекты
+// ═══════════════════════════════════════════════════════════════════
+
+/// IDXGISwapChain1* — нужен для Present hook.
 pub fn get_swapchain_ptr() -> Option<usize> {
     let sc = get_swapchain_wrapper()?;
     let ptr = sc.swapchain as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает `ID3D11Device*`.
+/// ID3D11Device*
 pub fn get_d3d_device_ptr() -> Option<usize> {
     let rd = get_render_device()?;
     let ptr = rd.d3d_device as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает `ID3D11DeviceContext*`.
+/// ID3D11DeviceContext*
 pub fn get_d3d_context_ptr() -> Option<usize> {
     let rd = get_render_device()?;
     let ptr = rd.d3d_context as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает `IDXGIFactory1*`.
+/// IDXGIFactory1*
 pub fn get_dxgi_factory_ptr() -> Option<usize> {
     let rd = get_render_device()?;
     let ptr = rd.dxgi_factory as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает `ID3D11RenderTargetView*` текущего backbuffer.
+/// ID3D11RenderTargetView* текущего backbuffer.
 pub fn get_backbuffer_rtv_ptr() -> Option<usize> {
     let sc = get_swapchain_wrapper()?;
     let ptr = sc.rtv as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает `ID3D11DepthStencilView*`.
+/// ID3D11DepthStencilView*
 pub fn get_backbuffer_dsv_ptr() -> Option<usize> {
     let sc = get_swapchain_wrapper()?;
     let ptr = sc.dsv as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает `ID3D11Texture2D*` backbuffer.
+/// ID3D11Texture2D* backbuffer.
 pub fn get_backbuffer_texture_ptr() -> Option<usize> {
     let sc = get_swapchain_wrapper()?;
     let ptr = sc.back_buffer as usize;
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-/// Возвращает HWND окна игры.
+// ═══════════════════════════════════════════════════════════════════
+//  Параметры рендера
+// ═══════════════════════════════════════════════════════════════════
+
+/// HWND окна игры.
 pub fn get_hwnd() -> Option<usize> {
     let sc = get_swapchain_wrapper()?;
     (sc.hwnd != 0).then_some(sc.hwnd)
 }
 
-/// Возвращает размеры из текущего swapchain wrapper.
+/// Размеры из текущего swapchain wrapper (backbuffer).
 pub fn get_swapchain_size() -> Option<(u32, u32)> {
     let sc = get_swapchain_wrapper()?;
     Some((sc.width, sc.height))
 }
 
-/// Возвращает размеры рендера из render init config.
+/// Размеры из render init config (могут отличаться при resize).
 pub fn get_render_size() -> Option<(u32, u32)> {
     let rd = get_render_device()?;
     Some((rd.render_init.width, rd.render_init.height))
 }
 
-/// Возвращает текущий `D3D_FEATURE_LEVEL`.
+/// Текущий D3D_FEATURE_LEVEL (0xB000 = 11.0, 0xB100 = 11.1).
 pub fn get_feature_level() -> Option<u32> {
     let rd = get_render_device()?;
     Some(rd.feature_level)
 }
 
-/// Возвращает tearing support флаг.
+/// Поддерживается ли tearing (DXGI_FEATURE_PRESENT_ALLOW_TEARING).
 pub fn is_tearing_supported() -> Option<bool> {
     let mgr = get_swapchain_manager()?;
     Some(mgr.tearing_supported != 0)
 }
 
-/// Возвращает true, если render path уже готов для overlay.
+// ═══════════════════════════════════════════════════════════════════
+//  Проверка готовности
+// ═══════════════════════════════════════════════════════════════════
+
+/// Готов ли render path для overlay.
+///
+/// Проверяет всю цепочку: render device → device → context →
+/// → swapchain → RTV. Если хотя бы одно звено NULL — не готов.
 pub fn is_overlay_ready() -> bool {
     get_render_device_ptr().is_some()
         && get_d3d_device_ptr().is_some()
@@ -172,21 +194,25 @@ pub fn is_overlay_ready() -> bool {
         && get_backbuffer_rtv_ptr().is_some()
 }
 
-/// Переводит `D3D_FEATURE_LEVEL` в человекочитаемую строку.
+/// D3D_FEATURE_LEVEL → человекочитаемое имя.
 pub fn feature_level_name(level: u32) -> &'static str {
     match level {
-        0x9100 => "D3D_FEATURE_LEVEL_9_1",
-        0x9200 => "D3D_FEATURE_LEVEL_9_2",
-        0x9300 => "D3D_FEATURE_LEVEL_9_3",
-        0xA000 => "D3D_FEATURE_LEVEL_10_0",
-        0xA100 => "D3D_FEATURE_LEVEL_10_1",
-        0xB000 => "D3D_FEATURE_LEVEL_11_0",
-        0xB100 => "D3D_FEATURE_LEVEL_11_1",
-        _ => "UNKNOWN",
+        0x9100 => "9.1",
+        0x9200 => "9.2",
+        0x9300 => "9.3",
+        0xA000 => "10.0",
+        0xA100 => "10.1",
+        0xB000 => "11.0",
+        0xB100 => "11.1",
+        _ => "неизвестно",
     }
 }
 
-/// Собирает удобный runtime snapshot.
+// ═══════════════════════════════════════════════════════════════════
+//  Диагностика
+// ═══════════════════════════════════════════════════════════════════
+
+/// Собрать полный снимок состояния рендера.
 pub fn get_runtime_info() -> Option<RenderRuntimeInfo> {
     let render_device_ptr = get_render_device_ptr()?;
     let rd = get_render_device()?;
@@ -214,17 +240,19 @@ pub fn get_runtime_info() -> Option<RenderRuntimeInfo> {
     })
 }
 
-/// Пишет в лог краткий snapshot render state.
+/// Вывести в лог состояние рендера.
 ///
-/// Удобно вызывать после инъекта и после загрузки мира.
+/// Удобно вызывать после инжекта и после загрузки мира —
+/// сразу видно какой device, какой feature level,
+/// работает ли tearing и т.д.
 pub fn dump_runtime_info() {
     let Some(info) = get_runtime_info() else {
-        logger::warn("[render] render path пока не готов");
+        logger::warn("[render] render path ещё не готов");
         return;
     };
 
     logger::info(&format!(
-        "[render] render_device=0x{:X} factory=0x{:X} device=0x{:X} context=0x{:X}",
+        "[render] device=0x{:X} factory=0x{:X} d3d_device=0x{:X} context=0x{:X}",
         info.render_device_ptr,
         info.dxgi_factory_ptr,
         info.d3d_device_ptr,
@@ -239,17 +267,13 @@ pub fn dump_runtime_info() {
     ));
 
     logger::info(&format!(
-        "[render] size={}x{} rtv=0x{:X} dsv=0x{:X} backbuffer=0x{:X}",
-        info.width,
-        info.height,
-        info.rtv_ptr,
-        info.dsv_ptr,
-        info.back_buffer_ptr,
+        "[render] {}x{} rtv=0x{:X} dsv=0x{:X} backbuffer=0x{:X}",
+        info.width, info.height,
+        info.rtv_ptr, info.dsv_ptr, info.back_buffer_ptr,
     ));
 
     logger::info(&format!(
-        "[render] feature_level=0x{:X} ({}) flags=0x{:X} tearing={} dx_initialized={}",
-        info.feature_level,
+        "[render] feature_level={} flags=0x{:X} tearing={} dx_init={}",
         feature_level_name(info.feature_level),
         info.adapter_flags,
         info.tearing_supported,
