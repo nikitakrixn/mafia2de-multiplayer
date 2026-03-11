@@ -10,6 +10,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, VK_INSERT, VK_DELETE,
     VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6,
     VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12,
+    VK_ADD, VK_SUBTRACT, VK_MULTIPLY,
     VIRTUAL_KEY,
 };
 
@@ -41,6 +42,9 @@ pub fn log_keybinds() {
     logger::info("    F10    — Показать баланс");
     logger::info("    F11    — Дать Thompson + 200 патронов");
     logger::info("    F12    — Дать Colt 1911 + 50 патронов");
+    logger::info("    Num+   — FOV +5");
+    logger::info("    Num-   — FOV -5");
+    logger::info("    Num*   — Показать FOV / сброс на 65");
 }
 
 /// Главный цикл обработки ввода.
@@ -88,5 +92,8 @@ pub fn run() {
         if just_pressed(VK_F10) { debug_commands::show_balance(&player); }
         if just_pressed(VK_F11) { debug_commands::give_weapon(&player, sdk::addresses::constants::weapons::THOMPSON_1928, 200, "Thompson 1928"); }
         if just_pressed(VK_F12) { debug_commands::give_weapon(&player, sdk::addresses::constants::weapons::COLT_M1911A1, 50, "Colt M1911A1"); }
+        if just_pressed(VK_ADD) { debug_commands::adjust_fov(5.0); }
+        if just_pressed(VK_SUBTRACT) { debug_commands::adjust_fov(-5.0); }
+        if just_pressed(VK_MULTIPLY) { debug_commands::show_fov(); }
     }
 }

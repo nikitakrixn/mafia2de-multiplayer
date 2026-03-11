@@ -236,3 +236,40 @@ pub mod message_ranges {
         msg_id >> 16
     }
 }
+
+/// Индексы параметров камеры в массиве DefaultParams/State.Params.
+///
+/// Строковая таблица: `0x1418ED230`, 27 записей по 0x23 байт.
+/// Формула: `offset = base + index * 4` (для float массива).
+pub mod camera_params {
+    pub const DISTANCE: usize = 0;
+    pub const MIN_DISTANCE: usize = 1;
+    pub const MAX_OFF_WALL_SHIFT_DISTANCE: usize = 2;
+    pub const DISTANCE_EXPONENT: usize = 3;
+    pub const FOV: usize = 4;
+    pub const MIN_ROT_Z: usize = 5;
+    pub const MAX_ROT_Z: usize = 6;
+    pub const SLOPE: usize = 7;
+    pub const CIRCLE_RADIUS: usize = 8;
+    pub const CIRCLE_HEIGHT: usize = 9;
+    pub const CIRCLE_SIDE_RIGHT: usize = 10;
+    pub const CIRCLE_SIDE_LEFT: usize = 11;
+    pub const CIRCLE_MIN_RADIUS: usize = 12;
+    pub const ELLIPSE_MAJOR_AXIS: usize = 13;
+    pub const ELLIPSE_MINOR_AXIS: usize = 14;
+    pub const ELLIPSE_MIN_ANGLE: usize = 15;
+    pub const ELLIPSE_MAX_ANGLE: usize = 16;
+    pub const SWITCH_SIDE_SPEED: usize = 17;
+    pub const FOV_DOWN_START_ANGLE: usize = 18;
+    pub const FOV_DOWN_MAX: usize = 19;
+    pub const FOLLOW_SPEED: usize = 20;
+    pub const AUTO_Z_SPEED: usize = 21;
+    pub const PREDICTION: usize = 22;
+    pub const DEFAULT_Z_ROT: usize = 23;
+    pub const Z_RESPONSE: usize = 24;
+    pub const Z_RESP_LIMIT_UP: usize = 25;
+    pub const Z_RESP_LIMIT_DOWN: usize = 26;
+
+    /// Общее количество параметров.
+    pub const COUNT: usize = 27;
+}

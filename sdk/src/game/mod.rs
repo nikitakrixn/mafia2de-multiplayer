@@ -5,6 +5,7 @@
 //! и прочую низкоуровневую механику.
 
 pub mod callbacks;
+pub mod camera;
 pub mod player;
 pub mod lua;
 pub mod render;

@@ -109,3 +109,26 @@ pub fn give_weapon(player: &Player, weapon_id: u32, ammo: u32, name: &str) {
         logger::error(&format!("  → Не удалось добавить {name}"));
     }
 }
+
+/// Показать текущий FOV.
+pub fn show_fov() {
+    sdk::game::camera::log_status();
+}
+
+/// Изменить FOV на delta.
+pub fn adjust_fov(delta: f32) {
+    let current = sdk::game::camera::get_interier_fov().unwrap_or(65.0);
+    let new_fov = (current + delta).clamp(30.0, 150.0);
+    logger::info(&format!("FOV: {current:.1} → {new_fov:.1}"));
+    sdk::game::camera::set_player_fov(new_fov);
+}
+
+/// Установить конкретный FOV.
+pub fn set_fov(fov: f32) {
+    logger::info(&format!("Устанавливаю FOV: {fov:.1}"));
+    if sdk::game::camera::set_player_fov(fov) {
+        logger::info(&format!("  → FOV = {fov:.1}"));
+    } else {
+        logger::error("  → Не удалось установить FOV");
+    }
+}

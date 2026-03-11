@@ -404,3 +404,106 @@ pub mod script_machine {
     /// +0x70 → lua_State*
     pub const LUA_STATE: usize = 0x70;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  Camera System
+// ═══════════════════════════════════════════════════════════════════
+
+/// CameraManager — статический объект, НЕ указатель.
+///
+/// Доступ: `module_base + globals::CAMERA_MANAGER + offset`
+///
+/// Содержит два PlayerCameraView (Interier/Exterier),
+/// TransitSpeed, и все конфиги автомобильных камер.
+pub mod camera_manager {
+    /// Interier PlayerCameraView base (0xD18 bytes).
+    pub const INTERIER_VIEW: usize = 0x0000;
+    /// Exterier PlayerCameraView base (0xD18 bytes).
+    pub const EXTERIER_VIEW: usize = 0x0D18;
+
+    /// Interier default FOV (float).
+    /// = INTERIER_VIEW + camera_view::DEFAULT_PARAMS + FOV_INDEX * 4
+    pub const INTERIER_DEFAULT_FOV: usize = 0x0C80;
+    /// Exterier default FOV (float).
+    /// = EXTERIER_VIEW + camera_view::DEFAULT_PARAMS + FOV_INDEX * 4
+    pub const EXTERIER_DEFAULT_FOV: usize = 0x1998;
+
+    /// TransitSpeed Exterier (float).
+    pub const TRANSIT_SPEED_EXTERIER: usize = 0x1A30;
+    /// TransitSpeed Interier (float).
+    pub const TRANSIT_SPEED_INTERIER: usize = 0x1A34;
+    /// PlayerCamera loaded flag (byte).
+    pub const PLAYER_CAMERA_LOADED: usize = 0x1FB4;
+
+    // ── Car/other camera param destinations ──
+
+    /// carCameraBumper params (Fov[4]).
+    pub const CAR_CAMERA_BUMPER_PARAMS: usize = 0x21D8;
+    /// carCameraWheel params (Fov[4]).
+    pub const CAR_CAMERA_WHEEL_PARAMS: usize = 0x21E8;
+    /// carCameraHood params (Fov[4]).
+    pub const CAR_CAMERA_HOOD_PARAMS: usize = 0x21F8;
+    /// carCameraShoot params (RotRatioX[15]).
+    pub const CAR_CAMERA_SHOOT_PARAMS: usize = 0x2208;
+    /// carCameraDynamic params (RotRatioX[25]).
+    pub const CAR_CAMERA_DYNAMIC_PARAMS: usize = 0x2244;
+    /// carCameraDynamicLong params (RotRatioX[25]).
+    pub const CAR_CAMERA_DYNAMIC_LONG_PARAMS: usize = 0x22A8;
+    /// carCameraLookback params (Fov[4]).
+    pub const CAR_CAMERA_LOOKBACK_PARAMS: usize = 0x230C;
+    /// carCameraGamepad params (RotRatioX[24]).
+    pub const CAR_CAMERA_GAMEPAD_PARAMS: usize = 0x231C;
+    /// fpvCamera params (Fov[8]).
+    pub const FPV_CAMERA_PARAMS: usize = 0x275C;
+    /// deathCamera params (Fov[2]).
+    pub const DEATH_CAMERA_PARAMS: usize = 0x277C;
+    /// meeleeCamera params (MinDistance[28]).
+    pub const MEELEE_CAMERA_PARAMS: usize = 0x2784;
+}
+
+/// PlayerCameraView — одна камерная "виды" (Interier или Exterier).
+///
+/// Размер: 0xD18 (3352) байт.
+///
+/// Содержит 15 state-блоков + defaults.
+/// State names: Stay, Walk, Run, Sprint, ...
+///
+/// Каждый state содержит:
+/// - Params\[27\] (float) — параметры камеры
+/// - Speeds\[15\] (float) — скорости переходов
+/// - ParamFlags\[27\] (byte) — 0=override, 1=use default
+/// - SpeedFlags\[15\] (byte)
+pub mod camera_view {
+    /// Full size of one CameraView.
+    pub const SIZE: usize = 0xD18;
+    /// Number of camera states per view.
+    pub const NUM_STATES: usize = 15;
+    /// Number of parameters per state.
+    pub const NUM_PARAMS: usize = 27;
+    /// Number of speed values per state.
+    pub const NUM_SPEEDS: usize = 15;
+
+    // ── State layout ──
+
+    /// Base offset of State\[0\] from CameraView start.
+    pub const STATES_BASE: usize = 0x04;
+    /// Stride between consecutive states (212 bytes).
+    pub const STATE_STRIDE: usize = 0xD4;
+
+    /// Within a state block: offset to Params\[27\] array (float\[27\]).
+    pub const STATE_PARAMS_OFFSET: usize = 0x00;
+    /// Within a state block: offset to Speeds\[15\] array (float\[15\]).
+    pub const STATE_SPEEDS_OFFSET: usize = 0x6C;
+    /// Within a state block: offset to ParamFlags\[27\] (byte\[27\]).
+    /// 0 = has override value, 1 = use default.
+    pub const STATE_PARAM_FLAGS_OFFSET: usize = 0xA8;
+    /// Within a state block: offset to SpeedFlags\[15\] (byte\[15\]).
+    pub const STATE_SPEED_FLAGS_OFFSET: usize = 0xC3;
+
+    // ── Defaults ──
+
+    /// Offset of DefaultParams\[27\] from CameraView start (float\[27\]).
+    pub const DEFAULT_PARAMS: usize = 0xC70;
+    /// Offset of DefaultSpeeds\[15\] from CameraView start (float\[15\]).
+    pub const DEFAULT_SPEEDS: usize = 0xCDC;
+}

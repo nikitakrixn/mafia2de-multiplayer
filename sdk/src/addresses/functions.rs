@@ -897,3 +897,52 @@ pub mod render {
     /// IDA: `0x14153F0B5`
     pub const CREATE_DXGI_FACTORY1_THUNK: usize = 0x153_F0B5;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Camera System
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod camera {
+    /// Инициализация всей камерной системы.
+    /// Загружает все XML-конфиги, создаёт camera component.
+    ///
+    /// `void(SystemContext*)`
+    ///
+    /// IDA: `0x141008230`
+    pub const SYSTEM_INIT: usize = 0x100_8230;
+
+    /// Switch-диспетчер загрузки камерного конфига по ID.
+    ///
+    /// `__int64(CameraManager*, int config_id)`
+    ///
+    /// IDA: `0x140E767E0`
+    pub const LOAD_CONFIG_BY_ID: usize = 0xE7_67E0;
+
+    /// Загрузка playerCamera.xml.
+    ///
+    /// `void(CameraManager*, char use_defaults_only)`
+    ///
+    /// IDA: `0x140E75CC0`
+    pub const LOAD_PLAYER_CAMERA: usize = 0xE7_5CC0;
+
+    /// Парсинг одного CameraView (Interier/Exterier) из XML.
+    ///
+    /// `char(CameraManager*, XMLNode*, CameraView*)`
+    ///
+    /// IDA: `0x140E7D020`
+    pub const VIEW_PARSE_FROM_XML: usize = 0xE7_D020;
+
+    /// Generic загрузчик для car/other camera конфигов.
+    ///
+    /// `__int64(CameraManager*, const char* path, DWORD* params, DWORD* effects, const char* names, int count)`
+    ///
+    /// IDA: `0x140E755E0`
+    pub const LOAD_GENERIC_CONFIG: usize = 0xE7_55E0;
+
+    /// Копирование DefaultParams/Speeds во все 15 states.
+    ///
+    /// `void(CameraView*, int)`
+    ///
+    /// IDA: `0x140E6BC00`
+    pub const VIEW_COPY_DEFAULTS_TO_STATES: usize = 0xE6_BC00;
+}

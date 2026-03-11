@@ -135,3 +135,19 @@ pub const RENDER_MAX_TEXTURE_SIZE_LOCAL: usize = 0x1C3_589C;
 ///
 /// IDA: `dword_141C358A0`
 pub const RENDER_MAX_TEXTURE_SIZE_REMOTE: usize = 0x1C3_58A0;
+
+/// `M2DE_g_CameraManager` — static (in-place) camera manager object.
+///
+/// ⚠️ Unlike most globals, this is NOT a pointer to an object!
+/// The object itself lives at this address in .bss section.
+/// Access: `(module_base + CAMERA_MANAGER) as *mut u8`
+/// Do NOT double-dereference like other globals!
+///
+/// Contains:
+/// - Interier PlayerCameraView at +0x0000 (0xD18 bytes)
+/// - Exterier PlayerCameraView at +0x0D18 (0xD18 bytes)
+/// - Car camera configs at +0x21D8..+0x2784
+/// - See `fields::camera_manager` for full layout.
+///
+/// IDA: `0x1431430F0` (`M2DE_g_CameraManager`)
+pub const CAMERA_MANAGER: usize = 0x314_30F0;

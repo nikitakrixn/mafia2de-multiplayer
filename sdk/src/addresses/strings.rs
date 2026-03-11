@@ -51,3 +51,11 @@ pub mod render_strings {
     /// IDA: `0x1418A3C88`
     pub const D3D11_RENDERING_DEVICE: usize = 0x18A_3C88;
 }
+
+pub mod camera_strings {
+    /// "/config/gameCamera/playerCamera.xml"
+    pub const PLAYER_CAMERA_XML: usize = 0x18E_CFE8;
+    /// Строковая таблица имён параметров камеры (27 записей, stride 0x23).
+    /// Первая: "Distance", индекс 4: "Fov".
+    pub const PARAM_NAMES_TABLE: usize = 0x18E_D230;
+}
