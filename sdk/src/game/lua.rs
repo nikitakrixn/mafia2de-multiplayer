@@ -43,27 +43,27 @@ type LuaSetTopFn = unsafe extern "C" fn(usize, i32);
 type LuaGetTopFn = unsafe extern "C" fn(usize) -> i32;
 
 fn lua_loadbuffer() -> LuaLoadBufferFn {
-    unsafe { std::mem::transmute(base() + addresses::functions::lua::LOADBUFFER) }
+    unsafe { memory::fn_at(base() + addresses::functions::lua::LOADBUFFER) }
 }
 
 fn lua_loadstring() -> LuaLoadStringFn {
-    unsafe { std::mem::transmute(base() + addresses::functions::lua::LOADSTRING) }
+    unsafe { memory::fn_at(base() + addresses::functions::lua::LOADSTRING) }
 }
 
 fn lua_pcall() -> LuaPcallFn {
-    unsafe { crate::memory::fn_at(base() + addresses::functions::lua::PCALL) }
+    unsafe { memory::fn_at(base() + addresses::functions::lua::PCALL) }
 }
 
 fn lua_tolstring() -> LuaTolStringFn {
-    unsafe { std::mem::transmute(base() + addresses::functions::lua::TOLSTRING) }
+    unsafe { memory::fn_at(base() + addresses::functions::lua::TOLSTRING) }
 }
 
 fn lua_settop() -> LuaSetTopFn {
-    unsafe { std::mem::transmute(base() + addresses::functions::lua::SETTOP) }
+    unsafe { memory::fn_at(base() + addresses::functions::lua::SETTOP) }
 }
 
 fn lua_gettop() -> LuaGetTopFn {
-    unsafe { std::mem::transmute(base() + addresses::functions::lua::GETTOP) }
+    unsafe { memory::fn_at(base() + addresses::functions::lua::GETTOP) }
 }
 
 struct LuaStackGuard {

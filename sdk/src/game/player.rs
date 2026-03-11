@@ -262,7 +262,7 @@ impl Player {
 
             type GetPosFn = unsafe extern "C" fn(usize, *mut Vec3) -> *mut Vec3;
             let func: GetPosFn =
-                std::mem::transmute(base() + addresses::functions::entity::GET_POS);
+                memory::fn_at(base() + addresses::functions::entity::GET_POS);
 
             let ret = func(self.ptr, &mut out as *mut Vec3);
             if ret.is_null() {
@@ -327,7 +327,7 @@ impl Player {
         unsafe {
             type SetPosFn = unsafe extern "C" fn(usize, *const Vec3);
             let func: SetPosFn =
-                std::mem::transmute(base() + addresses::functions::entity::SET_POS);
+                memory::fn_at(base() + addresses::functions::entity::SET_POS);
 
             func(self.ptr, pos as *const Vec3);
             true
@@ -355,7 +355,7 @@ impl Player {
 
         type AddWeaponFn = unsafe extern "C" fn(usize, u32, i32) -> u8;
         let func: AddWeaponFn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player::INVENTORY_ADD_WEAPON_CORE)
+            memory::fn_at(base() + addresses::functions::player::INVENTORY_ADD_WEAPON_CORE)
         };
 
         logger::debug(&format!(
@@ -385,7 +385,7 @@ impl Player {
 
         type AddAmmoFn = unsafe extern "C" fn(usize, u32, u32);
         let func: AddAmmoFn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player::INVENTORY_ADD_AMMO)
+            memory::fn_at(base() + addresses::functions::player::INVENTORY_ADD_AMMO)
         };
 
         unsafe { func(inv, weapon_id, ammo) };
@@ -405,7 +405,7 @@ impl Player {
 
         type Fn = unsafe extern "C" fn(usize) -> i64;
         let func: Fn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player_control::IS_LOCKED)
+            memory::fn_at(base() + addresses::functions::player_control::IS_LOCKED)
         };
 
         Some(unsafe { func(control) != 0 })
@@ -419,7 +419,7 @@ impl Player {
 
         type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
         let func: Fn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player_control::SET_LOCKED)
+            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED)
         };
 
         unsafe { func(control, locked as u8, 0) };
@@ -434,7 +434,7 @@ impl Player {
 
         type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
         let func: Fn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player_control::SET_LOCKED)
+            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED)
         };
 
         unsafe { func(control, 1, 1) };
@@ -446,7 +446,7 @@ impl Player {
 
         type Fn = unsafe extern "C" fn(usize) -> *const i8;
         let func: Fn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player_control::GET_STYLE_STR)
+            memory::fn_at(base() + addresses::functions::player_control::GET_STYLE_STR)
         };
 
         let ptr = unsafe { func(control) };
@@ -470,7 +470,7 @@ impl Player {
 
         type Fn = unsafe extern "C" fn(usize, *const i8) -> i64;
         let func: Fn = unsafe {
-            std::mem::transmute(base() + addresses::functions::player_control::SET_STYLE_STR)
+            memory::fn_at(base() + addresses::functions::player_control::SET_STYLE_STR)
         };
 
         unsafe { func(control, c_style.as_ptr()) != 0 }
