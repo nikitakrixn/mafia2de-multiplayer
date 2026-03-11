@@ -1,73 +1,57 @@
-use std::ffi::c_void;
+//! Система entity/human сообщений движка.
+//!
+//! Движок рассылает сообщения через EntityMessageRegistry_Broadcast.
+//! Каждое сообщение начинается с EntityMessageHeader (0x20 байт),
+//! за которым идёт payload конкретного типа.
+//!
+//! Подтверждённые источники:
+//! - M2DE_EntityMessageRegistry_Broadcast (0x1403A6DB0)
+//! - M2DE_HumanEntity_HandleMessage (0x140DC2CC0)
+//! - M2DE_HumanEntity_ProcessDeath (0x140DD2460)
+//! - M2DE_Human_SendEnterVehicleMessage (0x140DA4C80)
 
-/// Общий заголовок entity/human сообщения движка.
+use std::ffi::c_void;
+use crate::macros::{assert_field_offsets, assert_layout};
+
+/// Общий заголовок entity/human сообщения.
 ///
-/// Это базовая часть, которая встречается у всех сообщений.
-/// Конкретные типы сообщений добавляют свой payload начиная с `+0x20`.
-///
-/// Подтверждено:
-/// - `message_id` читается из `+0x14` в `M2DE_EntityMessageRegistry_Broadcast`
-/// - `+0x0C` автозаполняется broadcaster'ом, если было 0
-/// - `+0x1C` ставится в `1` при конструировании сообщения
-///
-/// Источники:
-/// - `M2DE_EntityMessageRegistry_Broadcast` (`0x1403A6DB0`)
-/// - `M2DE_HumanEntity_HandleMessage` (`0x140DC2CC0`)
-/// - `M2DE_HumanEntity_ProcessDeath` (`0x140DD2460`)
-/// - `M2DE_Human_SendEnterVehicleMessage` (`0x140DA4C80`)
+/// Все сообщения начинаются с этой структуры (0x20 байт).
+/// Тип сообщения определяется по `message_id`.
+/// Payload идёт сразу за заголовком начиная с +0x20.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct EntityMessageHeader {
     /// VTable конкретного типа сообщения.
-    ///
-    /// По vtable движок получает тип сообщения и данные payload
-    /// через виртуальные методы.
-    pub vtable: *const c_void, // +0x00
+    /// Через vtable движок определяет тип и читает payload.
+    pub vtable: *const c_void,              // +0x00
 
-    /// Пока не до конца расшифровано.
-    ///
-    /// Иногда совпадает с другими значениями сообщения,
-    /// поэтому оставляем нейтральное имя.
-    pub field_08: u32, // +0x08
+    /// Пока не расшифровано полностью.
+    pub field_08: u32,                      // +0x08
 
     /// ID сущности-широковещателя.
-    ///
-    /// В `M2DE_EntityMessageRegistry_Broadcast`:
-    /// если это поле равно 0, движок записывает сюда `[entity + 0x24]`.
-    pub broadcaster_id: u32, // +0x0C
+    /// Если 0 при отправке — движок заполнит из [entity + 0x24].
+    pub broadcaster_id: u32,                // +0x0C
 
     /// ID сущности, связанной с сообщением.
-    ///
-    /// Почти всегда sender-path явно пишет сюда `[entity + 0x24]`.
-    /// Пока используем нейтральное имя `entity_id`, без слишком смелых выводов.
-    pub entity_id: u32, // +0x10
+    /// Sender-path обычно пишет сюда [entity + 0x24].
+    pub entity_id: u32,                     // +0x10
 
     /// Основной ID сообщения.
-    ///
-    /// Примеры:
-    /// - `0xD0010` = DAMAGE
-    /// - `0xD0014` = DEATH
-    /// - `0xD001B` = ENTER_VEHICLE
-    /// - `0xD001C` = LEAVE_VEHICLE
-    pub message_id: u32, // +0x14
+    /// Примеры: 0xD0010 (DAMAGE), 0xD0014 (DEATH),
+    /// 0xD001B (ENTER_VEHICLE), 0xD001C (LEAVE_VEHICLE).
+    pub message_id: u32,                    // +0x14
 
-    /// Почти всегда `0xFFFFFFFF`.
-    pub sentinel: u32, // +0x18
+    /// Почти всегда 0xFFFFFFFF.
+    pub sentinel: u32,                      // +0x18
 
-    /// Флаг активности/валидности сообщения.
-    ///
-    /// Во всех подтверждённых sender-path ставится в `1`.
-    pub active_flag: u8, // +0x1C
-    pub _pad_1d: [u8; 3], // +0x1D
+    /// Флаг активности. Во всех sender-path ставится в 1.
+    pub active_flag: u8,                    // +0x1C
+    pub _pad_1d: [u8; 3],                   // +0x1D
 }
 
 impl EntityMessageHeader {
-    /// Упрощённая классификация по "старшим" битам id.
-    ///
-    /// Практически это совпадает с event_type family:
-    /// - `0x5`  -> low-level entity messages
-    /// - `0xD`  -> HUMAN messages
-    /// - `0x12` -> traffic/AI related
+    /// Классификация по старшим битам message_id.
+    /// 0x5 = low-level entity, 0xD = HUMAN, 0x12 = traffic/AI.
     pub fn message_family(&self) -> u32 {
         self.message_id >> 16
     }
@@ -77,30 +61,23 @@ impl EntityMessageHeader {
     }
 }
 
-/// Payload DAMAGE-сообщения (`0xD0010`).
+/// Payload DAMAGE-сообщения (0xD0010).
 ///
-/// Подтверждено по `M2DE_HumanEntity_HandleMessage`.
+/// Подтверждено по M2DE_HumanEntity_HandleMessage.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct DamageMessagePayload {
-    /// Зона попадания / hit area.
-    pub hit_area: u32, // +0x20
-
-    /// Часть тела.
-    ///
-    /// По текущей гипотезе:
-    /// - `0x10` = голова
-    /// - `0x11..0x13` = другие зоны
-    pub body_part: u32, // +0x24
-
-    /// Тип/ID оружия.
-    pub weapon_type: u32, // +0x28
-
+    /// Зона попадания.
+    pub hit_area: u32,                      // +0x20
+    /// Часть тела (0x10 = голова, 0x11..0x13 = другие зоны).
+    pub body_part: u32,                     // +0x24
+    /// Тип/ID оружия, нанёсшего урон.
+    pub weapon_type: u32,                   // +0x28
     /// Количество урона.
-    pub damage_amount: f32, // +0x2C
+    pub damage_amount: f32,                 // +0x2C
 }
 
-/// Полное DAMAGE-сообщение.
+/// Полное DAMAGE-сообщение = заголовок + payload.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct DamageMessage {
@@ -108,29 +85,26 @@ pub struct DamageMessage {
     pub payload: DamageMessagePayload,
 }
 
-/// Payload DEATH-сообщения (`0xD0014`).
+/// Payload DEATH-сообщения (0xD0014).
 ///
-/// Подтверждено по `M2DE_HumanEntity_ProcessDeath`.
+/// Подтверждено по M2DE_HumanEntity_ProcessDeath.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct DeathMessagePayload {
-    pub pos_x: f32, // +0x20
-    pub pos_y: f32, // +0x24
-
-    /// Z оставляем как raw, пока без лишней интерпретации.
-    pub pos_z_raw: u32, // +0x28
-
+    /// Позиция смерти X.
+    pub pos_x: f32,                         // +0x20
+    /// Позиция смерти Y.
+    pub pos_y: f32,                         // +0x24
+    /// Позиция Z (raw, без интерпретации).
+    pub pos_z_raw: u32,                     // +0x28
     /// ID сущности-убийцы.
-    pub killer_entity_id: u32, // +0x2C
-
+    pub killer_entity_id: u32,              // +0x2C
     /// Тип летального урона.
-    pub damage_type: u32, // +0x30
-
+    pub damage_type: u32,                   // +0x30
     /// Часть тела, куда пришёл смертельный удар.
-    pub body_part: u32, // +0x34
-
+    pub body_part: u32,                     // +0x34
     /// ID оружия.
-    pub weapon_id: u32, // +0x38
+    pub weapon_id: u32,                     // +0x38
 }
 
 /// Полное DEATH-сообщение.
@@ -141,21 +115,18 @@ pub struct DeathMessage {
     pub payload: DeathMessagePayload,
 }
 
-/// Payload weapon draw/holster сообщений.
+/// Payload для weapon draw/holster сообщений.
 ///
-/// Это уже менее жёстко подтверждённый layout, но поле `weapon_entity_id`
-/// выглядит достаточно правдоподобно для практики.
+/// Менее жёстко подтверждённый layout, но weapon_entity_id
+/// выглядит правдоподобно по runtime-дампам.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct WeaponMessagePayload {
-    pub weapon_entity_id: u32, // +0x20
+    /// ID сущности оружия.
+    pub weapon_entity_id: u32,              // +0x20
 }
 
-/// Полное weapon message.
-///
-/// Используется для:
-/// - `WEAPON_DRAW`
-/// - `WEAPON_HOLSTER`
+/// Weapon message (для WEAPON_DRAW и WEAPON_HOLSTER).
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct WeaponMessage {
@@ -164,12 +135,11 @@ pub struct WeaponMessage {
 }
 
 /// Минимальный payload для stance/transition сообщений.
-///
-/// Семантика пока частично подтверждена, поэтому layout делаем минимальным.
+/// Семантика пока частично подтверждена.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct StanceMessagePayload {
-    pub flag: u8, // +0x20
+    pub flag: u8,                           // +0x20
 }
 
 /// Полное stance message.
@@ -180,26 +150,49 @@ pub struct StanceMessage {
     pub payload: StanceMessagePayload,
 }
 
-const _: () = {
-    // Заголовок
-    assert!(std::mem::size_of::<EntityMessageHeader>() == 0x20);
-    assert!(std::mem::offset_of!(EntityMessageHeader, vtable) == 0x00);
-    assert!(std::mem::offset_of!(EntityMessageHeader, field_08) == 0x08);
-    assert!(std::mem::offset_of!(EntityMessageHeader, broadcaster_id) == 0x0C);
-    assert!(std::mem::offset_of!(EntityMessageHeader, entity_id) == 0x10);
-    assert!(std::mem::offset_of!(EntityMessageHeader, message_id) == 0x14);
-    assert!(std::mem::offset_of!(EntityMessageHeader, sentinel) == 0x18);
-    assert!(std::mem::offset_of!(EntityMessageHeader, active_flag) == 0x1C);
+// ═══════════════════════════════════════════════════════════════════
+//  Compile-time проверки layout'ов
+// ═══════════════════════════════════════════════════════════════════
 
-    // DAMAGE
-    assert!(std::mem::size_of::<DamageMessagePayload>() == 0x10);
-    assert!(std::mem::offset_of!(DamageMessage, payload) == 0x20);
+assert_layout!(EntityMessageHeader, size = 0x20, {
+    vtable         == 0x00,
+    field_08       == 0x08,
+    broadcaster_id == 0x0C,
+    entity_id      == 0x10,
+    message_id     == 0x14,
+    sentinel       == 0x18,
+    active_flag    == 0x1C,
+});
 
-    // DEATH
-    assert!(std::mem::size_of::<DeathMessagePayload>() == 0x1C);
-    assert!(std::mem::offset_of!(DeathMessage, payload) == 0x20);
+assert_layout!(DamageMessagePayload, size = 0x10, {
+    hit_area      == 0x00,
+    body_part     == 0x04,
+    weapon_type   == 0x08,
+    damage_amount == 0x0C,
+});
 
-    // Weapon / stance — только минимальные sanity checks
-    assert!(std::mem::offset_of!(WeaponMessage, payload) == 0x20);
-    assert!(std::mem::offset_of!(StanceMessage, payload) == 0x20);
-};
+assert_field_offsets!(DamageMessage {
+    payload == 0x20,
+});
+
+assert_layout!(DeathMessagePayload, size = 0x1C, {
+    pos_x            == 0x00,
+    pos_y            == 0x04,
+    pos_z_raw        == 0x08,
+    killer_entity_id == 0x0C,
+    damage_type      == 0x10,
+    body_part        == 0x14,
+    weapon_id        == 0x18,
+});
+
+assert_field_offsets!(DeathMessage {
+    payload == 0x20,
+});
+
+assert_field_offsets!(WeaponMessage {
+    payload == 0x20,
+});
+
+assert_field_offsets!(StanceMessage {
+    payload == 0x20,
+});
