@@ -369,3 +369,25 @@ pub mod swapchain_wrapper {
     /// `+0x40` → `ID3D11ShaderResourceView*`
     pub const SRV: usize = 0x40;
 }
+
+/// Менеджер скриптовых машин.
+/// Цепочка: manager → vector → ScriptMachine[] → lua_State*
+pub mod script_machine_manager {
+    /// +0x08 → указатель на std::vector<ScriptMachine*>
+    pub const VECTOR: usize = 0x08;
+}
+
+/// Внутренний std::vector (begin/end/capacity).
+/// Используется для vector'а script machines.
+pub mod std_vector {
+    pub const BEGIN: usize = 0x00;
+    pub const END: usize = 0x08;
+    pub const CAPACITY: usize = 0x10;
+}
+
+/// Одна ScriptMachine внутри менеджера.
+pub mod script_machine {
+    /// +0x70 → lua_State*
+    /// Подтверждено по цепочке из ScriptMachineManager
+    pub const LUA_STATE: usize = 0x70;
+}

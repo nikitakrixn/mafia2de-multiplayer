@@ -13,11 +13,6 @@ use common::logger;
 use crate::{addresses, memory};
 use super::base;
 
-const MANAGER_VECTOR_OFFSET: usize = 0x08;
-const VECTOR_BEGIN_OFFSET: usize = 0x00;
-const VECTOR_END_OFFSET: usize = 0x08;
-const SCRIPT_MACHINE_LUA_STATE_OFFSET: usize = 0x70;
-
 #[derive(Debug, Clone, Copy)]
 pub struct LuaChainInfo {
     pub manager: usize,
@@ -81,10 +76,10 @@ impl Drop for LuaStackGuard {
 pub fn discover(index: usize) -> Option<LuaChainInfo> {
     unsafe {
         let manager = memory::read_ptr(base() + addresses::globals::SCRIPT_MACHINE_MANAGER)?;
-        let vector = memory::read_ptr(manager + MANAGER_VECTOR_OFFSET)?;
+        let vector = memory::read_ptr(manager + addresses::fields::script_machine_manager::VECTOR)?;
 
-        let begin = memory::read_ptr_raw(vector + VECTOR_BEGIN_OFFSET)?;
-        let end = memory::read_ptr_raw(vector + VECTOR_END_OFFSET)?;
+        let begin = memory::read_ptr_raw(vector + addresses::fields::std_vector::BEGIN)?;
+        let end = memory::read_ptr_raw(vector + addresses::fields::std_vector::END)?;
 
         if begin == 0 || end < begin {
             return None;
@@ -96,7 +91,7 @@ pub fn discover(index: usize) -> Option<LuaChainInfo> {
         }
 
         let machine = memory::read_ptr(begin + index * 8)?;
-        let lua_state = memory::read_ptr(machine + SCRIPT_MACHINE_LUA_STATE_OFFSET)?;
+        let lua_state = memory::read_ptr(machine + addresses::fields::script_machine::LUA_STATE)?;
 
         Some(LuaChainInfo {
             manager,
