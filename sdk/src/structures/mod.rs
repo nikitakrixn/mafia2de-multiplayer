@@ -1,4 +1,4 @@
-mod core;
+mod game_world;
 mod player;
 mod inventory;
 mod vehicle;
@@ -9,13 +9,13 @@ mod callbacks;
 mod messages;
 mod render;
 
-pub use core::*;
-pub use player::*;
-pub use inventory::*;
-pub use vehicle::*;
-pub use car::*;
-pub use garage::*;
-pub use tables::*;
+pub use game_world::GameManager;
+pub use player::CHuman;
+pub use inventory::{Inventory, InventorySlot, InventoryData, MoneyValue};
+pub use vehicle::{Vehicle, VehicleWrapper};
+pub use car::{CCar, CarData};
+pub use garage::{CGarageManager, CGarage};
+pub use tables::TableManager;
 pub use callbacks::*;
 pub use messages::*;
-pub use render::*;
+pub use render::*; 
