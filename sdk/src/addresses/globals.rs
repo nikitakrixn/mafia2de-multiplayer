@@ -136,18 +136,33 @@ pub const RENDER_MAX_TEXTURE_SIZE_LOCAL: usize = 0x1C3_589C;
 /// IDA: `dword_141C358A0`
 pub const RENDER_MAX_TEXTURE_SIZE_REMOTE: usize = 0x1C3_58A0;
 
-/// `M2DE_g_CameraManager` — static (in-place) camera manager object.
+/// `M2DE_g_CameraManager` — статический объект камерной системы.
 ///
-/// ⚠️ Unlike most globals, this is NOT a pointer to an object!
-/// The object itself lives at this address in .bss section.
-/// Access: `(module_base + CAMERA_MANAGER) as *mut u8`
-/// Do NOT double-dereference like other globals!
+/// ⚠️ Важно: это **НЕ указатель** на объект, а сам объект,
+/// размещённый прямо в `.bss` секции игры.
 ///
-/// Contains:
-/// - Interier PlayerCameraView at +0x0000 (0xD18 bytes)
-/// - Exterier PlayerCameraView at +0x0D18 (0xD18 bytes)
-/// - Car camera configs at +0x21D8..+0x2784
-/// - See `fields::camera_manager` for full layout.
+/// То есть доступ такой:
+/// ```ignore
+/// let camera_mgr = module_base + CAMERA_MANAGER;
+/// ```
+///
+/// А НЕ такой:
+/// ```ignore
+/// let ptr = *(module_base + CAMERA_MANAGER as *const usize); // НЕПРАВИЛЬНО
+/// ```
+///
+/// Внутри объекта лежат:
+/// - `Interier` PlayerCameraView по `+0x0000`
+/// - `Exterier` PlayerCameraView по `+0x0D18`
+/// - `TransitSpeed` по `+0x1A30` / `+0x1A34`
+/// - конфиги автомобильных камер по диапазону `+0x21D8 .. +0x2784`
+///
+/// Полный layout см. в `addresses::fields::camera_manager`.
+///
+/// Reverse source:
+/// - `M2DE_CameraSystem_Init` (`0x141008230`)
+/// - `M2DE_CameraManager_LoadConfigById` (`0x140E767E0`)
+/// - все вызовы идут с `rcx = &unk_1431430F0`
 ///
 /// IDA: `0x1431430F0` (`M2DE_g_CameraManager`)
 pub const CAMERA_MANAGER: usize = 0x314_30F0;

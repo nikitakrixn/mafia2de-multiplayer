@@ -120,14 +120,14 @@ pub fn adjust_fov(delta: f32) {
     let current = sdk::game::camera::get_interier_fov().unwrap_or(65.0);
     let new_fov = (current + delta).clamp(30.0, 150.0);
     logger::info(&format!("FOV: {current:.1} → {new_fov:.1}"));
-    sdk::game::camera::set_player_fov(new_fov);
+    sdk::game::camera::set_all_fov(new_fov);
 }
 
-/// Установить конкретный FOV.
+/// Установить FOV для ВСЕХ камер (player + car).
 pub fn set_fov(fov: f32) {
-    logger::info(&format!("Устанавливаю FOV: {fov:.1}"));
-    if sdk::game::camera::set_player_fov(fov) {
-        logger::info(&format!("  → FOV = {fov:.1}"));
+    logger::info(&format!("Устанавливаю FOV для всех камер: {fov:.1}"));
+    if sdk::game::camera::set_all_fov(fov) {
+        logger::info(&format!("  → FOV = {fov:.1} (player + car)"));
     } else {
         logger::error("  → Не удалось установить FOV");
     }

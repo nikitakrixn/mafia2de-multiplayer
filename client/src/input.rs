@@ -10,7 +10,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, VK_INSERT, VK_DELETE,
     VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6,
     VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12,
-    VK_ADD, VK_SUBTRACT, VK_MULTIPLY,
+    VK_ADD, VK_SUBTRACT, VK_MULTIPLY, VK_DIVIDE,
     VIRTUAL_KEY,
 };
 
@@ -45,6 +45,7 @@ pub fn log_keybinds() {
     logger::info("    Num+   — FOV +5");
     logger::info("    Num-   — FOV -5");
     logger::info("    Num*   — Показать FOV / сброс на 65");
+    logger::info("    Num/   — Установить FOV на 75");
 }
 
 /// Главный цикл обработки ввода.
@@ -95,5 +96,6 @@ pub fn run() {
         if just_pressed(VK_ADD) { debug_commands::adjust_fov(5.0); }
         if just_pressed(VK_SUBTRACT) { debug_commands::adjust_fov(-5.0); }
         if just_pressed(VK_MULTIPLY) { debug_commands::show_fov(); }
+        if just_pressed(VK_DIVIDE)  { debug_commands::set_fov(75.0); }
     }
 }
