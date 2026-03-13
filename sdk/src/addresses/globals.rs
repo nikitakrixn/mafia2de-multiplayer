@@ -166,3 +166,31 @@ pub const RENDER_MAX_TEXTURE_SIZE_REMOTE: usize = 0x1C3_58A0;
 ///
 /// IDA: `0x1431430F0` (`M2DE_g_CameraManager`)
 pub const CAMERA_MANAGER: usize = 0x314_30F0;
+
+/// `g_M2DE_PlayerData` — глобальная структура настроек здоровья игрока.
+///
+/// Важно: это НЕ указатель — прямой объект в `.data` секции.
+/// Доступ: `module_base + PLAYER_DATA`, без разыменования.
+///
+/// Содержит:
+/// - `+0x00`: float healthmax (default 520.0, runtime 720.0 на нормальной сложности)
+/// - `+0x04`: float healthmaxvar (200.0)
+/// - `+0x14`: float healthrestoredown_raw (~0.0175, Lua возвращает *100)
+/// - `+0x18`: float boostfall (2.0)
+/// - `+0x1C`: float healthmax_threshold (520.0, для статистики)
+///
+/// Максимум здоровья игрока читается из +0x00, а НЕ из entity+0x14C.
+/// NPC используют entity+0x14C для своего healthmax.
+///
+/// IDA: `0x141CA1B38`
+pub const PLAYER_DATA: usize = 0x1CA_1B38;
+
+/// `g_M2DE_PhysicsWorldManager` — менеджер физического мира.
+///
+/// Важно: Двойная косвенность: *(module_base + RVA) → PhysicsWorldManager*
+///
+/// Содержит список физических объектов.
+/// Используется PlayerActor_GetPosition в режиме 3.
+///
+/// IDA: `0x141CABDC8`
+pub const PHYSICS_WORLD_MANAGER: usize = 0x1CA_BDC8;

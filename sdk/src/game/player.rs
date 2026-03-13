@@ -422,6 +422,178 @@ impl Player {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  Патроны
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Включить/выключить бесконечные патроны.
+    pub fn set_unlimited_ammo(&self, enabled: bool) -> bool {
+        let Some(inv) = self.inventory_ptr() else {
+            logger::error("set_unlimited_ammo: инвентарь NULL");
+            return false;
+        };
+        unsafe { memory::write_value(inv + fields::inventory::UNLIMITED_AMMO, enabled as u8) }
+    }
+
+    /// Проверить, включены ли бесконечные патроны.
+    pub fn is_unlimited_ammo(&self) -> Option<bool> {
+        let inv = self.inventory_ptr()?;
+        unsafe { memory::read_value::<u8>(inv + fields::inventory::UNLIMITED_AMMO).map(|v| v != 0) }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Оружие в руках
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Проверить, есть ли оружие в руках.
+    pub fn has_weapon_in_hand(&self) -> Option<bool> {
+        unsafe {
+            let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
+            let weapon_data = memory::read_ptr_raw(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
+            Some(weapon_data != 0)
+        }
+    }
+
+    /// Получить ID оружия в руках (None = руки пусты).
+    pub fn get_weapon_in_hand_id(&self) -> Option<u32> {
+        unsafe {
+            let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
+            let weapon_data = memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
+            memory::read_value::<u32>(weapon_data + fields::weapon_data::WEAPON_ID)
+        }
+    }
+
+    /// Проверить, огнестрельное ли оружие в руках.
+    pub fn has_fire_weapon_in_hand(&self) -> Option<bool> {
+        unsafe {
+            let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
+            let weapon_data = memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
+            let flags = memory::read_value::<u32>(weapon_data + fields::weapon_data::WEAPON_FLAGS)?;
+            Some((flags & fields::weapon_type_flags::FIRE_WEAPON) != 0)
+        }
+    }
+
+    /// Получить текущие патроны в обойме оружия в руках.
+    pub fn get_current_ammo(&self) -> Option<i32> {
+        unsafe {
+            let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
+            let weapon_data = memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
+            let container = memory::read_ptr(weapon_data + fields::weapon_data::AMMO_CONTAINER)?;
+            let value_store = memory::read_ptr(container + 0x10)?;
+            memory::read_value::<i32>(value_store + 0x10)
+        }
+    }
+
+    /// Проверить, холодное ли оружие в руках (нож, бита).
+    pub fn has_cold_weapon_in_hand(&self) -> Option<bool> {
+        unsafe {
+            let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
+            let wd = memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
+            let flags = memory::read_value::<u32>(wd + fields::weapon_data::WEAPON_FLAGS)?;
+            Some((flags & fields::weapon_type_flags::COLD_WEAPON) != 0)
+        }
+    }
+
+    /// Проверить, метательное ли оружие в руках (граната, молотов).
+    pub fn has_throwing_weapon_in_hand(&self) -> Option<bool> {
+        unsafe {
+            let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
+            let wd = memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
+            let flags = memory::read_value::<u32>(wd + fields::weapon_data::WEAPON_FLAGS)?;
+            Some((flags & fields::weapon_type_flags::THROWING_WEAPON) != 0)
+        }
+    }
+
+    /// Проверить, пусты ли руки.
+    pub fn has_empty_hands(&self) -> Option<bool> {
+        self.has_weapon_in_hand().map(|has| !has)
+    }
+
+    /// Получить тип оружия в руках как строку (для отладки).
+    pub fn get_weapon_type_str(&self) -> &'static str {
+        if self.has_fire_weapon_in_hand().unwrap_or(false) {
+            "огнестрельное"
+        } else if self.has_cold_weapon_in_hand().unwrap_or(false) {
+            "холодное"
+        } else if self.has_throwing_weapon_in_hand().unwrap_or(false) {
+            "метательное"
+        } else if self.has_weapon_in_hand().unwrap_or(false) {
+            "неизвестное"
+        } else {
+            "пусто"
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Physics State
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Получить текущее состояние физики.
+    pub fn get_phys_state(&self) -> Option<u32> {
+        unsafe {
+            let physics = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
+            let vtable = memory::read_ptr(physics)?;
+            let func_ptr = memory::read_ptr(vtable + 53 * 8)?;
+            type GetStateFn = unsafe extern "C" fn(usize) -> u32;
+            let func: GetStateFn = std::mem::transmute(func_ptr);
+            Some(func(physics))
+        }
+    }
+
+    /// Установить состояние физики.
+    /// Безопасный путь через движковую функцию.
+    pub fn set_phys_state(&self, state: u32) -> bool {
+        let Some(prop_acc) = (unsafe { memory::read_ptr(self.ptr + fields::player::CONTROL_COMPONENT) }) else {
+            return false;
+        };
+
+        type SetPhysStateFn = unsafe extern "C" fn(usize, u32) -> u64;
+        let func: SetPhysStateFn = unsafe {
+            memory::fn_at(base() + addresses::functions::physics::SET_PHYS_STATE)
+        };
+
+        unsafe { func(prop_acc, state) };
+        true
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Direction basis from frame matrix
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Получить forward-вектор персонажа (куда смотрит, в плоскости XY).
+    pub fn get_forward(&self) -> Option<Vec3> {
+        unsafe {
+            let frame = memory::read_ptr_raw(self.ptr + fields::player::FRAME_NODE)?;
+            if frame == 0 { return None; }
+            // Col1 = Forward
+            let x = memory::read_value::<f32>(frame + fields::entity_frame::FORWARD_X)?;
+            let y = memory::read_value::<f32>(frame + fields::entity_frame::FORWARD_Y)?;
+            let z = memory::read_value::<f32>(frame + fields::entity_frame::FORWARD_Z)?;
+            if x.is_finite() && y.is_finite() && z.is_finite() {
+                Some(Vec3 { x, y, z })
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Получить right-вектор персонажа (направление вправо).
+    pub fn get_right(&self) -> Option<Vec3> {
+        unsafe {
+            let frame = memory::read_ptr_raw(self.ptr + fields::player::FRAME_NODE)?;
+            if frame == 0 { return None; }
+            // Col0 = Right
+            let x = memory::read_value::<f32>(frame + fields::entity_frame::RIGHT_X)?;
+            let y = memory::read_value::<f32>(frame + fields::entity_frame::RIGHT_Y)?;
+            let z = memory::read_value::<f32>(frame + fields::entity_frame::RIGHT_Z)?;
+            if x.is_finite() && y.is_finite() && z.is_finite() {
+                Some(Vec3 { x, y, z })
+            } else {
+                None
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  Управление (блокировка, стиль)
     // ═══════════════════════════════════════════════════════════════
 
@@ -549,6 +721,165 @@ impl Player {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  Здоровье
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Получить текущее здоровье.
+    /// 720.0 = полное на нормальной сложности.
+    pub fn get_health(&self) -> Option<f32> {
+        unsafe { memory::read_value::<f32>(self.ptr + fields::player::CURRENT_HEALTH) }
+    }
+
+    /// Установить текущее здоровье напрямую.
+    ///
+    /// Если поставить <= 0.0 — персонаж НЕ умрёт автоматически,
+    /// смерть тригерится только из кода урона. Для убийства
+    /// используй Lua `healthrel = 0`.
+    pub fn set_health(&self, value: f32) -> bool {
+        unsafe { memory::write_value(self.ptr + fields::player::CURRENT_HEALTH, value) }
+    }
+
+    /// Получить максимум здоровья игрока.
+    /// Читает из глобальной структуры g_M2DE_PlayerData+0x00.
+    /// НЕ из entity — у игрока healthmax хранится отдельно.
+    pub fn get_health_max(&self) -> Option<f32> {
+        unsafe {
+            let player_data = base() + addresses::globals::PLAYER_DATA;
+            memory::read_value::<f32>(player_data)
+        }
+    }
+
+    /// Установить максимум здоровья игрока.
+    /// Пишет в g_M2DE_PlayerData+0x00.
+    pub fn set_health_max(&self, value: f32) -> bool {
+        unsafe {
+            let player_data = base() + addresses::globals::PLAYER_DATA;
+            memory::write_value(player_data, value)
+        }
+    }
+
+    /// Полностью восстановить здоровье до максимума.
+    pub fn heal_full(&self) -> bool {
+        match self.get_health_max() {
+            Some(max_hp) => self.set_health(max_hp),
+            None => {
+                // Фоллбек: на нормальной сложности максимум 720
+                logger::warn("heal_full: не удалось прочитать healthmax, ставлю 720.0");
+                self.set_health(720.0)
+            }
+        }
+    }
+
+    /// Добавить здоровье (не выше максимума).
+    pub fn add_health(&self, amount: f32) -> Option<f32> {
+        let current = self.get_health()?;
+        let max_hp = self.get_health_max().unwrap_or(720.0);
+        let new_hp = (current + amount).min(max_hp).max(0.0);
+        self.set_health(new_hp);
+        Some(new_hp)
+    }
+
+    /// Получить здоровье в процентах (0.0 — 100.0).
+    pub fn get_health_percent(&self) -> Option<f32> {
+        let current = self.get_health()?;
+        let max_hp = self.get_health_max().unwrap_or(720.0);
+        if max_hp > 0.0 {
+            Some((current / max_hp) * 100.0)
+        } else {
+            Some(0.0)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Флаги: неуязвимость, полубог, смерть
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Жив ли игрок.
+    pub fn is_alive(&self) -> Option<bool> {
+        unsafe { memory::read_value::<u8>(self.ptr + fields::player::IS_DEAD).map(|v| v == 0) }
+    }
+
+    /// Проверить флаг неуязвимости.
+    pub fn is_invulnerable(&self) -> Option<bool> {
+        unsafe {
+            memory::read_value::<u8>(self.ptr + fields::player::INVULNERABILITY)
+                .map(|v| v != 0)
+        }
+    }
+
+    /// Установить/снять неуязвимость.
+    /// При включённой неуязвимости весь урон пропускается.
+    pub fn set_invulnerable(&self, enabled: bool) -> bool {
+        unsafe {
+            memory::write_value(self.ptr + fields::player::INVULNERABILITY, enabled as u8)
+        }
+    }
+
+    /// Проверить режим полубога.
+    pub fn is_demigod(&self) -> Option<bool> {
+        unsafe { memory::read_value::<u8>(self.ptr + fields::player::DEMIGOD).map(|v| v != 0) }
+    }
+
+    /// Установить/снять режим полубога.
+    /// При полубоге здоровье не падает ниже 1.0 — персонаж
+    /// получает урон, но не умирает.
+    pub fn set_demigod(&self, enabled: bool) -> bool {
+        unsafe { memory::write_value(self.ptr + fields::player::DEMIGOD, enabled as u8) }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  God Mode (комбинированный)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Включить/выключить режим бога.
+    ///
+    /// Включает:
+    /// 1. Неуязвимость (пропускает урон полностью)
+    /// 2. Полубог (запасной — если неуязвимость сбросится)
+    /// 3. Полное восстановление здоровья
+    pub fn set_god_mode(&self, enabled: bool) -> bool {
+        let ok1 = self.set_invulnerable(enabled);
+        let ok2 = self.set_demigod(enabled);
+
+        if enabled {
+            self.heal_full();
+        }
+
+        if ok1 && ok2 {
+            logger::info(&format!(
+                "God Mode: {}",
+                if enabled { "ВКЛЮЧЁН" } else { "ВЫКЛЮЧЕН" }
+            ));
+            true
+        } else {
+            logger::error("God Mode: не удалось записать флаги");
+            false
+        }
+    }
+
+    /// Проверить, активен ли God Mode.
+    pub fn is_god_mode(&self) -> bool {
+        self.is_invulnerable().unwrap_or(false) && self.is_demigod().unwrap_or(false)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Транспорт
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Проверить, находится ли игрок в транспорте.
+    pub fn is_in_vehicle(&self) -> Option<bool> {
+        unsafe {
+            memory::read_ptr_raw(self.ptr + fields::player::OWNER)
+                .map(|owner| owner != 0)
+        }
+    }
+
+    /// Получить указатель на текущий транспорт (или None если пешком).
+    pub fn get_vehicle_ptr(&self) -> Option<usize> {
+        unsafe { memory::read_ptr(self.ptr + fields::player::OWNER) }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  Диагностика
     // ═══════════════════════════════════════════════════════════════
 
@@ -598,6 +929,23 @@ impl Player {
                 }
             }
             None => logger::debug("  Инвентарь: NULL"),
+        }
+    }
+    /// Вывести информацию об оружии в руках.
+    pub fn log_weapon_info(&self) {
+        match self.get_weapon_in_hand_id() {
+            Some(id) => {
+                let ammo = self.get_current_ammo().unwrap_or(-1);
+                let is_fire = self.has_fire_weapon_in_hand().unwrap_or(false);
+                let unlimited = self.is_unlimited_ammo().unwrap_or(false);
+                logger::info(&format!(
+                    "[weapon] ID={} | Патроны={} | Огнестрельное={} | Бесконечные={}",
+                    id, ammo, is_fire, unlimited
+                ));
+            }
+            None => {
+                logger::info("[weapon] Руки пусты");
+            }
         }
     }
 }

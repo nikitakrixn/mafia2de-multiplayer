@@ -203,18 +203,22 @@ pub mod human_messages {
     pub const PLAYER_WEAPON_HIDE: u32    = 852_005;  // 0xD0025
     pub const SHOT: u32                  = 852_071;  // 0xD0057
 
-    pub const WEAPON_HOLSTER: u32        = 851_999;  // 0xD001F  conf 78%
-    pub const WEAPON_DRAW: u32           = 852_000;  // 0xD0020  conf 80%
-    pub const STANCE_CHANGE: u32         = 852_001;  // 0xD0021  conf 72%
-    pub const STANCE_CLEANUP: u32        = 852_002;  // 0xD0022  conf 68%
-    pub const STANCE_SECONDARY: u32      = 852_003;  // 0xD0023  conf 68%
-    pub const HEAD_DAMAGE: u32           = 852_033;  // 0xD0041  conf 85%
-    pub const BODY_DAMAGE: u32           = 852_034;  // 0xD0042  conf 85%
-    pub const KILL_DAMAGE: u32           = 852_035;  // 0xD0043  conf 80%
+    pub const WEAPON_HOLSTER: u32        = 851_999;  // 0xD001F
+    pub const WEAPON_DRAW: u32           = 852_000;  // 0xD0020
+    pub const STANCE_CHANGE: u32         = 852_001;  // 0xD0021
+    pub const STANCE_CLEANUP: u32        = 852_002;  // 0xD0022
+    pub const STANCE_SECONDARY: u32      = 852_003;  // 0xD0023
+    pub const HEAD_DAMAGE: u32           = 852_033;  // 0xD0041
+    pub const BODY_DAMAGE: u32           = 852_034;  // 0xD0042
+    pub const KILL_DAMAGE: u32           = 852_035;  // 0xD0043
 
-    pub const HUMAN_MODE_CHANGE: u32     = 851_972;  // 0xD0004  conf 70%
-    pub const HUMAN_TICK: u32            = 851_985;  // 0xD0011  conf 78%
-    pub const HUMAN_SETTLED: u32         = 851_994;  // 0xD001A  conf 72%
+    pub const HUMAN_MODE_CHANGE: u32     = 851_972;  // 0xD0004
+    pub const HUMAN_TICK: u32            = 851_985;  // 0xD0011
+    pub const HUMAN_SETTLED: u32         = 851_994;  // 0xD001A
+
+    /// Убрать оружие (holster). Для player — отправляется как entity message.
+    /// Для NPC — пишется напрямую в behavior+0x248.
+    pub const HOLSTER_WEAPON: u32        = 852_053;  // 0xD0055
 }
 
 /// Диапазоны event_type для быстрой классификации message_id.
