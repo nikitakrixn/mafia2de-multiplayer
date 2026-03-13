@@ -93,6 +93,10 @@ pub mod player {
 
     /// `+0x344` → int32 тип смерти (1=обычная, 128=взрыв).
     pub const DEATH_TYPE: usize = 0x344;
+
+    /// `+0x0A8` → указатель на AI params struct.
+    /// *(player+0xA8) + 4 = int32 aggressivity (0-4).
+    pub const AI_PARAMS: usize = 0xA8;
 }
 
 pub mod inventory {
@@ -802,4 +806,33 @@ pub mod camera_view {
 
     /// `DefaultSpeeds[15]` (`float[15]`)
     pub const DEFAULT_SPEEDS: usize = 0xCDC;
+}
+
+/// AI Params struct (указатель из player+0xA8).
+pub mod ai_params {
+    /// `+0x04` → int32 aggressivity level.
+    /// 0=OnAttack, 1=HearGunshot, 2=SeeEnemy, 3=SeeEnemyWithWeapon.
+    pub const AGGRESSIVITY: usize = 0x04;
+}
+
+/// DB Record (entity definition из глобальной БД).
+pub mod db_record {
+    /// `+0x24` → uint8 entity type.
+    pub const ENTITY_TYPE: usize = 0x24;
+    /// `+0x24` → uint32 table ID (offset +36 decimal).
+    pub const TABLE_ID: usize = 0x24; // Осторожно: совпадает с entity_type!
+    /// `+0x28` → uint32 flags. Бит 5 (0x20) = streamable/spawnable.
+    pub const FLAGS: usize = 0x28;
+}
+
+/// Script Wrapper layout (общий для всех типов).
+pub mod script_wrapper {
+    /// `+0x00` → vtable.
+    pub const VTABLE: usize = 0x00;
+    /// `+0x08` → int32 refcount.
+    pub const REFCOUNT: usize = 0x08;
+    /// `+0x10` → DB record / native entity pointer.
+    pub const NATIVE: usize = 0x10;
+    /// `+0x18` → observer/state object.
+    pub const OBSERVER: usize = 0x18;
 }

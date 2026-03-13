@@ -40,11 +40,6 @@ pub const RESOURCE_MANAGER: usize = 0x1CA_1FD0;
 /// Вызывается ~494 раза за игровую сессию.
 pub const GAME_CALLBACK_MANAGER: usize = 0x1CA_F038;
 
-/// Менеджер объектов.
-///
-/// IDA: `0x1431360F8`
-pub const OBJECT_MANAGER: usize = 0x313_60F8;
-
 /// Аллокатор памяти.
 ///
 /// IDA: `0x141CD4A28`
@@ -194,3 +189,38 @@ pub const PLAYER_DATA: usize = 0x1CA_1B38;
 ///
 /// IDA: `0x141CABDC8`
 pub const PHYSICS_WORLD_MANAGER: usize = 0x1CA_BDC8;
+
+/// `M2DE_g_EntityDatabase` — глобальная БД всех entity.
+///
+/// Двойная косвенность: *(module_base + RVA) → EntityDB*
+/// Содержит все entity загруженные через SDS.
+/// Используется GetEntityByName и GetEntityByGUID.
+///
+/// IDA: `0x141CAF788`
+pub const ENTITY_DATABASE: usize = 0x1CA_F788;
+
+/// `M2DE_g_EntityWrapperFactoryRegistry` — фабрики script wrappers.
+///
+/// RB-tree, ключ = entity type (uint8).
+/// Создаёт C_WrapperHuman, C_WrapperCar и т.д.
+/// Lazy-init при первом обращении.
+///
+/// IDA: `0x14313C8B8`
+pub const ENTITY_WRAPPER_FACTORY_REGISTRY: usize = 0x313_C8B8;
+
+/// `M2DE_g_ScriptWrapperManager` — менеджер Lua script wrappers для entity.
+///
+/// Двойная косвенность: *(module_base + RVA) → ScriptWrapperManager*
+///
+/// Lazy-init singleton. Используется для:
+/// - `GetEntityByName` (FNV-1a hash → wrapper)
+/// - `GetEntityByGUID` (tableID → wrapper)
+/// - `CreateCleanEntity` (создание wrapper)
+/// - Кеширование wrappers
+///
+/// Layout:
+/// +0x08..+0x10: hash cache (sorted array, 16b/entry: hash + wrapper_ptr)
+/// +0x28..+0x30: tableID cache (sorted array, 16b/entry: tableID + wrapper_ptr)
+///
+/// IDA: `0x1431360F8` (`M2DE_g_ScriptWrapperManager`)
+pub const SCRIPT_WRAPPER_MANAGER: usize = 0x313_60F8;

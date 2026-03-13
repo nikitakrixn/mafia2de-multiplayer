@@ -4,11 +4,13 @@
 //! Скрывает за собой цепочки указателей, вызовы движка
 //! и прочую низкоуровневую механику.
 
+pub mod entity;
 pub mod callbacks;
 pub mod camera;
 pub mod player;
 pub mod lua;
 pub mod render;
+pub mod npc;
 
 pub use player::Player;
 

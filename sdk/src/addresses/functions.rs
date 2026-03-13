@@ -1022,3 +1022,51 @@ pub mod physics_state {
     pub const DISABLED: u32 = 2;
     pub const KINEMATIC: u32 = 3;
 }
+
+//=============================================================================
+// Entity
+//=============================================================================
+
+pub mod entity_manager {
+    /// Найти entity по имени (FNV-1a хеш → кеш → БД → factory).
+    /// `__int64(ScriptWrapperManager*, const char* name)`
+    /// Возвращает script wrapper или NULL.
+    /// IDA: `0x1410C7070`
+    pub const FIND_BY_NAME: usize = 0x10C_7070;
+
+    /// Найти/создать wrapper по tableID.
+    /// `__int64(ScriptWrapperManager*, uint32 tableID)`
+    /// TODO: exact address
+    pub const GET_OR_CREATE_WRAPPER: usize = 0x10C_7070; // TODO: exact address
+
+    /// FNV-1a хеш или числовой парсинг имени.
+    /// `void(uint64* out, const char* name)`
+    /// IDA: `0x140A76940`
+    pub const PARSE_NAME_OR_FNV1A: usize = 0xA7_6940;
+
+    /// Создать CleanEntity (type 114).
+    /// Из script context, НЕ для прямого вызова из DLL.
+    /// IDA: `0x140C7BFA0`
+    pub const CREATE_CLEAN_ENTITY_IMPL: usize = 0xC7_BFA0;
+
+    /// Конструктор CleanEntity (320 bytes).
+    /// IDA: `0x140DF1760`
+    pub const CLEAN_ENTITY_CONSTRUCT: usize = 0xDF_1760;
+}
+
+pub mod npc {
+    /// Native Follow implementation.
+    /// `void(PropertyAccessor*, SmartPtr* out, Entity* target, int speed,
+    ///       float min_dist, float max_dist, bool flag1, bool flag2)`
+    /// IDA: `0x140DC7B90`
+    pub const FOLLOW_CORE: usize = 0xDC_7B90;
+
+    /// Follow task constructor (96 bytes).
+    /// IDA: `0x140D70780`
+    pub const FOLLOW_TASK_CONSTRUCT: usize = 0xD7_0780;
+
+    /// SetAggressivity native.
+    /// Пишет в *(*(entity+0xA8) + 4) = value.
+    /// IDA: `0x140DCE6D0`
+    pub const SET_AGGRESSIVITY: usize = 0xDC_E6D0;
+}
