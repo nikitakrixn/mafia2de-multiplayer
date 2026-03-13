@@ -946,3 +946,79 @@ pub mod camera {
     /// IDA: `0x140E6BC00`
     pub const VIEW_COPY_DEFAULTS_TO_STATES: usize = 0xE6_BC00;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Human / Health
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod human {
+    /// `bool(C_Human*)` — is entity dead.
+    /// vtable[47]. return *(uint8*)(this + 0x161).
+    /// IDA: `0x1400C4690`
+    pub const IS_DEATH: usize = 0x0C_4690;
+
+    /// `char(C_Human*, EntityMessage*)` — process incoming damage.
+    /// vtable[82]. Saves health, calls damage processor, handles death.
+    /// IDA: `0x1400C00B0`
+    pub const PROCESS_DAMAGE: usize = 0x0C_00B0;
+
+    /// `char(C_Human*, EntityMessage*)` — core damage calculation.
+    /// Guards: IsDeath() || invulnerability(+0x160).
+    /// Subtracts from health(+0x148). Checks demigod(+0x162).
+    /// IDA: `0x140D93B80`
+    pub const APPLY_DAMAGE: usize = 0xD9_3B80;
+
+    /// `void(C_Human*, EntityMessage*)` — death handler.
+    /// Called when health <= 0 and !demigod.
+    /// IDA: look for M2DE_HumanEntity_ProcessDeath xref in ApplyDamage
+    pub const PROCESS_DEATH: usize = 0; // TODO: exact address
+
+    /// `float(C_Human*)` — get current health.
+    /// return *(float*)(*(component) + 0x148).
+    /// IDA: `0x140DA3C30`
+    pub const GET_HEALTH: usize = 0xDA_3C30;
+
+    /// `float(ComponentRef*)` — get healthmax.
+    /// Player: reads g_PlayerData+0x00. NPC: reads entity+0x14C.
+    /// IDA: `0x140DA3C50`
+    pub const GET_HEALTH_MAX: usize = 0xDA_3C50;
+
+    /// `uint8(ComponentRef*)` — get invulnerability flag.
+    /// return *(uint8*)(*(a1) + 0x160).
+    /// IDA: `0x140DA5460`
+    pub const GET_INVULNERABILITY: usize = 0xDA_5460;
+
+    /// `void(ComponentRef*, uint8)` — set invulnerability flag.
+    /// *(*(a1) + 0x160) = value.
+    /// IDA: `0x140DD0300`
+    pub const SET_INVULNERABILITY: usize = 0xDD_0300;
+
+    /// `void*(void)` — get global player data singleton.
+    /// Returns &g_M2DE_PlayerData.
+    /// IDA: `0x1400C33C0`
+    pub const GET_PLAYER_INSTANCE: usize = 0x0C_33C0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Physics Provider
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod physics {
+    /// Получить текущий physics state через property accessor.
+    /// Внутри: *(player+0x258)->vtable[53]
+    /// IDA: `0x140DCCEC0`
+    pub const GET_PHYS_STATE: usize = 0xDC_CEC0;
+
+    /// Установить physics state.
+    /// Проверяет текущий, если отличается → provider->vtable[52].
+    /// IDA: `0x140DCD100`
+    pub const SET_PHYS_STATE: usize = 0xDC_D100;
+}
+
+/// Значения PhysicsState
+pub mod physics_state {
+    pub const DYNAMIC: u32 = 0;
+    pub const ENABLE: u32 = 1;
+    pub const DISABLED: u32 = 2;
+    pub const KINEMATIC: u32 = 3;
+}

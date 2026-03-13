@@ -20,25 +20,104 @@ pub mod player {
     /// IDA: `0x140DA7630` fallback path reads `[rcx+0x78]`
     pub const FRAME_NODE: usize = 0x78;
 
-    /// `+0x258` → Physics body handler (optional, may be NULL)
-    ///
-    /// When present, position is read via vtable[0xA8] instead of frame node.
-    pub const PHYSICS_HANDLER: usize = 0x258;
+    /// `+0x024` → uint8 тип сущности.
+    /// 0x10 = игрок, 0x0E = NPC-человек, 0x12 = физическое тело.
+    pub const ENTITY_TYPE: usize = 0x24;
+
+    /// `+0x080` → C_Entity* владелец.
+    /// Пешком = NULL, в машине = указатель на vehicle entity.
+    pub const OWNER: usize = 0x80;
+
+    /// `+0x0C0` → AI/Navigation компонент.
+    /// vtbl 0x1418E3290. Хранит текущую AI-позицию.
+    pub const AI_NAV_COMPONENT: usize = 0xC0;
+
+    /// `+0x0D0` → TransformSync компонент.
+    /// vtbl 0x1418E33A8. Синхронизирует позицию из актора ~258 раз/сек.
+    /// comp+0x18 = Vec3 позиция, comp+0x24 = параметр (100.0).
+    pub const TRANSFORM_SYNC: usize = 0xD0;
+
+    /// `+0x0F8` → Behavior компонент.
+    /// vtbl 0x1418E37A8. Сюда пересылаются сообщения из HandleMessage.
+    pub const BEHAVIOR_COMPONENT: usize = 0xF8;
+
+    /// `+0x108` → Компонент состояния оружия.
+    /// *(component + 0x2B0) → указатель на ID выбранного оружия (uint32).
+    pub const WEAPON_STATE_COMPONENT: usize = 0x108;
+
+    /// `+0x148` → float текущее здоровье.
+    /// 720.0 = полное на нормальной сложности.
+    pub const CURRENT_HEALTH: usize = 0x148;
+
+    /// `+0x14C` → float.
+    /// Для NPC: максимальное здоровье.
+    /// Для игрока: множитель урона определённых типов (12/15/22).
+    /// Максимум здоровья игрока берётся из g_M2DE_PlayerData+0x00.
+    pub const NPC_HEALTHMAX: usize = 0x14C;
+
+    /// `+0x150` → float множитель урона от NPC.
+    /// Lua возвращает это * 100.0 как проценты. Default 1.0 (= 100%).
+    pub const NONPLAYER_DAMAGE_MULT: usize = 0x150;
+
+    /// `+0x154` → float пороговая дистанция для снижения урона.
+    /// Default 5.0.
+    pub const NONPLAYER_DAMAGE_DIST: usize = 0x154;
+
+    /// `+0x160` → uint8 флаг неуязвимости.
+    /// 0 = обычный режим, 1 = неуязвим (урон пропускается полностью).
+    pub const INVULNERABILITY: usize = 0x160;
+
+    /// `+0x161` → uint8 флаг смерти.
+    /// IsDeath() = vtable[47] = return *(this + 353).
+    pub const IS_DEAD: usize = 0x161;
+
+    /// `+0x162` → uint8 флаг полубога.
+    /// Если установлен — здоровье не опускается ниже 1.0.
+    pub const DEMIGOD: usize = 0x162;
+
+    /// `+0x180` → float* массив множителей урона по частям тела.
+    /// [4]=голова, [5]=торс, [6]=руки, [7]=ноги.
+    pub const BODY_DAMAGE_MULTIPLIERS: usize = 0x180;
+
+    /// `+0x190` → C_Human* ссылка на самого себя (== this).
+    /// Используется для валидации указателя.
+    pub const SELF_REF: usize = 0x190;
+
+    /// `+0x258` → Physics provider (выделен в куче отдельно).
+    /// vtbl 0x141993998. Используется GetPos/SetPos для physics-пути.
+    pub const PHYSICS_PROVIDER: usize = 0x258;
+
+    /// `+0x338` → Vec3 позиция смерти (12 байт).
+    /// Записывается когда здоровье достигает 0.
+    pub const DEATH_POSITION: usize = 0x338;
+
+    /// `+0x344` → int32 тип смерти (1=обычная, 128=взрыв).
+    pub const DEATH_TYPE: usize = 0x344;
 }
 
 pub mod inventory {
+    /// `+0x08` → Корень RB-дерева поиска оружия по ID.
+    /// std::map<int32, WeaponData*>.
+    /// node+0x20 = weapon_id (ключ), node+0x28 = weapon data ptr.
+    pub const WEAPON_TREE: usize = 0x08;
+
+    /// `+0x24` → uint8 тип инвентаря (0=player).
     pub const TYPE: usize = 0x24;
+
+    /// `+0x50` → начало массива указателей на слоты.
+    /// *(slots_begin + N*8) = Slot* для слота N.
     pub const SLOTS_START: usize = 0x50;
+
+    /// `+0x58` → конец массива слотов.
     pub const SLOTS_END: usize = 0x58;
-    pub const WEAPONS: usize = 0xE8;
-    
-    /// `+0x170` → back-pointer на entity-владельца (C_Human* для игрока)
-    ///
-    /// Проверка `*(parent + 0x24) == 16` в игре определяет
-    /// показывать ли HUD popup. Для player это значение = 0,
-    /// поэтому HUD вызывается через g_HUDManager напрямую.
+
+    /// `+0x168` → bool бесконечные патроны.
+    pub const UNLIMITED_AMMO: usize = 0x168;
+
+    /// `+0x170` → C_Human* обратная ссылка на владельца.
     pub const OWNER_ENTITY_REF: usize = 0x170;
 }
+
 
 pub mod money_item {
     /// `+0x18` → MoneyCore* (M2DE_MoneyItem_GetCore возвращает [a1+0x18])
@@ -54,29 +133,66 @@ pub mod money_core {
     pub const CONTAINER_PTR: usize = 0x10;
 }
 
-/// Структура слота инвентаря (например MoneySlot).
-///
-/// ```text
-/// +0x00: vtable
-/// +0x08: back-pointer на Inventory
-/// +0x10: i32 (-1?)
-/// +0x14: i32 (0x80?)
-/// +0x18: vec_begin — начало внутреннего std::vector<ptr>
-/// +0x20: vec_end   — конец вектора
-/// +0x28: vec_capacity
-/// ```
-///
-/// IDA: `M2DE_Inventory_GetMoneyPtrFromArray`:
-/// ```c
-/// rdx = *(slot + 0x18);  // vec_begin
-/// rax = *(slot + 0x20);  // vec_end
-/// ```
-pub mod slot {
-    /// `+0x18` → начало внутреннего вектора (std::vector begin)
-    pub const VEC_BEGIN: usize = 0x18;
+/// Индексы слотов инвентаря.
+pub mod slots {
+    /// Слот 0 — текущее оружие в руках
+    pub const CURRENT_WEAPON: usize = 0;
+    /// Слот 1 — неизвестно
+    pub const UNKNOWN_1: usize = 1;
+    /// Слот 2 — оружейный слот 1 (пистолеты, дробовики)
+    pub const WEAPON_1: usize = 2;
+    /// Слот 3 — оружейный слот 2 (винтовки, автоматы)
+    pub const WEAPON_2: usize = 3;
+    /// Слот 4 — запас патронов
+    pub const AMMO: usize = 4;
+    /// Слот 5 — деньги
+    pub const MONEY: usize = 5;
+}
 
-    /// `+0x20` → конец внутреннего вектора (std::vector end)
+/// Структура одного слота инвентаря.
+pub mod slot {
+    /// `+0x18` → начало std::vector<ptr> элементов
+    pub const VEC_BEGIN: usize = 0x18;
+    /// `+0x20` → конец std::vector
     pub const VEC_END: usize = 0x20;
+    /// `+0x50` → указатель на weapon table entry
+    pub const TABLE_ENTRY: usize = 0x50;
+}
+
+/// Запись из /tables/weapons.tbl.
+pub mod weapon_table_entry {
+    /// `+0x24` → int32 flags. Бит 1 (& 2): слот назначения
+    pub const FLAGS: usize = 0x24;
+    /// `+0x58` → int32 максимальная ёмкость обоймы
+    pub const MAX_AMMO: usize = 0x58;
+}
+
+/// Данные оружия (из RB-дерева или weapon_state компонента).
+pub mod weapon_data {
+    /// `+0x00` → int32 ID оружия
+    pub const WEAPON_ID: usize = 0x00;
+    /// `+0x10` → ptr → container → +0x10 → int32 текущие патроны
+    pub const AMMO_CONTAINER: usize = 0x10;
+    /// `+0x24` → uint32 флаги типа оружия
+    ///   бит 5 (0x20) = огнестрельное
+    pub const WEAPON_FLAGS: usize = 0x24;
+}
+
+/// Битовые флаги типа оружия (weapon_data+0x24).
+pub mod weapon_type_flags {
+    /// Холодное оружие (нож, бита, кулаки)
+    pub const COLD_WEAPON: u32 = 0x04;
+    /// Огнестрельное оружие (пистолет, автомат, дробовик, винтовка)
+    pub const FIRE_WEAPON: u32 = 0x20;
+    /// Метательное оружие (граната, молотов)
+    pub const THROWING_WEAPON: u32 = 0x200000;
+}
+
+/// Weapon State Component (player+0x108).
+pub mod weapon_state {
+    /// `+0x2B0` → ptr на WeaponData текущего оружия в руках
+    /// NULL = руки пусты.
+    pub const CURRENT_WEAPON_DATA: usize = 0x2B0;
 }
 
 /// Объект "wallet" — первый элемент вектора слота.
@@ -129,17 +245,25 @@ pub mod hud_money_display {
 }
 
 pub mod entity_frame {
-    /// `+0x64` → Position X (f32)
-    ///
-    /// Part of 4x4 transform matrix starting at +0x58.
-    /// Position is in the last column of each row (stride 0x10).
-    ///
-    /// IDA: `0x140DA7630` reads `[frame+0x64]`, `[frame+0x74]`, `[frame+0x84]`
+    // Позиция
     pub const POS_X: usize = 0x64;
-    /// `+0x74` → Position Y (f32)
     pub const POS_Y: usize = 0x74;
-    /// `+0x84` → Position Z (f32)
     pub const POS_Z: usize = 0x84;
+
+    // Right вектор (Col0) — направление вправо от персонажа
+    pub const RIGHT_X: usize = 0x58;
+    pub const RIGHT_Y: usize = 0x68;
+    pub const RIGHT_Z: usize = 0x78;
+
+    // Forward вектор (Col1) — куда смотрит персонаж (в XY плоскости)
+    pub const FORWARD_X: usize = 0x5C;
+    pub const FORWARD_Y: usize = 0x6C;
+    pub const FORWARD_Z: usize = 0x7C;
+
+    // Up вектор (Col2) — мировой "вверх" (обычно 0,0,1)
+    pub const UP_X: usize = 0x60;
+    pub const UP_Y: usize = 0x70;
+    pub const UP_Z: usize = 0x80;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
