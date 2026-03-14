@@ -84,10 +84,6 @@ pub fn process_pending() {
     };
     
     for ev in &drained {
-        if matches!(ev, PlayerEvent::EnterVehicleDone | PlayerEvent::LeaveVehicleDone) {
-            crate::camera_state::request_apply();
-        }
-
         log_event(ev);
     }
 }

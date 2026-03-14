@@ -858,3 +858,59 @@ pub mod sds_manager {
     /// +0x90: ModuleObject (module_id = 0x0D)
     pub const MODULE_OBJECT: usize = 0x90;
 }
+
+/// Кеш SDS Line Manager (hash → index).
+pub mod sds_line_cache {
+    /// +0x18 от Line Manager → начало отсортированного кеша.
+    pub const CACHE_BEGIN: usize = 0x18;
+    /// +0x20 от Line Manager → конец кеша.
+    pub const CACHE_END: usize = 0x20;
+    /// Размер одной записи (hash(8) + data(8) + flags(4) + index(4)).
+    pub const ENTRY_SIZE: usize = 24;
+    /// Смещение hash внутри записи.
+    pub const ENTRY_HASH: usize = 0x00;
+    /// Смещение index внутри записи.
+    pub const ENTRY_INDEX: usize = 0x14;
+}
+
+/// Кеш ScriptWrapperManager (для entity lookup).
+pub mod entity_cache {
+    /// +0x08 → hash cache begin (sorted, 16b/entry: hash(8) + wrapper_ptr(8)).
+    pub const HASH_CACHE_BEGIN: usize = 0x08;
+    /// +0x10 → hash cache end.
+    pub const HASH_CACHE_END: usize = 0x10;
+    /// +0x28 → tableID cache begin (sorted, 16b/entry).
+    pub const TABLE_ID_CACHE_BEGIN: usize = 0x28;
+    /// +0x30 → tableID cache end.
+    pub const TABLE_ID_CACHE_END: usize = 0x30;
+    /// Размер одной записи в кеше.
+    pub const ENTRY_SIZE: usize = 16;
+    /// Смещение wrapper_ptr внутри записи.
+    pub const ENTRY_WRAPPER: usize = 0x08;
+}
+
+/// Контейнер значений (общий для ammo и money chains).
+pub mod value_container {
+    /// +0x10 → указатель на хранилище значения.
+    pub const STORE_PTR: usize = 0x10;
+}
+
+/// Хранилище значения (последний уровень цепочки ammo/money).
+pub mod value_store {
+    /// +0x10 → само значение (i32 для ammo, i64 для money).
+    pub const VALUE: usize = 0x10;
+}
+
+/// RB-дерево (общий layout для entity factory registry и др.).
+pub mod rb_tree_node {
+    /// +0x00 → left child.
+    pub const LEFT: usize = 0x00;
+    /// +0x10 → right child.
+    pub const RIGHT: usize = 0x10;
+    /// +0x19 → is_sentinel flag (0 = real node, 1 = sentinel).
+    pub const IS_SENTINEL: usize = 0x19;
+    /// +0x20 → key (u32 type_id).
+    pub const KEY: usize = 0x20;
+    /// +0x28 → value (ptr).
+    pub const VALUE: usize = 0x28;
+}

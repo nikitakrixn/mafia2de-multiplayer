@@ -1,0 +1,18 @@
+[package]
+name = "devtools"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "m2mp_devtools"
+crate-type = ["cdylib"]   # Отдельная DLL
+
+[dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_UI_Input_KeyboardAndMouse",
+]}
+common = { workspace = true }
+sdk    = { workspace = true }
+minhook = { workspace = true }

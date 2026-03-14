@@ -11,21 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use common::logger;
 use sdk::addresses::constants::game_events as ev;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AppFocusState {
-    Active,
-    Inactive,
-}
-
 static APP_ACTIVE: AtomicBool = AtomicBool::new(true);
-
-pub fn app_focus_state() -> AppFocusState {
-    if APP_ACTIVE.load(Ordering::Acquire) {
-        AppFocusState::Active
-    } else {
-        AppFocusState::Inactive
-    }
-}
 
 /// Меняем focus state и логируем только реальное изменение.
 fn set_app_focus(active: bool) {
@@ -112,18 +98,6 @@ pub fn process_fired_event(event_id: i32) {
     match event_id {
         ev::APP_ACTIVATE => set_app_focus(true),
         ev::APP_DEACTIVATE => set_app_focus(false),
-        _ => {}
-    }
-
-    // События, после которых камеры часто уже готовы
-    match event_id {
-        ev::MISSION_AFTER_OPEN
-        | ev::GAME_INIT
-        | ev::LOADING_PROCESS_FINISHED
-        | ev::LOADING_FADE_FINISHED
-        | ev::GAME_UNPAUSED => {
-            crate::camera_state::request_apply();
-        }
         _ => {}
     }
 

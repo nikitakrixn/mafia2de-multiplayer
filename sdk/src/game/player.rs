@@ -474,12 +474,13 @@ impl Player {
 
     /// Получить текущие патроны в обойме оружия в руках.
     pub fn get_current_ammo(&self) -> Option<i32> {
+        use crate::addresses::fields::{value_container, value_store};
         unsafe {
             let ws = memory::read_ptr(self.ptr + fields::player::WEAPON_STATE_COMPONENT)?;
             let weapon_data = memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA)?;
             let container = memory::read_ptr(weapon_data + fields::weapon_data::AMMO_CONTAINER)?;
-            let value_store = memory::read_ptr(container + 0x10)?;
-            memory::read_value::<i32>(value_store + 0x10)
+            let store = memory::read_ptr(container + value_container::STORE_PTR)?;
+            memory::read_value::<i32>(store + value_store::VALUE)
         }
     }
 

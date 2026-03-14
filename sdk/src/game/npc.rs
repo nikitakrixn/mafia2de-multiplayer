@@ -1,19 +1,16 @@
 use crate::game::entity;
 use crate::game::player::Vec3;
 use crate::addresses::fields;
+use crate::addresses::constants::entity_types;
 use crate::memory;
 use common::logger;
 
-/// Handle для управления NPC через native path.
 pub struct Npc {
-    /// Native C_Human* pointer.
     native: usize,
-    /// Имя (для логов).
     name: String,
 }
 
 impl Npc {
-    /// Найти NPC по имени в мире. Native path — без Lua.
     pub fn find(name: &str) -> Option<Self> {
         let native = entity::find_native_entity(name)?;
 
@@ -21,29 +18,19 @@ impl Npc {
         let entity_type = unsafe {
             memory::read_value::<u8>(native + fields::player::ENTITY_TYPE)?
         };
-        if entity_type != 0x0E && entity_type != 0x10 {
+        if entity_type != entity_types::HUMAN_NPC
+            && entity_type != entity_types::HUMAN_PLAYER
+        {
             logger::warn(&format!(
-                "[npc] '{}' не является человеком (type=0x{:02X})",
-                name, entity_type
+                "[npc] '{}' is not a human (type=0x{:02X})", name, entity_type
             ));
             return None;
         }
 
-        logger::debug(&format!(
-            "[npc] '{}' найден: native=0x{:X}, type=0x{:02X}",
-            name, native, entity_type
-        ));
-
-        Some(Self {
-            native,
-            name: name.to_string(),
-        })
+        Some(Self { native, name: name.to_string() })
     }
 
-    /// Native pointer.
-    pub fn ptr(&self) -> usize {
-        self.native
-    }
+    pub fn ptr(&self) -> usize { self.native }
 
     /// Жив ли NPC.
     pub fn is_alive(&self) -> bool {
@@ -69,19 +56,12 @@ impl Npc {
 
     /// Сделать неуязвимым.
     pub fn set_invulnerable(&self, enabled: bool) {
-        unsafe {
-            memory::write_value(
-                self.native + fields::player::INVULNERABILITY,
-                enabled as u8,
-            );
-        }
+        unsafe { memory::write_value(self.native + fields::player::INVULNERABILITY, enabled as u8); }
     }
 
     /// Установить полубога.
     pub fn set_demigod(&self, enabled: bool) {
-        unsafe {
-            memory::write_value(self.native + fields::player::DEMIGOD, enabled as u8);
-        }
+        unsafe { memory::write_value(self.native + fields::player::DEMIGOD, enabled as u8); }
     }
 
     /// Получить позицию.
@@ -112,9 +92,8 @@ impl Npc {
     pub fn log_info(&self) {
         let pos = self.get_position().unwrap_or_default();
         logger::info(&format!(
-            "[npc] {} | ptr=0x{:X} | HP={:.0} | Жив={} | Позиция={}",
-            self.name, self.native,
-            self.health(), self.is_alive(), pos,
+            "[npc] {} | ptr=0x{:X} | HP={:.0} | alive={} | pos={}",
+            self.name, self.native, self.health(), self.is_alive(), pos,
         ));
     }
 }

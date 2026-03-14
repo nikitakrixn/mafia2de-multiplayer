@@ -5,6 +5,7 @@
 //! получить native entity через wrapper+0x10.
 
 use crate::addresses;
+use crate::addresses::fields::script_wrapper;
 use crate::memory;
 use super::base;
 use common::logger;
@@ -63,26 +64,27 @@ pub fn find_entity_by_name(name: &str) -> Option<usize> {
 /// Возвращает C_Human*/C_Car*/etc. напрямую.
 pub fn find_native_entity(name: &str) -> Option<usize> {
     let wrapper = find_entity_by_name(name)?;
-    unsafe { memory::read_ptr(wrapper + 0x10) }
+    unsafe { memory::read_ptr(wrapper + script_wrapper::NATIVE) }
 }
 
 /// Получить тип entity по имени.
 /// 0x0E = NPC human, 0x10 = player, 0x12 = physics, etc.
 pub fn get_entity_type(name: &str) -> Option<u8> {
     let native = find_native_entity(name)?;
-    unsafe { memory::read_value::<u8>(native + 0x24) }
+    unsafe { memory::read_value::<u8>(native + addresses::fields::player::ENTITY_TYPE) }
 }
 
 /// Проверить что entity жива (для C_Human).
 pub fn is_entity_alive(name: &str) -> Option<bool> {
     let native = find_native_entity(name)?;
     unsafe {
-        memory::read_value::<u8>(native + 0x161).map(|v| v == 0)
+        memory::read_value::<u8>(native + addresses::fields::player::IS_DEAD)
+            .map(|v| v == 0)
     }
 }
 
 /// Прочитать здоровье entity (для C_Human).
 pub fn get_entity_health(name: &str) -> Option<f32> {
     let native = find_native_entity(name)?;
-    unsafe { memory::read_value::<f32>(native + 0x148) }
+    unsafe { memory::read_value::<f32>(native + addresses::fields::player::CURRENT_HEALTH) }
 }

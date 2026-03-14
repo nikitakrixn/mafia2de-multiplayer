@@ -3,14 +3,13 @@
 //! Инжектится лаунчером в процесс игры.
 //! Точка входа — DllMain → initialize() в отдельном потоке.
 
-mod camera_state;
-mod debug_commands;
 mod events;
 mod hooks;
 mod human_messages;
 mod input;
 mod lua_queue;
 mod main_thread;
+mod overlay;
 mod player_events;
 mod player_tracker;
 mod runtime;
@@ -70,7 +69,6 @@ fn initialize() {
     let _ = state::refresh_from_runtime();
 
     sdk::game::lua::log_chain();
-    sdk::game::callbacks::dump_interesting_events();
 
     // Установка хуков
     logger::info("Устанавливаю хуки...");
@@ -79,12 +77,16 @@ fn initialize() {
         return;
     }
 
+    logger::info("[init] calling overlay::init()...");
+    match overlay::init() {
+        Ok(()) => logger::info("[init] overlay::init() succeeded"),
+        Err(e) => logger::error(&format!("[init] overlay::init() FAILED: {e}")),
+    }
+
     input::log_keybinds();
     logger::info("======================================");
     logger::info("  Клиент инициализирован!");
     logger::info("======================================");
 
-    // Запускаем фоновый мониторинг и ввод
-    // std::thread::spawn(monitor::run);
     input::run();
 }
