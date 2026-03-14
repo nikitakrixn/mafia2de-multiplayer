@@ -25,6 +25,7 @@ use crate::macros::assert_field_offsets;
 /// - `demigod` (+0x162) — флаг полубога
 /// - `self_ref` (+0x190) — указатель на самого себя (валидация)
 #[repr(C)]
+#[allow(non_snake_case)]
 pub struct CHuman {
     // === Базовый C_Entity ===
 

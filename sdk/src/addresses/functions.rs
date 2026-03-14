@@ -1104,3 +1104,24 @@ pub mod sds {
     /// IDA: `0x1403F0BB0`
     pub const LOAD_SDS_FILE_CORE: usize = 0x3F_0BB0;
 }
+
+pub mod type_registry {
+    /// Создать native entity по type ID.
+    /// Linked list lookup → call create function.
+    /// IDA: `0x1403A4DE0`
+    pub const CREATE_BY_TYPE_ID: usize = 0x3A_4DE0;
+}
+
+pub mod car_spawn {
+    /// Создать C_Car entity из загруженного SDS slot.
+    /// IDA: `0x1403EDDB0`
+    pub const CREATE_WORLD_ENTITY_TYPE18: usize = 0x3E_DDB0;
+    
+    /// Привязать entity к frame node по имени.
+    /// IDA: `0x1403B9570`
+    pub const ENTITY_ATTACH_TO_FRAME: usize = 0x3B_9570;
+    
+    /// Установить entity ID (+ WorldEntityManager registration).
+    /// IDA: `0x1403B91C0`
+    pub const ENTITY_SET_ID: usize = 0x3B_91C0;
+}
