@@ -277,3 +277,53 @@ pub mod camera_params {
     /// Общее количество параметров.
     pub const COUNT: usize = 27;
 }
+
+/// Типы entity (из runtime dump EntityWrapperFactoryRegistry).
+/// 39 зарегистрированных типов.
+pub mod entity_types {
+    /// NPC (C_Human)
+    pub const HUMAN_NPC: u8 = 0x0E;       // 14
+    /// Игрок (C_Human/C_Player)
+    pub const HUMAN_PLAYER: u8 = 0x10;     // 16
+    /// Физическое тело
+    pub const PHYSICS_BODY: u8 = 0x12;     // 18
+    /// Транспорт (C_Car)
+    pub const CAR: u8 = 0x70;              // 112
+    /// Пустая сущность (CreateCleanEntity)
+    pub const CLEAN_ENTITY: u8 = 0x72;     // 114
+
+    pub const TYPE_01: u8 = 0x01;  //   1 — ?
+    pub const TYPE_03: u8 = 0x03;  //   3 — ?
+    pub const TYPE_05: u8 = 0x05;  //   5 — ?
+    pub const TYPE_14: u8 = 0x14;  //  20 — ?
+    pub const TYPE_19: u8 = 0x19;  //  25 — ?
+    pub const TYPE_1E: u8 = 0x1E;  //  30 — ? (same create as 108)
+    pub const TYPE_24: u8 = 0x24;  //  36 — ?
+    pub const TYPE_26: u8 = 0x26;  //  38 — ?
+    pub const TYPE_28: u8 = 0x28;  //  40 — ?
+    pub const TYPE_29: u8 = 0x29;  //  41 — ?
+    pub const TYPE_2B: u8 = 0x2B;  //  43 — ?
+    pub const TYPE_30: u8 = 0x30;  //  48 — ?
+    pub const TYPE_31: u8 = 0x31;  //  49 — ?
+    pub const TYPE_36: u8 = 0x36;  //  54 — ?
+    pub const TYPE_37: u8 = 0x37;  //  55 — ?
+    pub const TYPE_38: u8 = 0x38;  //  56 — ?
+    pub const TYPE_3F: u8 = 0x3F;  //  63 — ?
+    pub const TYPE_41: u8 = 0x41;  //  65 — ?
+    pub const TYPE_42: u8 = 0x42;  //  66 — ?
+    pub const TYPE_46: u8 = 0x46;  //  70 — ?
+    pub const TYPE_47: u8 = 0x47;  //  71 — ?
+    pub const TYPE_49: u8 = 0x49;  //  73 — ?
+    pub const TYPE_5C: u8 = 0x5C;  //  92 — ?
+    pub const TYPE_5F: u8 = 0x5F;  //  95 — ?
+    pub const TYPE_67: u8 = 0x67;  // 103 — ?
+    pub const TYPE_68: u8 = 0x68;  // 104 — ?
+    pub const TYPE_6A: u8 = 0x6A;  // 106 — ?
+    pub const TYPE_6B: u8 = 0x6B;  // 107 — ?
+    pub const TYPE_6C: u8 = 0x6C;  // 108 — ? (same create as 30)
+    pub const TYPE_6E: u8 = 0x6E;  // 110 — ?
+    pub const TYPE_76: u8 = 0x76;  // 118 — ?
+    pub const TYPE_77: u8 = 0x77;  // 119 — ?
+    pub const TYPE_78: u8 = 0x78;  // 120 — ?
+    pub const TYPE_79: u8 = 0x79;  // 121 — ?
+}
