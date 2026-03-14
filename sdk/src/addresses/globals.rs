@@ -224,3 +224,57 @@ pub const ENTITY_WRAPPER_FACTORY_REGISTRY: usize = 0x313_C8B8;
 ///
 /// IDA: `0x1431360F8` (`M2DE_g_ScriptWrapperManager`)
 pub const SCRIPT_WRAPPER_MANAGER: usize = 0x313_60F8;
+
+/// `M2DE_g_SDSManager` — глобальный менеджер SDS системы.
+///
+/// ⚠️ Двойная косвенность: *(module_base + RVA) → SDSManager*
+///
+/// Используется для:
+/// - ActivateStreamMapLine(name)
+/// - GetSyncObjectForLoadSDS(name)
+/// - LoadCityShop / ReleaseCityShop
+/// - LoadCityPart / ReleaseCityPart
+///
+/// Layout (SDSManager+0x08 = loader context):
+/// loader+0x08: int32 current_load_index
+/// loader+0x10..0x18: loaded slots array
+/// loader+0x18..0x20: map line name cache (sorted, 24b/entry)
+///
+/// IDA: `0x141CAF758`
+pub const SDS_MANAGER: usize = 0x1CA_F758;
+
+/// `M2DE_g_GfxEnvEffSystem` — графика/погода/эффекты окружения.
+///
+/// ⚠️ Двойная косвенность.
+///
+/// Layout:
+/// +0x18: WeatherDataStore*
+/// +0x20: WeatherSystem*
+/// +0x28: DateTimeBuffers*
+/// +0x60: WeatherRenderParams*
+///
+/// Используется SDS loader для проверки ночного режима (z-suffix).
+///
+/// IDA: `0x141CB2340`
+pub const GFX_ENV_EFF_SYSTEM: usize = 0x1CB_2340;
+
+/// `qword_141CAF7B0` — SDS Line Manager (загруженные stream map lines).
+///
+/// ⚠️ Двойная косвенность.
+///
+/// Layout:
+/// +0x00..+0x08: loaded configs array (ptrs to config structs)
+/// +0x18: cache_begin (sorted by hash, 24b/entry)
+/// +0x20: cache_end
+///
+/// IDA: `0x141CAF7B0`
+pub const SDS_LINE_MANAGER: usize = 0x1CA_F7B0;
+
+/// `qword_141CAF760` — SDS Observer Manager.
+///
+/// ⚠️ Двойная косвенность.
+///
+/// +0x78..+0x88: observer list (vector of module ptrs)
+///
+/// IDA: `0x141CAF760`
+pub const SDS_OBSERVER_MANAGER: usize = 0x1CA_F760;

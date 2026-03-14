@@ -836,3 +836,25 @@ pub mod script_wrapper {
     /// `+0x18` → observer/state object.
     pub const OBSERVER: usize = 0x18;
 }
+
+pub mod sds_manager {
+    /// +0x00: vtable (off_14186F8D0)
+    pub const VTABLE: usize = 0x00;
+    /// +0x08: vtable2 (off_14186F810)
+    pub const VTABLE2: usize = 0x08;
+    /// +0x10: int32 current_load_index (-1 = idle)
+    pub const CURRENT_LOAD_INDEX: usize = 0x10;
+    /// +0x30: byte loading_flag
+    pub const LOADING_FLAG: usize = 0x30;
+    /// +0x44: int32 (-1)
+    pub const FIELD_44: usize = 0x44;
+    /// +0x68: word
+    pub const FIELD_68: usize = 0x68;
+    /// +0x70..+0x78: loaded SDS slot array
+    pub const LOADED_SLOTS_BEGIN: usize = 0x70;
+    pub const LOADED_SLOTS_END: usize = 0x78;
+    /// +0x88: vtable3 (off_14186F7B8)
+    pub const VTABLE3: usize = 0x88;
+    /// +0x90: ModuleObject (module_id = 0x0D)
+    pub const MODULE_OBJECT: usize = 0x90;
+}

@@ -1070,3 +1070,37 @@ pub mod npc {
     /// IDA: `0x140DCE6D0`
     pub const SET_AGGRESSIVITY: usize = 0xDC_E6D0;
 }
+
+pub mod sds {
+    /// Native ActivateStreamMapLine.
+    /// IDA: `0x1403F4F30`
+    pub const ACTIVATE_STREAM_MAP_LINE: usize = 0x3F_4F30;
+
+    /// Парсер /sdsconfig.bin.
+    /// IDA: `0x1403F0640`
+    pub const PARSE_CONFIG: usize = 0x3F_0640;
+
+    /// SDSManager constructor. Module ID = 0x0D.
+    /// IDA: `0x1403D1D40`
+    pub const MANAGER_CONSTRUCTOR: usize = 0x3D_1D40;
+
+    /// Per-frame SDS tick (priority 2900).
+    /// IDA: `0x1403FA210`
+    pub const MANAGER_TICK: usize = 0x3F_A210;
+
+    /// Frame resource name resolver.
+    /// IDA: `0x1403EF480`
+    pub const FRAME_RESOURCE_RESOLVE: usize = 0x3E_F480;
+
+    /// Scene graph frame attach by hash.
+    /// IDA: `0x1406E6FB0`
+    pub const SCENE_GRAPH_ATTACH_FRAME: usize = 0x6E_6FB0;
+
+    /// SDS file loader.
+    /// IDA: `0x1403F0EB0`
+    pub const LOAD_SDS_FILE: usize = 0x3F_0EB0;
+
+    /// SDS file loader core (via CarManager).
+    /// IDA: `0x1403F0BB0`
+    pub const LOAD_SDS_FILE_CORE: usize = 0x3F_0BB0;
+}
