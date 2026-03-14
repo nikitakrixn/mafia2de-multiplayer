@@ -278,3 +278,17 @@ pub const SDS_LINE_MANAGER: usize = 0x1CA_F7B0;
 ///
 /// IDA: `0x141CAF760`
 pub const SDS_OBSERVER_MANAGER: usize = 0x1CA_F760;
+
+/// `M2DE_g_CarManager` — основной менеджер машин/SDS.
+/// ⚠️ Двойная косвенность.
+/// Первый аргумент LoadFile_Core. Содержит loaded SDS slots.
+/// Layout: +0x20..+0x28 = loaded slots, +0x38 = dirty flag.
+/// 8 callbacks registered in constructor.
+/// IDA: `0x141CAF7D8`
+pub const CAR_MANAGER: usize = 0x1CA_F7D8;
+
+/// `M2DE_g_TypeRegistry` — linked list дескрипторов entity types.
+/// node+0x00: next ptr, node+0x08: typeId (int32), node+0x18: createFn ptr.
+/// Используется M2DE_TypeRegistry_CreateByTypeId для аллокации entity.
+/// IDA: `0x141CAE228`
+pub const TYPE_REGISTRY: usize = 0x1CA_E228;
