@@ -970,8 +970,8 @@ pub mod human {
 
     /// `void(C_Human*, EntityMessage*)` — death handler.
     /// Called when health <= 0 and !demigod.
-    /// IDA: look for M2DE_HumanEntity_ProcessDeath xref in ApplyDamage
-    pub const PROCESS_DEATH: usize = 0; // TODO: exact address
+    /// IDA: `0x140DD2460`
+    pub const PROCESS_DEATH: usize = 0xDD_2460;
 
     /// `float(C_Human*)` — get current health.
     /// return *(float*)(*(component) + 0x148).
@@ -1037,7 +1037,7 @@ pub mod entity_manager {
     /// Найти/создать wrapper по tableID.
     /// `__int64(ScriptWrapperManager*, uint32 tableID)`
     /// TODO: exact address
-    pub const GET_OR_CREATE_WRAPPER: usize = 0x10C_7070; // TODO: exact address
+    pub const GET_OR_CREATE_WRAPPER: usize = 0;
 
     /// FNV-1a хеш или числовой парсинг имени.
     /// `void(uint64* out, const char* name)`
