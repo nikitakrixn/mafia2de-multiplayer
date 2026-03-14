@@ -40,11 +40,6 @@ pub const RESOURCE_MANAGER: usize = 0x1CA_1FD0;
 /// Вызывается ~494 раза за игровую сессию.
 pub const GAME_CALLBACK_MANAGER: usize = 0x1CA_F038;
 
-/// Менеджер объектов.
-///
-/// IDA: `0x1431360F8`
-pub const OBJECT_MANAGER: usize = 0x313_60F8;
-
 /// Аллокатор памяти.
 ///
 /// IDA: `0x141CD4A28`
@@ -194,3 +189,92 @@ pub const PLAYER_DATA: usize = 0x1CA_1B38;
 ///
 /// IDA: `0x141CABDC8`
 pub const PHYSICS_WORLD_MANAGER: usize = 0x1CA_BDC8;
+
+/// `M2DE_g_EntityDatabase` — глобальная БД всех entity.
+///
+/// Двойная косвенность: *(module_base + RVA) → EntityDB*
+/// Содержит все entity загруженные через SDS.
+/// Используется GetEntityByName и GetEntityByGUID.
+///
+/// IDA: `0x141CAF788`
+pub const ENTITY_DATABASE: usize = 0x1CA_F788;
+
+/// `M2DE_g_EntityWrapperFactoryRegistry` — фабрики script wrappers.
+///
+/// RB-tree, ключ = entity type (uint8).
+/// Создаёт C_WrapperHuman, C_WrapperCar и т.д.
+/// Lazy-init при первом обращении.
+///
+/// IDA: `0x14313C8B8`
+pub const ENTITY_WRAPPER_FACTORY_REGISTRY: usize = 0x313_C8B8;
+
+/// `M2DE_g_ScriptWrapperManager` — менеджер Lua script wrappers для entity.
+///
+/// Двойная косвенность: *(module_base + RVA) → ScriptWrapperManager*
+///
+/// Lazy-init singleton. Используется для:
+/// - `GetEntityByName` (FNV-1a hash → wrapper)
+/// - `GetEntityByGUID` (tableID → wrapper)
+/// - `CreateCleanEntity` (создание wrapper)
+/// - Кеширование wrappers
+///
+/// Layout:
+/// +0x08..+0x10: hash cache (sorted array, 16b/entry: hash + wrapper_ptr)
+/// +0x28..+0x30: tableID cache (sorted array, 16b/entry: tableID + wrapper_ptr)
+///
+/// IDA: `0x1431360F8` (`M2DE_g_ScriptWrapperManager`)
+pub const SCRIPT_WRAPPER_MANAGER: usize = 0x313_60F8;
+
+/// `M2DE_g_SDSManager` — глобальный менеджер SDS системы.
+///
+/// ⚠️ Двойная косвенность: *(module_base + RVA) → SDSManager*
+///
+/// Используется для:
+/// - ActivateStreamMapLine(name)
+/// - GetSyncObjectForLoadSDS(name)
+/// - LoadCityShop / ReleaseCityShop
+/// - LoadCityPart / ReleaseCityPart
+///
+/// Layout (SDSManager+0x08 = loader context):
+/// loader+0x08: int32 current_load_index
+/// loader+0x10..0x18: loaded slots array
+/// loader+0x18..0x20: map line name cache (sorted, 24b/entry)
+///
+/// IDA: `0x141CAF758`
+pub const SDS_MANAGER: usize = 0x1CA_F758;
+
+/// `M2DE_g_GfxEnvEffSystem` — графика/погода/эффекты окружения.
+///
+/// ⚠️ Двойная косвенность.
+///
+/// Layout:
+/// +0x18: WeatherDataStore*
+/// +0x20: WeatherSystem*
+/// +0x28: DateTimeBuffers*
+/// +0x60: WeatherRenderParams*
+///
+/// Используется SDS loader для проверки ночного режима (z-suffix).
+///
+/// IDA: `0x141CB2340`
+pub const GFX_ENV_EFF_SYSTEM: usize = 0x1CB_2340;
+
+/// `qword_141CAF7B0` — SDS Line Manager (загруженные stream map lines).
+///
+/// ⚠️ Двойная косвенность.
+///
+/// Layout:
+/// +0x00..+0x08: loaded configs array (ptrs to config structs)
+/// +0x18: cache_begin (sorted by hash, 24b/entry)
+/// +0x20: cache_end
+///
+/// IDA: `0x141CAF7B0`
+pub const SDS_LINE_MANAGER: usize = 0x1CA_F7B0;
+
+/// `qword_141CAF760` — SDS Observer Manager.
+///
+/// ⚠️ Двойная косвенность.
+///
+/// +0x78..+0x88: observer list (vector of module ptrs)
+///
+/// IDA: `0x141CAF760`
+pub const SDS_OBSERVER_MANAGER: usize = 0x1CA_F760;

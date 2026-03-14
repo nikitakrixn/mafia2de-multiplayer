@@ -115,6 +115,21 @@ pub struct CHuman {
 
     /// Указатель на самого себя. Валидация: self_ref == this.
     pub self_ref: *mut CHuman,                   // +0x190
+
+    // === NPC-специфичные поля (за пределами +0x190) ===
+
+    /// `+0x198` → int32 entity_table_index (выделяется при создании)
+    pub entity_table_index: i32,                 // +0x198
+    /// `+0x19C` → int32 entity_table_slot
+    pub entity_table_slot: i32,                  // +0x19C
+
+    _pad_1A0: [u8; 0x20],                       // +0x1A0..+0x1C0
+
+    /// `+0x1C0` → 8 smart pointer слотов (16 bytes каждый).
+    /// IDs: 1,2,3,4,5,6,7,-1. Назначение неизвестно (AI states?).
+    pub smart_ptr_slots: [[u8; 16]; 8],          // +0x1C0..+0x240
+
+    _npc_pad_240: [u8; 0x18],                   // +0x240..+0x258
 }
 
 assert_field_offsets!(CHuman {

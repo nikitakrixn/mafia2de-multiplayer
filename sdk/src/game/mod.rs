@@ -4,11 +4,14 @@
 //! Скрывает за собой цепочки указателей, вызовы движка
 //! и прочую низкоуровневую механику.
 
+pub mod entity;
 pub mod callbacks;
 pub mod camera;
 pub mod player;
 pub mod lua;
 pub mod render;
+pub mod npc;
+pub mod sds;
 
 pub use player::Player;
 
@@ -28,7 +31,7 @@ static GAME_BASE: OnceLock<usize> = OnceLock::new();
 ///
 /// Паникует если DLL загружена не в процесс игры.
 /// Это ожидаемое поведение — без модуля игры SDK бесполезен.
-pub(crate) fn base() -> usize {
+pub fn base() -> usize {
     *GAME_BASE.get_or_init(|| {
         memory::get_module_base(addresses::GAME_MODULE)
             .expect("Модуль игры не найден — DLL не инжектирована?")

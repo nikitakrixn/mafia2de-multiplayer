@@ -93,6 +93,10 @@ pub mod player {
 
     /// `+0x344` → int32 тип смерти (1=обычная, 128=взрыв).
     pub const DEATH_TYPE: usize = 0x344;
+
+    /// `+0x0A8` → указатель на AI params struct.
+    /// *(player+0xA8) + 4 = int32 aggressivity (0-4).
+    pub const AI_PARAMS: usize = 0xA8;
 }
 
 pub mod inventory {
@@ -802,4 +806,55 @@ pub mod camera_view {
 
     /// `DefaultSpeeds[15]` (`float[15]`)
     pub const DEFAULT_SPEEDS: usize = 0xCDC;
+}
+
+/// AI Params struct (указатель из player+0xA8).
+pub mod ai_params {
+    /// `+0x04` → int32 aggressivity level.
+    /// 0=OnAttack, 1=HearGunshot, 2=SeeEnemy, 3=SeeEnemyWithWeapon.
+    pub const AGGRESSIVITY: usize = 0x04;
+}
+
+/// DB Record (entity definition из глобальной БД).
+pub mod db_record {
+    /// `+0x24` → uint8 entity type.
+    pub const ENTITY_TYPE: usize = 0x24;
+    /// `+0x24` → uint32 table ID (offset +36 decimal).
+    pub const TABLE_ID: usize = 0x24; // Осторожно: совпадает с entity_type!
+    /// `+0x28` → uint32 flags. Бит 5 (0x20) = streamable/spawnable.
+    pub const FLAGS: usize = 0x28;
+}
+
+/// Script Wrapper layout (общий для всех типов).
+pub mod script_wrapper {
+    /// `+0x00` → vtable.
+    pub const VTABLE: usize = 0x00;
+    /// `+0x08` → int32 refcount.
+    pub const REFCOUNT: usize = 0x08;
+    /// `+0x10` → DB record / native entity pointer.
+    pub const NATIVE: usize = 0x10;
+    /// `+0x18` → observer/state object.
+    pub const OBSERVER: usize = 0x18;
+}
+
+pub mod sds_manager {
+    /// +0x00: vtable (off_14186F8D0)
+    pub const VTABLE: usize = 0x00;
+    /// +0x08: vtable2 (off_14186F810)
+    pub const VTABLE2: usize = 0x08;
+    /// +0x10: int32 current_load_index (-1 = idle)
+    pub const CURRENT_LOAD_INDEX: usize = 0x10;
+    /// +0x30: byte loading_flag
+    pub const LOADING_FLAG: usize = 0x30;
+    /// +0x44: int32 (-1)
+    pub const FIELD_44: usize = 0x44;
+    /// +0x68: word
+    pub const FIELD_68: usize = 0x68;
+    /// +0x70..+0x78: loaded SDS slot array
+    pub const LOADED_SLOTS_BEGIN: usize = 0x70;
+    pub const LOADED_SLOTS_END: usize = 0x78;
+    /// +0x88: vtable3 (off_14186F7B8)
+    pub const VTABLE3: usize = 0x88;
+    /// +0x90: ModuleObject (module_id = 0x0D)
+    pub const MODULE_OBJECT: usize = 0x90;
 }
