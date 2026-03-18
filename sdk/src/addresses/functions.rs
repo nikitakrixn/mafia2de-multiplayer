@@ -39,10 +39,6 @@ pub mod engine {
     /// IDA: `0x140B8B5E0`
     pub const AUDIO_SYSTEM_INIT: usize = 0xB8_B5E0;
 
-    /// Обработка ввода игрока.
-    /// IDA: `0x1400FE640`
-    pub const PLAYER_INPUT_HANDLER: usize = 0xFE640;
-
     /// Обновление игровых объектов.
     /// IDA: `0x140D8B7A0`
     pub const GAME_OBJECTS_UPDATE: usize = 0xD8_B7A0;
@@ -140,7 +136,19 @@ pub mod player_control {
 
     /// `bool(PlayerControlRef*, u8 locked, u8 play_anim_flag)`
     /// IDA: `0x140DB1B40`
+    /// 
+    /// ВАЖНО: Эта функция проверяет текущее состояние через IS_LOCKED
+    /// и ничего не делает, если состояние уже соответствует запрошенному.
+    /// Для принудительной блокировки используйте SET_LOCKED_INTERNAL.
     pub const SET_LOCKED: usize = 0xDB_1B40;
+
+    /// `i64(control_component+112, u8 locked, u8 flags)`
+    /// IDA: `0x140DB1BE0`
+    /// 
+    /// Внутренняя функция блокировки управления, вызываемая из SET_LOCKED.
+    /// Принимает указатель на (control_component + 112), а не на сам компонент!
+    /// Всегда выполняет блокировку/разблокировку, не проверяя текущее состояние.
+    pub const SET_LOCKED_INTERNAL: usize = 0xDB_1BE0;
 
     /// `const char*(PlayerControlRef*)`
     /// IDA: `0x140DCCEB0`
@@ -257,6 +265,20 @@ pub mod hud {
     ///
     /// IDA: `0x140A76940`
     pub const LOAD_ICON: usize = 0xA7_6940;
+
+    /// Обработчик ввода для интерактивной карты.
+    ///
+    /// `u64(MapContext*, InputEvent*, float dt)`
+    ///
+    /// Функционал:
+    /// - Зум колёсиком/клавишами (D=68, K=75)
+    /// - Панорамирование WASD-подобными клавишами
+    /// - Перетаскивание мышью (drag: состояния 0=idle, 1=click, 2=dragging)
+    /// - Выбор маркеров на карте
+    /// - Ограничения зума (0.5x - 2.5x)
+    ///
+    /// IDA: `0x1400FE640` (`M2DE_MapInputHandler`)
+    pub const MAP_INPUT_HANDLER: usize = 0xFE_640;
 }
 
 pub mod entity {
@@ -945,6 +967,70 @@ pub mod camera {
     ///
     /// IDA: `0x140E6BC00`
     pub const VIEW_COPY_DEFAULTS_TO_STATES: usize = 0xE6_BC00;
+
+    /// Основная функция обновления камеры.
+    /// Читает mouse delta и обновляет rotation/position камеры.
+    /// Вызывается каждый кадр.
+    ///
+    /// `void(Camera*, float dt, char flag)`
+    ///
+    /// IDA: `0x14029BAC0` (`M2DE_Camera_Update`)
+    pub const UPDATE: usize = 0x29_BAC0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DirectInput System
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub mod input {
+    /// Инициализация DirectInput8 manager.
+    /// Создаёт DirectInput8 context и сохраняет в input manager.
+    ///
+    /// `char(InputManager*, HWND)`
+    ///
+    /// IDA: `0x14079FA60` (`M2DE_InputManager_Init`)
+    pub const MANAGER_INIT: usize = 0x79_FA60;
+
+    /// Создание DirectInput8 устройств (клавиатура, мышь, геймпад).
+    /// Вызывается из MANAGER_INIT.
+    ///
+    /// `char(InputManager*, HWND)`
+    ///
+    /// IDA: `0x14079F770` (`M2DE_InputManager_CreateDevices`)
+    pub const MANAGER_CREATE_DEVICES: usize = 0x79_F770;
+
+    /// Обновление состояния input устройства.
+    /// Вызывает GetDeviceState через vtable+104.
+    /// Вызывается каждый кадр для каждого устройства.
+    ///
+    /// `char(InputDevice*)`
+    ///
+    /// IDA: `0x1407A3EB0` (`M2DE_InputDevice_Update`)
+    pub const DEVICE_UPDATE: usize = 0x7A_3EB0;
+
+    /// Опрос DirectInput устройства.
+    /// Вызывает vtable функции для получения текущего состояния.
+    ///
+    /// `char(InputDevice*)`
+    ///
+    /// IDA: `0x14079F560` (`M2DE_InputDevice_Poll`)
+    pub const DEVICE_POLL: usize = 0x79_F560;
+
+    /// Конструктор mouse input устройства.
+    /// Инициализирует буферы состояния мыши.
+    ///
+    /// `__int64(MouseDevice*, InputManager*, CallbackObject*)`
+    ///
+    /// IDA: `0x14079A6C0` (`M2DE_MouseDevice_Constructor`)
+    pub const MOUSE_DEVICE_CTOR: usize = 0x79_A6C0;
+
+    /// Конструктор keyboard input устройства.
+    /// Читает настройки клавиатуры Windows через SystemParametersInfo.
+    ///
+    /// `__int64(KeyboardDevice*, InputManager*, CallbackObject*)`
+    ///
+    /// IDA: `0x14079A890` (`M2DE_KeyboardDevice_Constructor`)
+    pub const KEYBOARD_DEVICE_CTOR: usize = 0x79_A890;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

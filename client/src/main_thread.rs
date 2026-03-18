@@ -1,4 +1,4 @@
-//! Main-thread service loop клиента.
+// Главный тик клиента — вызывается из хука Game Tick Always
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -43,7 +43,7 @@ pub fn on_main_thread_tick() {
     crate::player_tracker::update_main_thread();
     crate::player_events::process_pending();
     crate::hooks::try_deferred_present_hook();
-    crate::overlay::bridge::sync_game_to_ui();
+    crate::overlay::state::sync_from_game();
 }
 
 fn refresh_state_if_needed() {
@@ -87,7 +87,7 @@ pub fn drain_lua_queue(max_per_tick: usize) -> usize {
 
     if processed != 0 {
         logger::debug(&format!(
-            "[main-thread] processed {processed} queued Lua command(s)"
+            "[main-thread] обработано {processed} Lua команд(ы)"
         ));
     }
 
@@ -105,7 +105,7 @@ fn exec_one(cmd: QueuedLuaCommand) -> ExecResult {
                 ExecResult::NotReady(cmd)
             } else {
                 logger::error(&format!(
-                    "[lua-main] failed: {} -> {}",
+                    "[lua-main] ошибка: {} -> {}",
                     cmd.chunk_name, err
                 ));
                 ExecResult::Failed

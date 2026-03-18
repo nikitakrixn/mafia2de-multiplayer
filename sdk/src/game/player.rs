@@ -645,6 +645,58 @@ impl Player {
         true
     }
 
+    /// Принудительно заблокировать/разблокировать управление.
+    ///
+    /// В отличие от `lock_controls()`, эта функция вызывает внутреннюю
+    /// функцию блокировки напрямую, минуя проверку текущего состояния.
+    /// Используется когда игра уже заблокировала управление (например, пауза),
+    /// но нам нужно заблокировать ещё и ввод клавиатуры.
+    pub fn lock_controls_force(&self, locked: bool) -> bool {
+        let Some(control) = self.control_component_ptr() else {
+            logger::error("lock_controls_force: компонент управления NULL");
+            return false;
+        };
+
+        // control - это указатель на PlayerControlRef
+        // Нам нужно прочитать *control (разыменовать), а затем +248
+        // v3 = *a1;
+        // v5 = *(_QWORD *)(*a1 + 248);
+        
+        let control_ref = unsafe {
+            match memory::read_ptr(control) {
+                Some(ptr) => ptr,
+                None => {
+                    logger::error("lock_controls_force: не удалось разыменовать control");
+                    return false;
+                }
+            }
+        };
+
+        let internal_ptr = unsafe {
+            match memory::read_ptr(control_ref + 248) {
+                Some(ptr) => ptr,
+                None => {
+                    logger::error(&format!(
+                        "lock_controls_force: не удалось прочитать internal_ptr (control_ref=0x{:X})",
+                        control_ref
+                    ));
+                    return false;
+                }
+            }
+        };
+
+        // Вызываем sub_140DB1BE0(internal_ptr + 112, locked, 0)
+        type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
+        let func: Fn = unsafe {
+            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED_INTERNAL)
+        };
+
+        unsafe { func(internal_ptr + 112, locked as u8, 0) };
+        
+        logger::debug(&format!("[player] lock_controls_force({}) called successfully", locked));
+        true
+    }
+
     /// Получить текущий стиль управления как строку.
     ///
     /// Примеры: "Normal", "DoNothing", "Intoxicated" и т.д.

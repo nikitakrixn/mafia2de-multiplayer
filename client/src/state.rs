@@ -1,16 +1,47 @@
-//! Состояние игровой сессии клиента.
-//!
-//! Работает в смешанном режиме:
-//! - callback lifecycle события через FireEventById
-//! - polling fallback через refresh_from_runtime()
+// Состояние игровой сессии клиента
+//
+// Работает в смешанном режиме:
+// - События через FireEventById (callback lifecycle)
+// - Polling fallback через refresh_from_runtime()
+//
+// Также управляет shutdown флагом для корректного завершения
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use common::logger;
 use sdk::{
     addresses::constants::game_events as ev,
     game::{self, Player},
 };
+
+// ═══════════════════════════════════════════════════════
+//  Shutdown управление
+// ═══════════════════════════════════════════════════════
+
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+pub fn is_shutting_down() -> bool {
+    SHUTTING_DOWN.load(Ordering::Acquire)
+}
+
+pub fn shutdown() {
+    if SHUTTING_DOWN.swap(true, Ordering::AcqRel) {
+        return; // уже запущен
+    }
+
+    mark_shutting_down();
+    logger::info("[runtime] начато завершение");
+
+    if let Err(e) = crate::hooks::uninstall() {
+        logger::error(&format!("[runtime] ошибка удаления хуков: {e}"));
+    }
+
+    logger::info("[runtime] завершение закончено");
+}
+
+// ═══════════════════════════════════════════════════════
+//  Состояние игровой сессии
+// ═══════════════════════════════════════════════════════
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,11 +112,11 @@ pub fn mark_unpaused() {
     }
 }
 
-pub fn mark_shutting_down() {
+fn mark_shutting_down() {
     set(GameSessionState::ShuttingDown);
 }
 
-/// Lifecycle event -> state transition.
+// Lifecycle event -> state transition
 pub fn on_event(event_id: i32) {
     match event_id {
         ev::LOADING_PROCESS_STARTED
@@ -123,7 +154,7 @@ pub fn on_event(event_id: i32) {
     }
 }
 
-/// Polling fallback на случай, если какое-то lifecycle-событие не пришло.
+// Polling fallback на случай если какое-то lifecycle-событие не пришло
 pub fn refresh_from_runtime() -> GameSessionState {
     let current = get();
 
