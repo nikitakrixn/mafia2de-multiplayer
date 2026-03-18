@@ -19,7 +19,6 @@ license = "MIT"
 windows = { version = "0.62.2" }
 chrono = "0.4.44"
 minhook = "0.9.0"
-slint = "1.15.1"
 
 common   = { path = "common" }
 sdk      = { path = "sdk" }
