@@ -1,19 +1,16 @@
-//! Клиентская DLL для Mafia II: DE Multiplayer.
-//!
-//! Инжектится лаунчером в процесс игры.
-//! Точка входа — DllMain → initialize() в отдельном потоке.
+// Клиентская DLL для Mafia II: DE Multiplayer
 
 mod events;
 mod hooks;
 mod human_messages;
-mod input;
+pub mod input;
 mod lua_queue;
 mod main_thread;
-mod overlay;
+pub mod overlay;
 mod player_events;
 mod player_tracker;
-mod runtime;
-mod state;
+mod utils;
+pub mod state;
 
 use std::ffi::c_void;
 use windows::Win32::Foundation::HINSTANCE;
@@ -37,7 +34,7 @@ extern "system" fn DllMain(
         }
         DLL_PROCESS_DETACH => {
             logger::info("Клиент завершает работу...");
-            runtime::shutdown();
+            state::shutdown();
             1
         }
         _ => 1,
@@ -52,35 +49,34 @@ fn initialize() {
         logger::Target::Both,
         Some("logs/m2mp_client.log"),
     ) {
-        eprintln!("[m2mp] Не удалось инициализировать логгер: {e}");
+        eprintln!("[m2mp] Ошибка инициализации логгера: {e}");
     }
 
     logger::info("======================================");
     logger::info("  Mafia II: DE Multiplayer Client");
-    logger::info("  Версия 0.1.0 | x86_64");
+    logger::info("  v0.1.0 | x86_64 | egui D3D11 UI");
     logger::info("======================================");
 
     sdk::game::log_module_info();
 
-    // Инициализация подсистем
+    // Подсистемы
     lua_queue::init();
     player_tracker::init();
     player_events::init();
     let _ = state::refresh_from_runtime();
-
     sdk::game::lua::log_chain();
 
-    // Установка хуков
-    logger::info("Устанавливаю хуки...");
+    // Хуки
+    logger::info("Установка хуков...");
     if let Err(e) = hooks::install() {
-        logger::error(&format!("Не удалось установить хуки: {e}"));
+        logger::error(&format!("Ошибка установки хуков: {e}"));
         return;
     }
 
-    logger::info("[init] calling overlay::init()...");
+    logger::info("[init] Инициализация оверлея...");
     match overlay::init() {
-        Ok(()) => logger::info("[init] overlay::init() succeeded"),
-        Err(e) => logger::error(&format!("[init] overlay::init() FAILED: {e}")),
+        Ok(()) => logger::info("[init] Оверлей готов (или отложен)"),
+        Err(e) => logger::error(&format!("[init] Ошибка оверлея: {e}")),
     }
 
     input::log_keybinds();
@@ -88,5 +84,6 @@ fn initialize() {
     logger::info("  Клиент инициализирован!");
     logger::info("======================================");
 
+    // Input loop — блокирует поток до shutdown
     input::run();
 }
