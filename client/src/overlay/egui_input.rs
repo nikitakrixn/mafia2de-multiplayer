@@ -1,4 +1,4 @@
-// Конвертация Win32 input → egui::RawInput
+// Конвертация Win32 input -> egui::RawInput
 //
 // Не используем GetAsyncKeyState(0x0001) — он крадёт нажатия у игры
 // Вместо этого: edge detection через 0x8000 для горячих клавиш мода,
@@ -123,9 +123,9 @@ fn get_cursor_client_pos(hwnd: Option<usize>) -> Option<egui::Pos2> {
     Some(egui::Pos2::new(pt.x as f32, pt.y as f32))
 }
 
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 //  Edge detection для горячих клавиш (не для egui)
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 
 static KEY_STATES: OnceLock<Mutex<HashMap<u16, bool>>> = OnceLock::new();
 
@@ -133,7 +133,7 @@ fn key_states() -> &'static Mutex<HashMap<u16, bool>> {
     KEY_STATES.get_or_init(|| Mutex::new(HashMap::with_capacity(64)))
 }
 
-// Edge detection: was_up → is_down
+// Edge detection: was_up -> is_down
 // Использует ТОЛЬКО 0x8000 — НЕ крадёт ввод у игры
 pub fn just_pressed(vk: VIRTUAL_KEY) -> bool {
     let currently_down = is_key_down(vk);

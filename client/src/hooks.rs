@@ -14,18 +14,18 @@ use common::logger;
 use minhook::{MH_STATUS, MinHook};
 use sdk::{addresses, memory};
 
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 //  Типы функций
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 
-type GameTickAlwaysCallback = unsafe extern "C" fn(usize, usize);
-type FireEventByIdFn        = unsafe extern "C" fn(usize, i32, usize) -> usize;
-type EntityBroadcastFn      = unsafe extern "C" fn(usize, usize) -> u8;
-type Present1Fn             = unsafe extern "system" fn(*mut c_void, u32, u32, *const c_void) -> i32;
+type GameTickAlwaysCallback     = unsafe extern "C" fn(usize, usize);
+type FireEventByIdFn            = unsafe extern "C" fn(usize, i32, usize) -> usize;
+type EntityBroadcastFn          = unsafe extern "C" fn(usize, usize) -> u8;
+type Present1Fn                 = unsafe extern "system" fn(*mut c_void, u32, u32, *const c_void) -> i32;
 
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 //  Оригиналы функций
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 
 static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
 
@@ -34,9 +34,9 @@ static ORIGINAL_FIRE_EVENT_BY_ID: OnceLock<FireEventByIdFn>       = OnceLock::ne
 static ORIGINAL_ENTITY_BROADCAST: OnceLock<EntityBroadcastFn>     = OnceLock::new();
 static ORIGINAL_PRESENT1:         OnceLock<Present1Fn>            = OnceLock::new();
 
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 //  Detour функции
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 
 unsafe extern "C" fn game_tick_always_detour(callback_object: usize, dispatch_ctx: usize) {
     if let Some(original) = ORIGINAL_GAME_TICK_ALWAYS.get() {
@@ -84,9 +84,9 @@ unsafe extern "system" fn present1_detour(
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 //  Install / uninstall
-// ═══════════════════════════════════════════════════════════════
+// =============================================================================
 
 fn map_status(prefix: &str, status: MH_STATUS) -> String {
     format!("{prefix}: {status:?}")
