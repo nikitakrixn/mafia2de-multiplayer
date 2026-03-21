@@ -13,6 +13,13 @@ use windows::core::PCSTR;
 
 const GAME_EXE_NAME: &str = "Mafia II Definitive Edition.exe";
 const CLIENT_DLL: &str = "m2mp_client.dll";
+const DEVTOOLS_DLL: &str = "m2mp_devtools.dll";
+
+#[derive(Debug, Clone, Copy)]
+enum LaunchMode {
+    Client,
+    Devtools,
+}
 
 fn main() {
     if let Err(e) = logger::init(
@@ -28,7 +35,11 @@ fn main() {
     logger::info("  Version 0.1.0 | x86_64");
     logger::info("========================================");
 
-    if let Err(e) = run() {
+    // Определяем режим запуска из аргументов
+    let mode = parse_launch_mode();
+    logger::info(&format!("Launch mode: {:?}", mode));
+
+    if let Err(e) = run(mode) {
         logger::error(&format!("Fatal: {e}"));
         show_error(&format!("{e}"));
         std::process::exit(1);
@@ -37,7 +48,22 @@ fn main() {
     logger::info("Launcher finished. Have fun!");
 }
 
-fn run() -> Result<(), Error> {
+fn parse_launch_mode() -> LaunchMode {
+    let args: Vec<String> = std::env::args().collect();
+    
+    for arg in args.iter() {
+        match arg.to_lowercase().as_str() {
+            "--devtools" | "-d" | "devtools" => return LaunchMode::Devtools,
+            "--client" | "-c" | "client" => return LaunchMode::Client,
+            _ => {}
+        }
+    }
+    
+    // По умолчанию запускаем client
+    LaunchMode::Client
+}
+
+fn run(mode: LaunchMode) -> Result<(), Error> {
     // 1. Проверяем, не запущена ли уже игра
     if inject::is_process_running(GAME_EXE_NAME)? {
         return Err(Error::GameAlreadyRunning);
@@ -61,8 +87,8 @@ fn run() -> Result<(), Error> {
         return Err(Error::GamePathNotFound);
     }
 
-    // 4. Находим и проверяем DLL
-    let dll_path = find_client_dll()?;
+    // 4. Находим и проверяем DLL в зависимости от режима
+    let dll_path = find_dll(mode)?;
     logger::info(&format!("[ok] DLL: {}", dll_path.display()));
     validate_dll(&dll_path)?;
     logger::info("[ok] DLL validated");
@@ -74,10 +100,15 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
-fn find_client_dll() -> Result<std::path::PathBuf, Error> {
+fn find_dll(mode: LaunchMode) -> Result<std::path::PathBuf, Error> {
+    let dll_name = match mode {
+        LaunchMode::Client => CLIENT_DLL,
+        LaunchMode::Devtools => DEVTOOLS_DLL,
+    };
+
     let exe_dir = std::env::current_exe()
-        .map_err(|_| Error::DllNotFound(CLIENT_DLL.into()))?;
-    let dll = exe_dir.parent().unwrap().join(CLIENT_DLL);
+        .map_err(|_| Error::DllNotFound(dll_name.into()))?;
+    let dll = exe_dir.parent().unwrap().join(dll_name);
 
     if !dll.exists() {
         return Err(Error::DllNotFound(dll.display().to_string()));
