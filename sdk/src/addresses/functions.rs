@@ -1662,6 +1662,9 @@ pub mod player_vtable {
     /// vtable[83] — checks `player+0x430 == 10`.
     pub const IS_STATE_CODE_430_EQ_10: usize = 0x0B_D8C0;
 
+    /// vtable[83] — checks `player+0x430 == 4`.
+    pub const IS_STATE_CODE_430_EQ_4: usize = 0x0C_4760;
+
     /// vtable[94] — checks `player+0x3D8 != 3 && != 4`.
     pub const IS_MODE_3D8_NOT_3_OR_4: usize = 0x0C_47F0;
 
@@ -1682,6 +1685,36 @@ pub mod player_vtable {
 
     /// vtable[109] — thunk via physics provider at +0x258.
     pub const PHYSICS_PROVIDER_THUNK_FILLOUT: usize = 0x0C_3680;
+
+    /// HasSpecialState46F0 — checks if player has special state at +0x45C.
+    pub const HAS_SPECIAL_STATE_46F0: usize = 0x0C_46F0;
+
+    /// Sub45C_IsStateEq4 — checks if subobject at +0x45C has state == 4.
+    pub const SUB45C_IS_STATE_EQ_4: usize = 0x0C_4770;
+
+    /// ActionCodeManager_HandleCode — handles action codes.
+    pub const ACTION_CODE_MANAGER_HANDLE_CODE: usize = 0x0C_4220;
+
+    /// ValidateSpecialState45C — validates special state at +0x45C.
+    pub const VALIDATE_SPECIAL_STATE_45C: usize = 0x0C_18C0;
+
+    /// ClearSpecialState45C — clears special state at +0x45C.
+    pub const CLEAR_SPECIAL_STATE_45C: usize = 0x0C_1850;
+
+    /// FlushSpecialState45C_IfPending — flushes special state if pending.
+    pub const FLUSH_SPECIAL_STATE_45C_IF_PENDING: usize = 0x0C_22A0;
+
+    /// SendPhysicsMarkerEventByCode — sends physics marker event by code.
+    pub const SEND_PHYSICS_MARKER_EVENT_BY_CODE: usize = 0x0C_9C70;
+
+    /// Sub45C_GenerateAndDispatchCode — generates and dispatches code from +0x45C.
+    pub const SUB45C_GENERATE_AND_DISPATCH_CODE: usize = 0x0C_90D0;
+
+    /// HudStateSyncHelper — syncs HUD state.
+    pub const HUD_STATE_SYNC_HELPER: usize = 0x0C_93B0;
+
+    /// HudStateDispatchHelper — dispatches HUD state.
+    pub const HUD_STATE_DISPATCH_HELPER: usize = 0x0C_DC40;
 
     /// kill damage action cluster
     pub const KILL_DAMAGE_ACTION_BASE_DTOR_A: usize = 0x0B_B170;

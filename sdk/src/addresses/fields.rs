@@ -276,6 +276,13 @@ pub mod player {
     /// `+0x448` -> auxiliary player state field.
     pub const FIELD_448: usize = 0x448;
 
+    /// `+0x45C` -> player special-state subobject.
+    /// HasSpecialState46F0 delegates into this object.
+    pub const SUBOBJECT_45C: usize = 0x45C;
+
+    /// `+0x500` -> world/entity handle used by ClearSpecialState45C.
+    pub const FIELD_500: usize = 0x500;
+
     /// `+0x510` -> player state flags dword.
     ///
     /// В Character_Update используется bit 4 / bit 3-like логика,
