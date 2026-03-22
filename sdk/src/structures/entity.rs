@@ -208,6 +208,7 @@ impl CEntity {
 /// Actor добавляет:
 /// - `frame_node` (+0x78) — указатель на трансформ/позицию в мире
 /// - `owner` (+0x80) — NULL = на ногах, vehicle* = в машине
+/// - `entity_subtype` (+0xA0) — подтип entity (Player=6)
 ///
 /// Позиция читается из frame_node:
 /// ```text
@@ -236,16 +237,17 @@ pub struct CActorFields {
     /// Владелец/контейнер. NULL = на ногах, vehicle* = в транспорте.
     pub owner: *mut c_void, // +0x80
 
-    /// Неизвестно (обнулено в конструкторе).
-    pub _unk_88: u64, // +0x88
+    /// Неизвестно (обнулено в конструкторе). Runtime: всегда 0.
+    pub _zero_88: u64, // +0x88
 
-    /// Неизвестно (обнулено). Actor::OnStateUpdate читает +0x90.
-    pub _unk_90: u64, // +0x90
+    /// Неизвестно (обнулено). Actor::OnStateUpdate читает +0x90. Runtime: всегда 0.
+    pub _zero_90: u64, // +0x90
 
-    /// Неизвестно (обнулено).
-    pub _unk_98: u64, // +0x98
+    /// Неизвестно (обнулено). Runtime: всегда 0.
+    pub _zero_98: u64, // +0x98
 
     /// Подтип entity (устанавливается после конструирования).
+    /// Runtime: Player=6, NPC=?
     pub entity_subtype: u32, // +0xA0
     pub _pad_a4: u32, // +0xA4
 }
@@ -408,12 +410,12 @@ pub struct CTypeDescriptor {
 //  Документация цепочки конструкторов
 // =============================================================================
 
-/// Цепочка конструкторов для C_Human entity (подтверждено из IDA):
+/// Цепочка конструкторов для C_Human entity (подтверждено из IDA + runtime):
 ///
 /// ```text
 /// 1. M2DE_BaseEntity_Construct (0x14039B710)
 ///    - vtable = M2DE_VT_CEntity
-///    - Обнуляет +0x08..+0x70
+///    - Обнуляет +0x08..+0x70 (кроме Player-only +0x08/10/18)
 ///    - Аллоцирует два RB-tree sentinel (+0x40, +0x50)
 ///    - Генерирует table_id из глобального счётчика
 ///    - Регистрирует в WorldEntityManager
@@ -425,7 +427,7 @@ pub struct CTypeDescriptor {
 ///
 /// 3. M2DE_CHuman_BaseConstructor (0x140D730B0)
 ///    - vtable = M2DE_VT_CActor_Abstract (с _purecall)
-///    - Аллоцирует 2648 байт для ВСЕХ компонентов
+///    - Аллоцирует 2648 байт для ВСЕХ компонентов (блок 0x5F52xxxx)
 ///    - Инициализирует:
 ///        +0x148 = 210.0f (здоровье)
 ///        +0x14C = 210.0f (макс. здоровье NPC)
@@ -433,6 +435,10 @@ pub struct CTypeDescriptor {
 ///        +0x154 = 5.0f   (дистанция урона)
 ///        +0x160 = 0      (неуязвимость + мёртв)
 ///        +0x162 = 0      (полубог)
+///        +0x163 = 1      (unknown flag — alive/spawned?)
+///        +0x188 = 12     (body zone count)
+///        +0x190 = this   (self_ref)
+///        +0x198 = 0x400  (1024 — buffer size?)
 ///
 /// 4. M2DE_CHumanNPC_Constructor (0x140D712E0)
 ///    - vtable = 0x1418E5188 (NPC)
@@ -443,6 +449,15 @@ pub struct CTypeDescriptor {
 /// 5. M2DE_CPlayerEntity_Constructor (0x1400B9160) [только Player]
 ///    - vtable = 0x14184C060 (Player)
 ///    - Тип = 0x10 через SetTypeID
+///    - entity_subtype (+0xA0) = 6
 ///    - Player-специфичные поля от +0x338
+///    - Три heap аллокации в +0x08/10/18 (Player-only)
+///    - Отдельный компонент в +0xB0 (НЕ из блока 2648 байт)
+///
+/// Runtime подтверждено:
+/// - Компоненты +0xA8..+0x120 из одного блока ~2592 байт
+/// - +0xB0 указывает в ДРУГОЙ регион (отдельная аллокация)
+/// - +0xD8 может быть NULL (опциональный компонент)
+/// - Smart ptr slots: slot[-1] активен, slots[2-4] пусты
 /// ```
 pub const _CONSTRUCTOR_CHAIN_DOC: () = ();

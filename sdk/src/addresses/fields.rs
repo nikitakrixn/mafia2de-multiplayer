@@ -63,6 +63,12 @@ pub mod entity {
 
     /// `+0x80` -> owner entity pointer.
     pub const OWNER: usize = 0x80;
+
+    /// `+0xA0` -> Entity subtype (Actor layer). Значения:
+    /// - Player = 6
+    /// - NPC = ?
+    /// Устанавливается после конструирования.
+    pub const ENTITY_SUBTYPE: usize = 0xA0;
 }
 
 // =============================================================================
@@ -107,20 +113,51 @@ pub mod player {
     /// Пешком = NULL, в машине = pointer на vehicle entity.
     pub const OWNER: usize = super::entity::OWNER;
 
+    /// `+0xA0` -> Entity subtype (=6 для Player).
+    pub const ENTITY_SUBTYPE: usize = super::entity::ENTITY_SUBTYPE;
+
     /// `+0xA8` -> AI params pointer.
     pub const AI_PARAMS: usize = 0xA8;
+
+    /// `+0xB0` -> Отдельный объект (НЕ из компонентного блока 2648 байт).
+    /// Устанавливается после конструирования. Heap-указатель в другом регионе.
+    pub const EXTERNAL_COMPONENT_B0: usize = 0xB0;
+
+    /// `+0xB8` -> Неизвестный компонент (из компонентного блока).
+    pub const COMPONENT_B8: usize = 0xB8;
 
     /// `+0xC0` -> AI/navigation component.
     pub const AI_NAV_COMPONENT: usize = 0xC0;
 
+    /// `+0xC8` -> Компонент (из блока).
+    pub const COMPONENT_C8: usize = 0xC8;
+
     /// `+0xD0` -> TransformSync component.
     pub const TRANSFORM_SYNC: usize = 0xD0;
+
+    /// `+0xD8` -> Optional component (может быть NULL).
+    pub const OPT_COMPONENT: usize = 0xD8;
+
+    /// `+0xE0` -> Компонент (из блока).
+    pub const COMPONENT_E0: usize = 0xE0;
 
     /// `+0xF8` -> Behavior component.
     pub const BEHAVIOR_COMPONENT: usize = 0xF8;
 
+    /// `+0x100` -> Блок компонентов.
+    pub const COMPONENT_BLOCK_100: usize = 0x100;
+
     /// `+0x108` -> weapon state component.
     pub const WEAPON_STATE_COMPONENT: usize = 0x108;
+
+    /// `+0x110` -> Компонент.
+    pub const COMPONENT_110: usize = 0x110;
+
+    /// `+0x118` -> Компонент.
+    pub const COMPONENT_118: usize = 0x118;
+
+    /// `+0x120` -> Последний компонент из блока.
+    pub const COMPONENT_120: usize = 0x120;
 
     /// `+0x148` -> current health (`f32`).
     pub const CURRENT_HEALTH: usize = 0x148;
@@ -143,11 +180,25 @@ pub mod player {
     /// `+0x162` -> demigod flag.
     pub const DEMIGOD: usize = 0x162;
 
+    /// `+0x163` -> Неизвестный флаг (=1 у живого Player).
+    /// Возможно alive/spawned/has_controller.
+    pub const UNKNOWN_FLAG_163: usize = 0x163;
+
     /// `+0x180` -> pointer to body damage multipliers array.
     pub const BODY_DAMAGE_MULTIPLIERS: usize = 0x180;
 
+    /// `+0x188` -> Количество body damage zones (=12).
+    pub const BODY_ZONE_COUNT: usize = 0x188;
+
     /// `+0x190` -> self-reference (`this`).
     pub const SELF_REF: usize = 0x190;
+
+    /// `+0x198` -> Неизвестное значение (=0x400=1024 у Player).
+    pub const UNKNOWN_198: usize = 0x198;
+
+    /// `+0x1C0` -> Smart pointer slots начало (8 слотов по 16 байт).
+    /// Формат слота: { ptr(8), id(u32), state(u32) }
+    pub const SMART_PTR_SLOTS: usize = 0x1C0;
 
     /// `+0x258` -> physics provider pointer.
     pub const PHYSICS_PROVIDER: usize = 0x258;
