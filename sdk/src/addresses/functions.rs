@@ -1668,8 +1668,10 @@ pub mod player_vtable {
     /// vtable[94] — checks `player+0x3D8 != 3 && != 4`.
     pub const IS_MODE_3D8_NOT_3_OR_4: usize = 0x0C_47F0;
 
-    /// vtable[102] — checks `player+0x464 == 1`.
-    pub const IS_FIELD_464_EQ_1: usize = 0x0C_4640;
+    /// vtable[102] — checks `player.sub45c.state == 1`.
+    ///
+    /// Legacy name: `IsField464_Equal1` (because +0x464 is sub45c.state).
+    pub const IS_SUB45C_STATE_EQ_1: usize = 0x0C_4640;
 
     /// vtable[103] — `IsField464_Equal1 || sub_1400C46F0`.
     pub const CHECK_FIELD_464_OR_HELPER: usize = 0x0C_4650;
@@ -1687,12 +1689,21 @@ pub mod player_vtable {
     pub const PHYSICS_PROVIDER_THUNK_FILLOUT: usize = 0x0C_3680;
 
     /// HasSpecialState46F0 — checks if player has special state at +0x45C.
+    ///
+    /// Returns true if sub45c.state in {2, 3}.
     pub const HAS_SPECIAL_STATE_46F0: usize = 0x0C_46F0;
+
+    /// Sub45C_IsState2Or3 — checks if sub45c.state in {2, 3}.
+    ///
+    /// Implementation: `(state - 2) <= 1`
+    pub const SUB45C_IS_STATE_2_OR_3: usize = 0x0C_46E0;
 
     /// Sub45C_IsStateEq4 — checks if subobject at +0x45C has state == 4.
     pub const SUB45C_IS_STATE_EQ_4: usize = 0x0C_4770;
 
     /// ActionCodeManager_HandleCode — handles action codes.
+    ///
+    /// Thin wrapper: gets global action-code manager and forwards code.
     pub const ACTION_CODE_MANAGER_HANDLE_CODE: usize = 0x0C_4220;
 
     /// ValidateSpecialState45C — validates special state at +0x45C.
@@ -1702,6 +1713,8 @@ pub mod player_vtable {
     pub const CLEAR_SPECIAL_STATE_45C: usize = 0x0C_1850;
 
     /// FlushSpecialState45C_IfPending — flushes special state if pending.
+    ///
+    /// If sub45c.state == 1, dispatches stored code and resets state to 0.
     pub const FLUSH_SPECIAL_STATE_45C_IF_PENDING: usize = 0x0C_22A0;
 
     /// SendPhysicsMarkerEventByCode — sends physics marker event by code.
@@ -1715,6 +1728,20 @@ pub mod player_vtable {
 
     /// HudStateDispatchHelper — dispatches HUD state.
     pub const HUD_STATE_DISPATCH_HELPER: usize = 0x0C_DC40;
+
+    /// PhysicsProvider_InvokeVFunc88 — calls physics provider virtual method.
+    ///
+    /// Calls player.physics_provider (+0x258) virtual method at vtable+88 if provider exists.
+    pub const PHYSICS_PROVIDER_INVOKE_VFUNC_88: usize = 0xD8_36C0;
+
+    /// Sub45C_HandleStates2Or3 — handles sub45c.state 2 and 3.
+    pub const SUB45C_HANDLE_STATES_2_OR_3: usize = 0x0C_BDA0;
+
+    /// Sub45C_FlushIfState4 — if sub45c.state == 4, dispatches and resets.
+    pub const SUB45C_FLUSH_IF_STATE_4: usize = 0x0C_BD30;
+
+    /// Sub45C_EnterState4_IfIdle — if sub45c.state == 0, sets to 4.
+    pub const SUB45C_ENTER_STATE_4_IF_IDLE: usize = 0x0C_BD50;
 
     /// kill damage action cluster
     pub const KILL_DAMAGE_ACTION_BASE_DTOR_A: usize = 0x0B_B170;

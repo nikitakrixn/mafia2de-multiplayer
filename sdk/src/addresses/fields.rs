@@ -280,6 +280,12 @@ pub mod player {
     /// HasSpecialState46F0 delegates into this object.
     pub const SUBOBJECT_45C: usize = 0x45C;
 
+    /// `+0x464` -> sub45c.state.
+    /// NOT an independent field — part of the subobject at +0x45C.
+    ///
+    /// This is sub45c + 0x08.
+    pub const SUBOBJECT_45C_STATE: usize = 0x464;
+
     /// `+0x500` -> world/entity handle used by ClearSpecialState45C.
     pub const FIELD_500: usize = 0x500;
 

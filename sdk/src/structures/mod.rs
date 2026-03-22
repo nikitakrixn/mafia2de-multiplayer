@@ -25,7 +25,7 @@ pub use entity::{
 
 // Корневые типы
 pub use game_world::GameManager;
-pub use player::{CHuman, CHumanNPC, CPlayer};
+pub use player::{CHuman, CHumanNPC, CPlayer, CPlayerSub45C};
 
 // Инвентарь и деньги
 pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};

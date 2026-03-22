@@ -228,6 +228,41 @@ impl CHumanNPC {
 // =============================================================================
 //  CPlayer — игрок
 // =============================================================================
+//  CPlayerSub45C — special state subobject
+// =============================================================================
+
+/// Player subobject at +0x45C — подобъект специального состояния игрока.
+///
+/// Подтверждено:
+/// - +0x08 = state field (поле состояния)
+/// - state==1 проверяется через `M2DE_CPlayer_IsSub45CStateEqual1`
+/// - state in {2,3} проверяется через `M2DE_CPlayerSub45C_IsState2Or3`
+/// - state==4 проверяется через `M2DE_CPlayerSub45C_IsStateEqual4`
+///
+/// Этот подобъект является частью state machine игрока.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct CPlayerSub45C {
+    /// Основное сохранённое значение/код.
+    pub field_00: u32, // +0x00
+
+    /// Зеркальное/вспомогательное значение.
+    pub field_04: u32, // +0x04
+
+    /// Поле state machine.
+    ///
+    /// Наблюдаемые значения:
+    /// - 0 = idle (простой)
+    /// - 1 = pending (ожидание)
+    /// - 2 = special-active A (специальное активное состояние A)
+    /// - 3 = special-active B (специальное активное состояние B)
+    /// - 4 = deferred/threshold-triggered (отложенное/триггерное состояние)
+    pub state: u32, // +0x08
+}
+
+// =============================================================================
+//  CPlayer — игрок
+// =============================================================================
 
 /// CPlayer — класс игрока.
 ///
@@ -247,7 +282,7 @@ impl CHumanNPC {
 /// - +0x344: death_type (i32) [PROVISIONAL]
 /// - +0x3D8: state_flags_3d8 (u32 dword, low byte checked)
 /// - +0x430: state_code_430 (u32)
-/// - +0x464: field_464 (u32)
+/// - +0x45C: sub45c (CPlayerSub45C subobject)
 /// - +0x490: state_flags_490 (u32 bitfield)
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -289,12 +324,19 @@ pub struct CPlayer {
     /// Проверяется vtable[83]: `IsStateCode430_Equal10` (значение == 10).
     pub state_code_430: u32, // +0x430
 
-    /// Padding до field_464.
-    pub _pad_434: [u8; 0x30], // +0x434..+0x463
+    /// Padding до sub45c.
+    pub _pad_434: [u8; 0x28], // +0x434..+0x45B
 
-    /// Dword-like bool/state field.
-    /// Проверяется vtable[102]: `IsField464_Equal1` (значение == 1).
-    pub field_464: u32, // +0x464
+    /// Special state subobject.
+    ///
+    /// ВАЖНО:
+    /// +0x464 (старое field_464) — это sub45c.state (+0x08 внутри subobject).
+    ///
+    /// Подтверждено:
+    /// - `M2DE_CPlayer_IsSub45CStateEqual1` проверяет sub45c.state == 1
+    /// - `M2DE_CPlayerSub45C_IsState2Or3` проверяет sub45c.state in {2,3}
+    /// - `M2DE_CPlayerSub45C_IsStateEqual4` проверяет sub45c.state == 4
+    pub sub45c: CPlayerSub45C, // +0x45C..+0x467
 
     /// Padding до state_flags_490.
     pub _pad_468: [u8; 0x28], // +0x468..+0x48F
@@ -322,7 +364,7 @@ assert_field_offsets!(CPlayer {
     death_type       == 0x344,
     state_flags_3d8  == 0x3D8,
     state_code_430   == 0x430,
-    field_464        == 0x464,
+    sub45c           == 0x45C,
     state_flags_490  == 0x490,
 });
 
@@ -366,11 +408,27 @@ impl CPlayer {
         self.state_code_430 == 10
     }
 
-    /// Проверка field_464 (равен 1).
+    /// Проверка sub45c.state (равен 1).
     ///
-    /// Соответствует vtable[102]: `M2DE_CPlayer_IsField464_Equal1`.
-    pub fn is_field_464_equal_1(&self) -> bool {
-        self.field_464 == 1
+    /// Соответствует vtable[102]: `M2DE_CPlayer_IsSub45CStateEqual1`.
+    ///
+    /// ВАЖНО: старое название было `IsField464_Equal1`, но +0x464 — это sub45c.state.
+    pub fn is_sub45c_state_equal_1(&self) -> bool {
+        self.sub45c.state == 1
+    }
+
+    /// Проверка sub45c.state in {2, 3}.
+    ///
+    /// Соответствует helper'у `M2DE_CPlayerSub45C_IsState2Or3`.
+    pub fn is_sub45c_state_2_or_3(&self) -> bool {
+        (self.sub45c.state.wrapping_sub(2)) <= 1
+    }
+
+    /// Проверка sub45c.state (равен 4).
+    ///
+    /// Соответствует `M2DE_CPlayerSub45C_IsStateEqual4`.
+    pub fn is_sub45c_state_equal_4(&self) -> bool {
+        self.sub45c.state == 4
     }
 
     /// Получить биты [1..3] из state_flags_490.
