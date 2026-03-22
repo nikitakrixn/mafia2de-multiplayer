@@ -24,11 +24,9 @@ use crate::macros::assert_field_offsets;
 
 /// `C_Entity` — базовый класс для ВСЕХ сущностей Mafia II: DE.
 ///
-/// Размер: **0x78 байт** (120 decimal). Подтверждено деструктором:
-/// ```asm
-/// mov edx, 78h     ; размер для GlobalFree
-/// call M2DE_GlobalFree
-/// ```
+/// Размер: **0x78 байт** (120 decimal). Подтверждено:
+/// - Деструктор: `GlobalFree(this, 0x78)`
+/// - Runtime dump: 2415 entity в FreeRide (все типы)
 ///
 /// Vtable: `M2DE_VT_CEntity` (0x14186CAC8), ~110 виртуальных методов.
 /// Конструктор: `M2DE_BaseEntity_Construct` (0x14039B710).
@@ -145,7 +143,7 @@ pub struct CEntity {
     pub tree_1_root: usize, // +0x40
 
     /// Количество записей в дереве 1.
-    /// Runtime: 0 для большинства entity, 2 для Player.
+    /// Runtime подтверждено: 0 для большинства entity, 2 для Player.
     pub tree_1_count: usize, // +0x48
 
     /// RB-дерево 2 — корень sentinel'а (подписки на сообщения).
@@ -209,6 +207,10 @@ impl CEntity {
 /// - `frame_node` (+0x78) — указатель на трансформ/позицию в мире
 /// - `owner` (+0x80) — NULL = на ногах, vehicle* = в машине
 /// - `entity_subtype` (+0xA0) — подтип entity (Player=6)
+///
+/// Runtime подтверждено: НЕ Actor-derived типы:
+/// - Sound (0x29) — мусор в +0x78, не heap ptr
+/// - ScriptEntity (0x62) — script data в +0x78/80
 ///
 /// Позиция читается из frame_node:
 /// ```text
@@ -456,8 +458,11 @@ pub struct CTypeDescriptor {
 ///
 /// Runtime подтверждено:
 /// - Компоненты +0xA8..+0x120 из одного блока ~2592 байт
-/// - +0xB0 указывает в ДРУГОЙ регион (отдельная аллокация)
+/// - +0xB0 указывает в ДРУГОЙ регион (отдельная аллокация, НЕ из блока 2648 байт)
 /// - +0xD8 может быть NULL (опциональный компонент)
 /// - Smart ptr slots: slot[-1] активен, slots[2-4] пусты
+/// - +0x08/10/18: Player-only поля (три heap ptr), NULL у всех остальных типов
+/// - tree_1_count (+0x48): 2 для Player, 0 для остальных
+/// - Sound/ScriptEntity НЕ Actor-derived (мусор/script data в +0x78)
 /// ```
 pub const _CONSTRUCTOR_CHAIN_DOC: () = ();
