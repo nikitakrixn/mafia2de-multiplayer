@@ -7,13 +7,13 @@
 //! runtime_address = module_base + RVA
 //! ```
 
-pub mod data;
-pub mod globals;
-pub mod functions;
-pub mod vtables;
-pub mod strings;
-pub mod fields;
 pub mod constants;
+pub mod data;
+pub mod fields;
+pub mod functions;
+pub mod globals;
+pub mod strings;
+pub mod vtables;
 
 /// Имя основного исполняемого модуля.
 pub const GAME_MODULE: &str = "Mafia II Definitive Edition.exe";
