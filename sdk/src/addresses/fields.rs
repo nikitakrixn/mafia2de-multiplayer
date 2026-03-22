@@ -1,184 +1,225 @@
 //! Смещения полей от начала структуры (в байтах).
+//!
+//! Политика файла:
+//! - подтверждённые поля именуются явно
+//! - спорные или недоревершенные зоны не выдаются за факт
+
+// =============================================================================
+//  GameManager
+// =============================================================================
 
 pub mod game_manager {
-    /// `+0x180` → `Player*`
+    /// `+0x180` -> `Player*`
     pub const ACTIVE_PLAYER: usize = 0x180;
 }
 
-pub mod player {
-    /// `+0xE8` → `Inventory*`
-    pub const INVENTORY: usize = 0xE8;
+// =============================================================================
+//  Base Entity / Actor
+// =============================================================================
 
-    /// `+0xF0` → `PlayerControl*` / control component
-    pub const CONTROL_COMPONENT: usize = 0xF0;
+pub mod entity {
+    /// `+0x20` -> state/alive flags byte.
+    pub const STATE_FLAGS: usize = 0x20;
 
-    /// `+0x78` → Frame/transform node pointer
+    /// `+0x24` -> packed table_id (`u32`).
     ///
-    /// Contains 4x4 transformation matrix.
-    /// Position: frame+0x64 (X), frame+0x74 (Y), frame+0x84 (Z)
+    /// Формат:
+    /// - low byte   = factory type
+    /// - upper 24b  = instance id
     ///
-    /// IDA: `0x140DA7630` fallback path reads `[rcx+0x78]`
+    /// ВАЖНО:
+    /// это НЕ отдельное поле `entity_type`.
+    pub const TABLE_ID: usize = 0x24;
+
+    /// Legacy alias: читать как `u8`, если нужен только low byte factory type.
+    pub const FACTORY_TYPE_BYTE: usize = TABLE_ID;
+
+    /// `+0x28` -> entity flags (`u32`).
+    pub const ENTITY_FLAGS: usize = 0x28;
+
+    /// `+0x30` -> FNV-1 64-bit name hash.
+    pub const NAME_HASH: usize = 0x30;
+
+    /// `+0x78` -> frame/transform node pointer.
     pub const FRAME_NODE: usize = 0x78;
 
-    /// `+0x024` → uint8 тип сущности.
-    /// 0x10 = игрок, 0x0E = NPC-человек, 0x12 = физическое тело.
-    pub const ENTITY_TYPE: usize = 0x24;
-
-    /// `+0x080` → C_Entity* владелец.
-    /// Пешком = NULL, в машине = указатель на vehicle entity.
+    /// `+0x80` -> owner entity pointer.
     pub const OWNER: usize = 0x80;
-
-    /// `+0x0C0` → AI/Navigation компонент.
-    /// vtbl 0x1418E3290. Хранит текущую AI-позицию.
-    pub const AI_NAV_COMPONENT: usize = 0xC0;
-
-    /// `+0x0D0` → TransformSync компонент.
-    /// vtbl 0x1418E33A8. Синхронизирует позицию из актора ~258 раз/сек.
-    /// comp+0x18 = Vec3 позиция, comp+0x24 = параметр (100.0).
-    pub const TRANSFORM_SYNC: usize = 0xD0;
-
-    /// `+0x0F8` → Behavior компонент.
-    /// vtbl 0x1418E37A8. Сюда пересылаются сообщения из HandleMessage.
-    pub const BEHAVIOR_COMPONENT: usize = 0xF8;
-
-    /// `+0x108` → Компонент состояния оружия.
-    /// *(component + 0x2B0) → указатель на ID выбранного оружия (uint32).
-    pub const WEAPON_STATE_COMPONENT: usize = 0x108;
-
-    /// `+0x148` → float текущее здоровье.
-    /// 720.0 = полное на нормальной сложности.
-    pub const CURRENT_HEALTH: usize = 0x148;
-
-    /// `+0x14C` → float.
-    /// Для NPC: максимальное здоровье.
-    /// Для игрока: множитель урона определённых типов (12/15/22).
-    /// Максимум здоровья игрока берётся из g_M2DE_PlayerData+0x00.
-    pub const NPC_HEALTHMAX: usize = 0x14C;
-
-    /// `+0x150` → float множитель урона от NPC.
-    /// Lua возвращает это * 100.0 как проценты. Default 1.0 (= 100%).
-    pub const NONPLAYER_DAMAGE_MULT: usize = 0x150;
-
-    /// `+0x154` → float пороговая дистанция для снижения урона.
-    /// Default 5.0.
-    pub const NONPLAYER_DAMAGE_DIST: usize = 0x154;
-
-    /// `+0x160` → uint8 флаг неуязвимости.
-    /// 0 = обычный режим, 1 = неуязвим (урон пропускается полностью).
-    pub const INVULNERABILITY: usize = 0x160;
-
-    /// `+0x161` → uint8 флаг смерти.
-    /// IsDeath() = vtable[47] = return *(this + 353).
-    pub const IS_DEAD: usize = 0x161;
-
-    /// `+0x162` → uint8 флаг полубога.
-    /// Если установлен — здоровье не опускается ниже 1.0.
-    pub const DEMIGOD: usize = 0x162;
-
-    /// `+0x180` → float* массив множителей урона по частям тела.
-    /// [4]=голова, [5]=торс, [6]=руки, [7]=ноги.
-    pub const BODY_DAMAGE_MULTIPLIERS: usize = 0x180;
-
-    /// `+0x190` → C_Human* ссылка на самого себя (== this).
-    /// Используется для валидации указателя.
-    pub const SELF_REF: usize = 0x190;
-
-    /// `+0x258` → Physics provider (выделен в куче отдельно).
-    /// vtbl 0x141993998. Используется GetPos/SetPos для physics-пути.
-    pub const PHYSICS_PROVIDER: usize = 0x258;
-
-    /// `+0x338` → Vec3 позиция смерти (12 байт).
-    /// Записывается когда здоровье достигает 0.
-    pub const DEATH_POSITION: usize = 0x338;
-
-    /// `+0x344` → int32 тип смерти (1=обычная, 128=взрыв).
-    pub const DEATH_TYPE: usize = 0x344;
-
-    /// `+0x0A8` → указатель на AI params struct.
-    /// *(player+0xA8) + 4 = int32 aggressivity (0-4).
-    pub const AI_PARAMS: usize = 0xA8;
 }
 
+// =============================================================================
+//  Human / Player
+// =============================================================================
+
+pub mod player {
+    /// `+0xE8` -> `Inventory*`
+    pub const INVENTORY: usize = 0xE8;
+
+    /// `+0xF0` -> control/property-like component pointer.
+    pub const CONTROL_COMPONENT: usize = 0xF0;
+
+    /// `+0x78` -> frame/transform node pointer.
+    ///
+    /// Позиция:
+    /// - `frame + 0x64` = X
+    /// - `frame + 0x74` = Y
+    /// - `frame + 0x84` = Z
+    pub const FRAME_NODE: usize = super::entity::FRAME_NODE;
+
+    /// `+0x24` -> packed table_id alias.
+    ///
+    /// Legacy use:
+    /// - читать как `u8`, если нужен только factory type byte
+    ///
+    /// Примеры:
+    /// - `0x10` = Player
+    /// - `0x0E` = Human NPC
+    /// - `0x12` = C_Car
+    /// - `0x70` = C_CarVehicle
+    pub const ENTITY_TYPE: usize = super::entity::TABLE_ID;
+
+    /// Явный alias для packed table_id.
+    pub const TABLE_ID: usize = super::entity::TABLE_ID;
+
+    /// `+0x28` -> entity flags.
+    pub const ENTITY_FLAGS: usize = super::entity::ENTITY_FLAGS;
+
+    /// `+0x80` -> owner entity pointer.
+    ///
+    /// Пешком = NULL, в машине = pointer на vehicle entity.
+    pub const OWNER: usize = super::entity::OWNER;
+
+    /// `+0xA8` -> AI params pointer.
+    pub const AI_PARAMS: usize = 0xA8;
+
+    /// `+0xC0` -> AI/navigation component.
+    pub const AI_NAV_COMPONENT: usize = 0xC0;
+
+    /// `+0xD0` -> TransformSync component.
+    pub const TRANSFORM_SYNC: usize = 0xD0;
+
+    /// `+0xF8` -> Behavior component.
+    pub const BEHAVIOR_COMPONENT: usize = 0xF8;
+
+    /// `+0x108` -> weapon state component.
+    pub const WEAPON_STATE_COMPONENT: usize = 0x108;
+
+    /// `+0x148` -> current health (`f32`).
+    pub const CURRENT_HEALTH: usize = 0x148;
+
+    /// `+0x14C` -> NPC healthmax or type-related multiplier field.
+    pub const NPC_HEALTHMAX: usize = 0x14C;
+
+    /// `+0x150` -> damage multiplier from NPC/non-player sources.
+    pub const NONPLAYER_DAMAGE_MULT: usize = 0x150;
+
+    /// `+0x154` -> distance threshold for damage falloff.
+    pub const NONPLAYER_DAMAGE_DIST: usize = 0x154;
+
+    /// `+0x160` -> invulnerability flag.
+    pub const INVULNERABILITY: usize = 0x160;
+
+    /// `+0x161` -> is_dead flag.
+    pub const IS_DEAD: usize = 0x161;
+
+    /// `+0x162` -> demigod flag.
+    pub const DEMIGOD: usize = 0x162;
+
+    /// `+0x180` -> pointer to body damage multipliers array.
+    pub const BODY_DAMAGE_MULTIPLIERS: usize = 0x180;
+
+    /// `+0x190` -> self-reference (`this`).
+    pub const SELF_REF: usize = 0x190;
+
+    /// `+0x258` -> physics provider pointer.
+    pub const PHYSICS_PROVIDER: usize = 0x258;
+
+    /// `+0x338` -> death position (`Vec3`) [provisional usage].
+    pub const DEATH_POSITION: usize = 0x338;
+
+    /// `+0x344` -> death type / death mode (`i32`) [provisional].
+    pub const DEATH_TYPE: usize = 0x344;
+}
+
+// =============================================================================
+//  Inventory / weapon / money
+// =============================================================================
+
 pub mod inventory {
-    /// `+0x08` → Корень RB-дерева поиска оружия по ID.
-    /// std::map<int32, WeaponData*>.
-    /// node+0x20 = weapon_id (ключ), node+0x28 = weapon data ptr.
+    /// `+0x08` -> root of RB-tree / map lookup by weapon id.
     pub const WEAPON_TREE: usize = 0x08;
 
-    /// `+0x24` → uint8 тип инвентаря (0=player).
+    /// `+0x24` -> inventory type byte.
     pub const TYPE: usize = 0x24;
 
-    /// `+0x50` → начало массива указателей на слоты.
-    /// *(slots_begin + N*8) = Slot* для слота N.
+    /// `+0x50` -> slots begin.
     pub const SLOTS_START: usize = 0x50;
 
-    /// `+0x58` → конец массива слотов.
+    /// `+0x58` -> slots end.
     pub const SLOTS_END: usize = 0x58;
 
-    /// `+0x168` → bool бесконечные патроны.
+    /// `+0x168` -> unlimited ammo flag.
     pub const UNLIMITED_AMMO: usize = 0x168;
 
-    /// `+0x170` → C_Human* обратная ссылка на владельца.
+    /// `+0x170` -> owner entity ref.
     pub const OWNER_ENTITY_REF: usize = 0x170;
 }
 
-
 pub mod money_item {
-    /// `+0x18` → MoneyCore* (M2DE_MoneyItem_GetCore возвращает [a1+0x18])
+    /// `+0x18` -> MoneyCore*
     pub const CORE: usize = 0x18;
 }
 
 pub mod money_core {
-    /// `+0x00` → vtable (0x1418E5520)
+    /// `+0x00` -> vtable (0x1418E5520)
     pub const VTABLE: usize = 0x00;
-    /// `+0x08` → i32 limit (default 2000 = $20.00 limit?)
+    /// `+0x08` -> limit (i32).
     pub const LIMIT: usize = 0x08;
-    /// `+0x10` → MoneyContainer* → +0x10 = i64 cents
+    /// `+0x10` -> MoneyContainer* -> +0x10 = i64 cents
     pub const CONTAINER_PTR: usize = 0x10;
 }
 
 /// Индексы слотов инвентаря.
 pub mod slots {
-    /// Слот 0 — текущее оружие в руках
+    /// `+0x00` -> current weapon slot.
     pub const CURRENT_WEAPON: usize = 0;
-    /// Слот 1 — неизвестно
+    /// `+0x01` -> unknown slot.
     pub const UNKNOWN_1: usize = 1;
-    /// Слот 2 — оружейный слот 1 (пистолеты, дробовики)
+    /// `+0x02` -> weapon slot 1.
     pub const WEAPON_1: usize = 2;
-    /// Слот 3 — оружейный слот 2 (винтовки, автоматы)
+    /// `+0x03` -> weapon slot 2.
     pub const WEAPON_2: usize = 3;
-    /// Слот 4 — запас патронов
+    /// `+0x04` -> ammo slot.
     pub const AMMO: usize = 4;
-    /// Слот 5 — деньги
+    /// `+0x05` -> money slot.
     pub const MONEY: usize = 5;
 }
 
 /// Структура одного слота инвентаря.
 pub mod slot {
-    /// `+0x18` → начало std::vector<ptr> элементов
+    /// `+0x18` -> begin of vector.
     pub const VEC_BEGIN: usize = 0x18;
-    /// `+0x20` → конец std::vector
+    /// `+0x20` -> конец std::vector
     pub const VEC_END: usize = 0x20;
-    /// `+0x50` → указатель на weapon table entry
+    /// `+0x50` -> указатель на weapon table entry
     pub const TABLE_ENTRY: usize = 0x50;
 }
 
 /// Запись из /tables/weapons.tbl.
 pub mod weapon_table_entry {
-    /// `+0x24` → int32 flags. Бит 1 (& 2): слот назначения
+    /// `+0x24` -> flags.
     pub const FLAGS: usize = 0x24;
-    /// `+0x58` → int32 максимальная ёмкость обоймы
+    /// `+0x58` -> int32 максимальная ёмкость обоймы
     pub const MAX_AMMO: usize = 0x58;
 }
 
 /// Данные оружия (из RB-дерева или weapon_state компонента).
 pub mod weapon_data {
-    /// `+0x00` → int32 ID оружия
+    /// `+0x00` -> int32 ID оружия
     pub const WEAPON_ID: usize = 0x00;
-    /// `+0x10` → ptr → container → +0x10 → int32 текущие патроны
+    /// `+0x10` -> ptr -> container -> +0x10 -> int32 текущие патроны
     pub const AMMO_CONTAINER: usize = 0x10;
-    /// `+0x24` → uint32 флаги типа оружия
-    ///   бит 5 (0x20) = огнестрельное
+    /// `+0x24` -> flags
     pub const WEAPON_FLAGS: usize = 0x24;
 }
 
@@ -194,7 +235,7 @@ pub mod weapon_type_flags {
 
 /// Weapon State Component (player+0x108).
 pub mod weapon_state {
-    /// `+0x2B0` → ptr на WeaponData текущего оружия в руках
+    /// `+0x2B0` -> ptr на WeaponData текущего оружия в руках
     /// NULL = руки пусты.
     pub const CURRENT_WEAPON_DATA: usize = 0x2B0;
 }
@@ -203,7 +244,7 @@ pub mod weapon_state {
 ///
 /// IDA: `M2DE_Wallet_GetInnerStruct` возвращает `[a1 + 0x18]`
 pub mod wallet {
-    /// `+0x18` → inner struct pointer
+    /// `+0x18` -> inner struct pointer
     ///
     /// IDA comment: "Returns [a1+24]" (24 decimal = 0x18)
     pub const INNER_STRUCT: usize = 0x18;
@@ -218,13 +259,13 @@ pub mod wallet {
 /// ret
 /// ```
 pub mod wallet_inner {
-    /// `+0x10` → указатель на контейнер денег
+    /// `+0x10` -> указатель на контейнер денег
     pub const MONEY_CONTAINER_PTR: usize = 0x10;
 }
 
 /// Контейнер денег (последний уровень).
 pub mod money_container {
-    /// `+0x10` → значение денег (i64, truncated to i32)
+    /// `+0x10` -> значение денег (i64, truncated to i32)
     ///
     /// Хранится в центах: $600 = 60000
     ///
@@ -233,20 +274,24 @@ pub mod money_container {
 }
 
 pub mod hud_manager {
-    /// `+0x98` → Money display component (HudMoneyDisplay*)
+    /// `+0x98` -> Money display component (HudMoneyDisplay*)
     pub const MONEY_DISPLAY: usize = 0x98;
 }
 
 pub mod hud_money_display {
-    /// `+0x48` → displayed/animated value (i64)
+    /// `+0x48` -> displayed/animated value (i64)
     pub const ANIMATED_VALUE: usize = 0x48;
-    /// `+0x50` → actual target value (i64)
+    /// `+0x50` -> actual target value (i64)
     pub const TARGET_VALUE: usize = 0x50;
-    /// `+0x5C` → animation timer (f32, popup shows only when <= 0)
+    /// `+0x5C` -> animation timer (f32, popup shows only when <= 0)
     pub const ANIM_TIMER: usize = 0x5C;
-    /// `+0x78` → popup enabled flag (bool)
+    /// `+0x78` -> popup enabled flag (bool)
     pub const POPUP_ENABLED: usize = 0x78;
 }
+
+// =============================================================================
+//  Frame / transform
+// =============================================================================
 
 pub mod entity_frame {
     // Позиция
@@ -270,21 +315,87 @@ pub mod entity_frame {
     pub const UP_Z: usize = 0x80;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Vehicle и другие (без изменений)
-// ═══════════════════════════════════════════════════════════════════════
+// =============================================================================
+//  Vehicle / C_Car / C_CarVehicle
+// =============================================================================
 
 pub mod vehicle {
-    pub const COLOR_ID: usize = 0xA4;
-    pub const SPAWN_DATA: usize = 0xE0;
-    pub const SPEED: usize = 0x360;
-    pub const ANIM_PARAM1: usize = 0x388;
-    pub const ANIM_PARAM2: usize = 0x394;
+    // --- inherited entity/actor part ---
+
+    /// `+0x00` -> primary vtable.
+    ///
+    /// Runtime:
+    /// - `0x141850030` = `C_Car`
+    /// - `0x1418EAAC8` = `C_CarVehicle`
+    pub const VTABLE: usize = 0x00;
+
+    /// `+0x24` -> packed table_id.
+    ///
+    /// Low byte:
+    /// - `0x12` = parked/static `C_Car`
+    /// - `0x70` = drivable/active `C_CarVehicle`
+    pub const TABLE_ID: usize = 0x24;
+
+    /// Legacy alias: читать low byte как u8.
+    pub const ENTITY_TYPE: usize = TABLE_ID;
+
+    /// `+0x28` -> entity flags.
+    pub const ENTITY_FLAGS: usize = 0x28;
+
+    /// `+0x38` -> raw entity-head / class-specific region.
+    ///
+    /// ⚠️ Раньше здесь фигурировала гипотеза про GUID.
+    /// Сейчас GUID по `+0x38` НЕ подтверждён.
+    pub const RAW_38: usize = 0x38;
+
+    /// `+0x78` -> frame pointer.
+    pub const FRAME: usize = 0x78;
+
+    /// `+0x80` -> owner pointer.
+    pub const OWNER: usize = 0x80;
+
+    /// `+0x258` -> physics provider pointer.
+    pub const PHYSICS_PROVIDER: usize = 0x258;
+
+    // --- nested / class-specific zones ---
+    // ВАЖНО: эти смещения исторически собраны для `C_Car` path и часть из них
+    // ещё требует дополнительной проверки на всех runtime сценариях.
+
+    /// `+0x0E0` -> nested/subobject region [provisional].
+    pub const SUBOBJ_0E0: usize = 0x0E0;
+
+    /// `+0x1E0` -> nested/subobject region [provisional].
+    pub const SUBOBJ_1E0: usize = 0x1E0;
+
+    /// `+0x1E8` -> nested/subobject region [provisional].
+    pub const SUBOBJ_1E8: usize = 0x1E8;
+
+    /// `+0x1F8` -> nested/subobject region [provisional].
+    pub const SUBOBJ_1F8: usize = 0x1F8;
+
+    /// `+0x210` -> nested/subobject region [provisional].
+    pub const SUBOBJ_210: usize = 0x210;
+
+    // --- color-related ---
+    pub const COLOR_FLAGS: usize = 0x944;
+    pub const COLOR1_RGB: usize = 0x954;
+    pub const COLOR1_ALPHA: usize = 0x95C;
+    pub const COLOR2_RGB: usize = 0x960;
+    pub const COLOR2_ALPHA: usize = 0x968;
+
+    // --- spawn/time-related ---
     pub const SPAWN_TIMESTAMP: usize = 0x1248;
-    pub const MIN_SPAWN_TIME: usize = 0x1288;
-    pub const MAX_SPAWN_TIME: usize = 0x128C;
-    pub const SPAWN_PROGRESS: usize = 0x12AC;
-    pub const SPAWN_SPEED_MULT: usize = 0x12CC;
+
+    // --- old/provisional offsets ---
+    pub const COLOR_ID: usize = 0xA4; // provisional
+    pub const SPAWN_DATA: usize = 0xE0; // provisional
+    pub const SPEED: usize = 0x360; // provisional
+    pub const ANIM_PARAM1: usize = 0x388; // provisional
+    pub const ANIM_PARAM2: usize = 0x394; // provisional
+    pub const MIN_SPAWN_TIME: usize = 0x1288; // provisional
+    pub const MAX_SPAWN_TIME: usize = 0x128C; // provisional
+    pub const SPAWN_PROGRESS: usize = 0x12AC; // provisional
+    pub const SPAWN_SPEED_MULT: usize = 0x12CC; // provisional
 }
 
 pub mod vehicle_wrapper {
@@ -305,6 +416,10 @@ pub mod car_data {
     pub const BBOX_MAX_Y: usize = 0x33C;
 }
 
+// =============================================================================
+//  Garage
+// =============================================================================
+
 pub mod garage {
     pub const CURRENT_CAPACITY: usize = 0x08;
     pub const VEHICLES_BEGIN: usize = 0x10;
@@ -313,6 +428,10 @@ pub mod garage {
     pub const CURRENT_VEHICLE_INDEX: usize = 0x60;
     pub const MAX_VEHICLES: usize = 0x64;
 }
+
+// =============================================================================
+//  Tables / callbacks
+// =============================================================================
 
 pub mod table_manager {
     pub const POLICE_OFFENCES: usize = 0x38;
@@ -340,175 +459,102 @@ pub mod callback_entry {
     pub const SIZE: usize = 64;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  RenderDevice и swapchain (новые)
-// ═══════════════════════════════════════════════════════════════════════
+// =============================================================================
+//  RenderDevice / swapchain
+// =============================================================================
 
 pub mod render_device {
-    /// `+0x2008` → начало блока init-параметров рендера.
-    ///
-    /// Внутри этого блока лежат:
-    /// - `+0x18` от блока → текущая ширина
-    /// - `+0x1C` от блока → текущая высота
-    /// - `+0x20` от блока → указатель на window/config структуру
     pub const INIT_CONFIG: usize = 0x2008;
-
-    /// `+0x2020` → текущая ширина рендера.
-    ///
-    /// Поле обновляется и в recreate/resize path.
     pub const RENDER_WIDTH: usize = 0x2020;
-
-    /// `+0x2024` → текущая высота рендера.
     pub const RENDER_HEIGHT: usize = 0x2024;
-
-    /// `+0x2028` → указатель на window/config структуру из init params.
     pub const WINDOW_CONFIG_PTR: usize = 0x2028;
-
-    /// `+0x2032` → поддержка feature level 10.0.
     pub const SUPPORTS_FL_10_0: usize = 0x2032;
-
-    /// `+0x2033` → дополнительный флаг поддержки FL10.0.
     pub const SUPPORTS_FL_10_0_DUP: usize = 0x2033;
-
-    /// `+0x2034` → поддержка feature level 10.1.
     pub const SUPPORTS_FL_10_1: usize = 0x2034;
-
-    /// `+0x2035` → флаг завершённой DX-инициализации.
     pub const DX_INITIALIZED: usize = 0x2035;
-
-    /// `+0x203C` → количество выходов текущего адаптера.
     pub const ADAPTER_OUTPUT_COUNT: usize = 0x203C;
-
-    /// `+0x2040` → максимальный размер текстур.
     pub const MAX_TEXTURE_SIZE: usize = 0x2040;
-
-    /// `+0x2044` → настройка фильтрации / aniso-related state.
     pub const ANISO_FILTER_SETTING: usize = 0x2044;
-
-    /// `+0x2050` → shader/resource cache из базового конструктора.
     pub const SHADER_CACHE: usize = 0x2050;
-
-    /// `+0x2070` → dynamic vertex buffer resource.
-    ///
-    /// Строка: `"RenderDeviceBase::DynamicVB"`
     pub const DYNAMIC_VB: usize = 0x2070;
 
-    /// `+0x2078` → dynamic index buffer resource.
+    /// `+0x2078` -> dynamic index buffer resource.
     ///
     /// Строка: `"RenderDeviceBase::DynamicIB"`
     pub const DYNAMIC_IB: usize = 0x2078;
 
-    /// `+0x21A8` → текущий режим/профиль рендера.
+    /// `+0x21A8` -> текущий режим/профиль рендера.
     ///
     /// Используется в switch внутри init.
     pub const CURRENT_STATE_MODE: usize = 0x21A8;
 
-    /// `+0x21AC` → вторичный state mode.
+    /// `+0x21AC` -> вторичный state mode.
     pub const CURRENT_STATE_MODE_B: usize = 0x21AC;
 
-    /// `+0x2780` → `IDXGIFactory1*`
+    /// `+0x2780` -> `IDXGIFactory1*`
     pub const DXGI_FACTORY: usize = 0x2780;
 
-    /// `+0x2788` → `D3D_FEATURE_LEVEL`
+    /// `+0x2788` -> `D3D_FEATURE_LEVEL`
     pub const FEATURE_LEVEL: usize = 0x2788;
 
-    /// `+0x2790` → `ID3D11Device*`
+    /// `+0x2790` -> `ID3D11Device*`
     pub const D3D_DEVICE: usize = 0x2790;
 
-    /// `+0x2798` → `ID3D11DeviceContext*`
+    /// `+0x2798` -> `ID3D11DeviceContext*`
     pub const D3D_CONTEXT: usize = 0x2798;
 
-    /// `+0x27A0` → `M2DE_SwapChainManager*`
+    /// `+0x27A0` -> `M2DE_SwapChainManager*`
     pub const SWAPCHAIN_MANAGER: usize = 0x27A0;
 
-    /// `+0x27A8` → `M2DE_SwapChainWrapper*`
+    /// `+0x27A8` -> `M2DE_SwapChainWrapper*`
     ///
     /// Это основной путь к текущему DXGI swapchain.
     pub const CURRENT_SWAPCHAIN: usize = 0x27A8;
 
-    /// `+0x27B0` → дополнительный указатель на активный swapchain wrapper.
+    /// `+0x27B0` -> дополнительный указатель на активный swapchain wrapper.
     pub const ACTIVE_SWAPCHAIN: usize = 0x27B0;
 
-    /// `+0x510C` → флаги адаптера / init flags.
+    /// `+0x510C` -> флаги адаптера / init flags.
     ///
     /// Влияют на выбор режима swapchain.
     pub const ADAPTER_FLAGS: usize = 0x510C;
 
-    /// `+0x5110` → `ID3DUserDefinedAnnotation*` или NULL.
+    /// `+0x5110` -> `ID3DUserDefinedAnnotation*` или NULL.
     pub const DEBUG_ANNOTATION: usize = 0x5110;
 }
 
 pub mod swapchain_manager {
-    /// `+0x00` → root/sentinel узел RB-дерева.
-    ///
-    /// Ключ дерева: `HWND`
-    /// Значение: `M2DE_SwapChainWrapper*`
     pub const TREE_ROOT: usize = 0x00;
 
-    /// `+0x08` → количество элементов в дереве.
+    /// `+0x08` -> количество элементов в дереве.
     pub const TREE_SIZE: usize = 0x08;
 
-    /// `+0x10` → `IDXGIFactory4*`
+    /// `+0x10` -> `IDXGIFactory4*`
     pub const FACTORY: usize = 0x10;
-
-    /// `+0x18` → `ID3D11Device*`
     pub const DEVICE: usize = 0x18;
-
-    /// `+0x20` → `ID3D11DeviceContext*`
     pub const CONTEXT: usize = 0x20;
-
-    /// `+0x28` → поддерживается ли `DXGI_FEATURE_PRESENT_ALLOW_TEARING`.
     pub const TEARING_SUPPORTED: usize = 0x28;
-
-    /// `+0x29` → debug mode флаг.
     pub const DEBUG_MODE: usize = 0x29;
 }
 
 pub mod swapchain_wrapper {
-    /// `+0x00` → ширина swapchain.
+    /// `+0x00` -> ширина swapchain.
     pub const WIDTH: usize = 0x00;
-
-    /// `+0x04` → высота swapchain.
     pub const HEIGHT: usize = 0x04;
-
-    /// `+0x08` → режим / флаг swapchain.
     pub const SWAPCHAIN_MODE: usize = 0x08;
-
-    /// `+0x10` → HWND окна.
     pub const HWND: usize = 0x10;
-
-    /// `+0x18` → `IDXGISwapChain1*`
-    ///
-    /// Это raw DXGI swapchain, который нужен для hook'а `Present`.
     pub const SWAPCHAIN: usize = 0x18;
-
-    /// `+0x20` → `ID3D11Texture2D*` back buffer.
     pub const BACK_BUFFER: usize = 0x20;
-
-    /// `+0x28` → `ID3D11Texture2D*` depth texture.
     pub const DEPTH_TEXTURE: usize = 0x28;
-
-    /// `+0x30` → `ID3D11DepthStencilView*`
     pub const DSV: usize = 0x30;
-
-    /// `+0x38` → `ID3D11RenderTargetView*`
     pub const RTV: usize = 0x38;
-
-    /// `+0x40` → `ID3D11ShaderResourceView*`
     pub const SRV: usize = 0x40;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-//  Script Machine (Lua VM)
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
+//  Script machine / Lua
+// =============================================================================
 
-/// Менеджер скриптовых машин.
-///
-/// Цепочка до lua_State*:
-/// `g_ScriptMachineManager + 0x08` → vector
-/// `vector + 0x00` → begin (ScriptMachine**)
-/// `array[0]` → Main Game Script Machine
-/// `machine + 0x70` → lua_State*
 pub mod script_machine_manager {
     /// +0x08 → указатель на std::vector<ScriptMachine*>
     pub const VECTOR: usize = 0x08;
@@ -521,396 +567,313 @@ pub mod script_machine_manager {
 pub mod std_vector {
     /// +0x00 → первый элемент
     pub const BEGIN: usize = 0x00;
-    /// +0x08 → один за последним
     pub const END: usize = 0x08;
-    /// +0x10 → конец выделенной памяти
     pub const CAPACITY: usize = 0x10;
 }
 
-/// Одна ScriptMachine.
 pub mod script_machine {
-    /// +0x70 → lua_State*
     pub const LUA_STATE: usize = 0x70;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Camera System
-// ═══════════════════════════════════════════════════════════════════════
+// =============================================================================
+//  Camera system
+// =============================================================================
 
-/// `CameraManager` — статический объект камерной системы.
-///
-/// Доступ:
-/// ```ignore
-/// let camera_mgr = module_base + addresses::globals::CAMERA_MANAGER;
-/// ```
-///
-/// ⚠️ Это не `CameraManager*`, а сам объект по фиксированному RVA.
-///
-/// Содержит:
-/// - два `PlayerCameraView`:
-///   - `Interier` по `+0x0000`
-///   - `Exterier` по `+0x0D18`
-/// - `TransitSpeed`
-/// - параметры автомобильных камер
-/// - fpv/death/meelee камеры
-///
-/// Подтверждено из:
-/// - `M2DE_CameraSystem_Init`
-/// - `M2DE_CameraManager_LoadConfigById`
-/// - `M2DE_CameraManager_LoadPlayerCamera`
 pub mod camera_manager {
-    // ── Player camera ───────────────────────────────────────────────
-
-    /// `Interier` PlayerCameraView base.
     pub const INTERIER_VIEW: usize = 0x0000;
-
-    /// `Exterier` PlayerCameraView base.
     pub const EXTERIER_VIEW: usize = 0x0D18;
 
-    /// `Interier.DefaultParams[Fov]`
-    ///
-    /// Формула:
-    /// `INTERIER_VIEW + camera_view::DEFAULT_PARAMS + camera_params::FOV * 4`
     pub const INTERIER_DEFAULT_FOV: usize = 0x0C80;
-
-    /// `Exterier.DefaultParams[Fov]`
-    ///
-    /// Формула:
-    /// `EXTERIER_VIEW + camera_view::DEFAULT_PARAMS + camera_params::FOV * 4`
     pub const EXTERIER_DEFAULT_FOV: usize = 0x1998;
 
-    /// `TransitSpeed["Exterier"]` (float)
     pub const TRANSIT_SPEED_EXTERIER: usize = 0x1A30;
-
-    /// `TransitSpeed["Interier"]` (float)
     pub const TRANSIT_SPEED_INTERIER: usize = 0x1A34;
-
-    /// Флаг, который пишет `M2DE_CameraManager_LoadPlayerCamera(a1, a2)`
-    /// в `a1 + 0x1FB4`.
     pub const PLAYER_CAMERA_LOADED: usize = 0x1FB4;
 
-    // ── Простые автомобильные камеры ────────────────────────────────
-    // Здесь `Fov` лежит в `params[0]`
-
-    /// `carCameraBumper.xml` → `Params[0] = Fov`
-    ///
-    /// Params:
-    /// - Fov
-    /// - Slope
-    /// - WheelLeft
-    /// - WheelFront
     pub const CAR_BUMPER_FOV: usize = 0x21D8;
-
-    /// `carCameraWheel.xml` → `Params[0] = Fov`
-    ///
-    /// Params:
-    /// - Fov
-    /// - Slope
-    /// - WheelLeft
-    /// - WheelFront
     pub const CAR_WHEEL_FOV: usize = 0x21E8;
-
-    /// `carCameraHood.xml` → `Params[0] = Fov`
-    ///
-    /// Params:
-    /// - Fov
-    /// - Slope
-    /// - HoodTop
-    /// - HoodFront
     pub const CAR_HOOD_FOV: usize = 0x21F8;
-
-    /// `carCameraLookback.xml` → `Params[0] = Fov`
-    ///
-    /// Params:
-    /// - Fov
-    /// - Slope
-    /// - HOffset
-    /// - VOffset
     pub const CAR_LOOKBACK_FOV: usize = 0x230C;
 
-    // ── carCameraDynamic ────────────────────────────────────────────
-    //
-    // Base params array: +0x2244
-    // Count: 25
-    // String table base: 0x1418EE3A0
-    // Stride: 0x20
-    //
-    // Reverse result:
-    //   Fov    = index 11
-    //   FovMax = index 16
-
-    /// `carCameraDynamic.Params[11] = Fov`
-    ///
-    /// Runtime observed value: ~72.12
-    pub const CAR_DYNAMIC_FOV: usize = 0x2244 + 11 * 4; // 0x2270
-
-    /// `carCameraDynamic.Params[16] = FovMax`
-    ///
-    /// Это speed-based delta FOV.
-    /// Runtime observed value: ~9.96
-    pub const CAR_DYNAMIC_FOV_MAX: usize = 0x2244 + 16 * 4; // 0x2284
-
-    // ── carCameraDynamicLong ────────────────────────────────────────
-    //
-    // Base params array: +0x22A8
-    // Count: 25
-    // Та же string table, что и у carCameraDynamic.
-    //
-    // Reverse result:
-    //   Fov    = index 11
-    //   FovMax = index 16
-
-    /// `carCameraDynamicLong.Params[11] = Fov`
-    ///
-    /// Runtime observed value: ~70.08
-    pub const CAR_DYNAMIC_LONG_FOV: usize = 0x22A8 + 11 * 4; // 0x22D4
-
-    /// `carCameraDynamicLong.Params[16] = FovMax`
-    ///
-    /// Runtime observed value: ~15.0
-    pub const CAR_DYNAMIC_LONG_FOV_MAX: usize = 0x22A8 + 16 * 4; // 0x22E8
-
-    // ── carCameraShoot ──────────────────────────────────────────────
-    //
-    // Base params array: +0x2208
-    // Count: 15
-    // String table base: 0x1418EE190
-    // Stride: 0x20
-    //
-    // Reverse result:
-    //   Fov = index 3
-
-    /// `carCameraShoot.Params[3] = Fov`
-    ///
-    /// Runtime observed value: ~61.08
-    pub const CAR_SHOOT_FOV: usize = 0x2208 + 3 * 4; // 0x2214
-
-    // ── carCameraGamepad ────────────────────────────────────────────
-    //
-    // Base params array: +0x231C
-    // Count: 24
-    // String table base: 0x1418EE720
-    // Stride: 0x20
-    //
-    // Reverse result:
-    //   Fov    = index 10
-    //   FovMax = index 14
-
-    /// `carCameraGamepad.Params[10] = Fov`
-    ///
-    /// Runtime observed value: ~65.16
-    pub const CAR_GAMEPAD_FOV: usize = 0x231C + 10 * 4; // 0x2344
-
-    /// `carCameraGamepad.Params[14] = FovMax`
-    ///
-    /// Runtime observed value: ~20.04
-    pub const CAR_GAMEPAD_FOV_MAX: usize = 0x231C + 14 * 4; // 0x2354
-
-    // ── Остальные камеры ────────────────────────────────────────────
-
-    /// `fpvCamera.Params[0] = Fov`
-    pub const FPV_FOV: usize = 0x275C;
-
-    /// `deathCamera.Params[0] = Fov`
-    pub const DEATH_FOV: usize = 0x277C;
-
-    /// `meeleeCamera.Params[5] = Fov`
-    ///
-    /// Params:
-    /// - MinDistance
-    /// - MaxDistance
-    /// - DistanceExponent
-    /// - MinZ
-    /// - MaxZ
-    /// - Fov
-    /// - ...
-    pub const MEELEE_FOV: usize = 0x2784 + 5 * 4; // 0x2798
-
-    // ── Базы массивов параметров для диагностики ───────────────────
-
-    /// База `carCameraDynamic.Params`
     pub const CAR_DYNAMIC_PARAMS: usize = 0x2244;
-    /// Количество параметров `carCameraDynamic`
     pub const CAR_DYNAMIC_PARAM_COUNT: usize = 25;
+    pub const CAR_DYNAMIC_FOV: usize = 0x2244 + 11 * 4;
+    pub const CAR_DYNAMIC_FOV_MAX: usize = 0x2244 + 16 * 4;
 
-    /// База `carCameraDynamicLong.Params`
     pub const CAR_DYNAMIC_LONG_PARAMS: usize = 0x22A8;
-    /// Количество параметров `carCameraDynamicLong`
     pub const CAR_DYNAMIC_LONG_PARAM_COUNT: usize = 25;
+    pub const CAR_DYNAMIC_LONG_FOV: usize = 0x22A8 + 11 * 4;
+    pub const CAR_DYNAMIC_LONG_FOV_MAX: usize = 0x22A8 + 16 * 4;
 
-    /// База `carCameraShoot.Params`
     pub const CAR_SHOOT_PARAMS: usize = 0x2208;
-    /// Количество параметров `carCameraShoot`
     pub const CAR_SHOOT_PARAM_COUNT: usize = 15;
+    pub const CAR_SHOOT_FOV: usize = 0x2208 + 3 * 4;
 
-    /// База `carCameraGamepad.Params`
     pub const CAR_GAMEPAD_PARAMS: usize = 0x231C;
-    /// Количество параметров `carCameraGamepad`
     pub const CAR_GAMEPAD_PARAM_COUNT: usize = 24;
+    pub const CAR_GAMEPAD_FOV: usize = 0x231C + 10 * 4;
+    pub const CAR_GAMEPAD_FOV_MAX: usize = 0x231C + 14 * 4;
+
+    pub const FPV_FOV: usize = 0x275C;
+    pub const DEATH_FOV: usize = 0x277C;
+    pub const MEELEE_FOV: usize = 0x2784 + 5 * 4;
 }
 
-/// `PlayerCameraView` — один набор player camera параметров
-/// (`Interier` или `Exterier`).
-///
-/// Размер структуры: `0xD18` (3352 байта).
-///
-/// Внутри:
-/// - 15 state-блоков (`Stay`, `Walk`, `Run`, `Sprint`, ...)
-/// - `DefaultParams[27]`
-/// - `DefaultSpeeds[15]`
 pub mod camera_view {
-    /// Полный размер одного `CameraView`.
     pub const SIZE: usize = 0xD18;
-
-    /// Количество state-блоков.
     pub const NUM_STATES: usize = 15;
-
-    /// Количество camera params в одном state/default block.
     pub const NUM_PARAMS: usize = 27;
-
-    /// Количество speed params в одном state/default block.
     pub const NUM_SPEEDS: usize = 15;
 
-    // ── State layout ────────────────────────────────────────────────
-
-    /// Смещение первого state-блока от начала `CameraView`.
-    ///
-    /// То есть `State[0]` начинается с `+0x04`.
     pub const STATES_BASE: usize = 0x04;
-
-    /// Размер одного state-блока.
-    ///
-    /// `0xD4 = 212` байт.
     pub const STATE_STRIDE: usize = 0xD4;
-
-    /// Внутри state-блока: `Params[27]` (`float[27]`)
     pub const STATE_PARAMS_OFFSET: usize = 0x00;
-
-    /// Внутри state-блока: `Speeds[15]` (`float[15]`)
     pub const STATE_SPEEDS_OFFSET: usize = 0x6C;
-
-    /// Внутри state-блока: `ParamFlags[27]` (`byte[27]`)
-    ///
-    /// Семантика:
-    /// - `0` = для параметра есть state-specific override
-    /// - `1` = брать значение из `DefaultParams`
     pub const STATE_PARAM_FLAGS_OFFSET: usize = 0xA8;
-
-    /// Внутри state-блока: `SpeedFlags[15]` (`byte[15]`)
     pub const STATE_SPEED_FLAGS_OFFSET: usize = 0xC3;
 
-    // ── Defaults ────────────────────────────────────────────────────
-
-    /// `DefaultParams[27]` (`float[27]`)
     pub const DEFAULT_PARAMS: usize = 0xC70;
-
-    /// `DefaultSpeeds[15]` (`float[15]`)
     pub const DEFAULT_SPEEDS: usize = 0xCDC;
 }
 
-/// AI Params struct (указатель из player+0xA8).
+// =============================================================================
+//  AI / DB / wrappers / caches
+// =============================================================================
+
 pub mod ai_params {
-    /// `+0x04` → int32 aggressivity level.
-    /// 0=OnAttack, 1=HearGunshot, 2=SeeEnemy, 3=SeeEnemyWithWeapon.
     pub const AGGRESSIVITY: usize = 0x04;
 }
 
-/// DB Record (entity definition из глобальной БД).
 pub mod db_record {
-    /// `+0x24` → uint8 entity type.
-    pub const ENTITY_TYPE: usize = 0x24;
-    /// `+0x24` → uint32 table ID (offset +36 decimal).
-    pub const TABLE_ID: usize = 0x24; // Осторожно: совпадает с entity_type!
-    /// `+0x28` → uint32 flags. Бит 5 (0x20) = streamable/spawnable.
+    pub const TABLE_ID: usize = 0x24;
     pub const FLAGS: usize = 0x28;
+    pub const NAME_HASH: usize = 0x30;
 }
 
 /// Script Wrapper layout (общий для всех типов).
 pub mod script_wrapper {
-    /// `+0x00` → vtable.
     pub const VTABLE: usize = 0x00;
-    /// `+0x08` → int32 refcount.
     pub const REFCOUNT: usize = 0x08;
-    /// `+0x10` → DB record / native entity pointer.
     pub const NATIVE: usize = 0x10;
-    /// `+0x18` → observer/state object.
     pub const OBSERVER: usize = 0x18;
 }
 
 pub mod sds_manager {
-    /// +0x00: vtable (off_14186F8D0)
     pub const VTABLE: usize = 0x00;
-    /// +0x08: vtable2 (off_14186F810)
     pub const VTABLE2: usize = 0x08;
-    /// +0x10: int32 current_load_index (-1 = idle)
     pub const CURRENT_LOAD_INDEX: usize = 0x10;
-    /// +0x30: byte loading_flag
     pub const LOADING_FLAG: usize = 0x30;
-    /// +0x44: int32 (-1)
     pub const FIELD_44: usize = 0x44;
-    /// +0x68: word
     pub const FIELD_68: usize = 0x68;
-    /// +0x70..+0x78: loaded SDS slot array
     pub const LOADED_SLOTS_BEGIN: usize = 0x70;
     pub const LOADED_SLOTS_END: usize = 0x78;
-    /// +0x88: vtable3 (off_14186F7B8)
     pub const VTABLE3: usize = 0x88;
-    /// +0x90: ModuleObject (module_id = 0x0D)
     pub const MODULE_OBJECT: usize = 0x90;
 }
 
-/// Кеш SDS Line Manager (hash → index).
 pub mod sds_line_cache {
-    /// +0x18 от Line Manager → начало отсортированного кеша.
     pub const CACHE_BEGIN: usize = 0x18;
-    /// +0x20 от Line Manager → конец кеша.
     pub const CACHE_END: usize = 0x20;
-    /// Размер одной записи (hash(8) + data(8) + flags(4) + index(4)).
     pub const ENTRY_SIZE: usize = 24;
-    /// Смещение hash внутри записи.
     pub const ENTRY_HASH: usize = 0x00;
-    /// Смещение index внутри записи.
     pub const ENTRY_INDEX: usize = 0x14;
 }
 
-/// Кеш ScriptWrapperManager (для entity lookup).
 pub mod entity_cache {
-    /// +0x08 → hash cache begin (sorted, 16b/entry: hash(8) + wrapper_ptr(8)).
     pub const HASH_CACHE_BEGIN: usize = 0x08;
-    /// +0x10 → hash cache end.
     pub const HASH_CACHE_END: usize = 0x10;
-    /// +0x28 → tableID cache begin (sorted, 16b/entry).
     pub const TABLE_ID_CACHE_BEGIN: usize = 0x28;
-    /// +0x30 → tableID cache end.
     pub const TABLE_ID_CACHE_END: usize = 0x30;
-    /// Размер одной записи в кеше.
     pub const ENTRY_SIZE: usize = 16;
-    /// Смещение wrapper_ptr внутри записи.
     pub const ENTRY_WRAPPER: usize = 0x08;
 }
 
-/// Контейнер значений (общий для ammo и money chains).
 pub mod value_container {
-    /// +0x10 → указатель на хранилище значения.
     pub const STORE_PTR: usize = 0x10;
 }
 
-/// Хранилище значения (последний уровень цепочки ammo/money).
 pub mod value_store {
-    /// +0x10 → само значение (i32 для ammo, i64 для money).
     pub const VALUE: usize = 0x10;
 }
 
-/// RB-дерево (общий layout для entity factory registry и др.).
 pub mod rb_tree_node {
-    /// +0x00 → left child.
     pub const LEFT: usize = 0x00;
-    /// +0x10 → right child.
     pub const RIGHT: usize = 0x10;
-    /// +0x19 → is_sentinel flag (0 = real node, 1 = sentinel).
     pub const IS_SENTINEL: usize = 0x19;
-    /// +0x20 → key (u32 type_id).
+    /// +0x20 -> key (u32 type_id).
     pub const KEY: usize = 0x20;
-    /// +0x28 → value (ptr).
+    /// +0x28 -> value (ptr).
     pub const VALUE: usize = 0x28;
+}
+
+// =============================================================================
+//  ScriptEntity family
+// =============================================================================
+
+pub mod script_entity {
+    /// `+0x78` -> script entry id / slot index.
+    ///
+    /// В direct police child path используется как индекс в `scripts[this+0x78]`.
+    pub const SCRIPT_ENTRY_ID: usize = 0x78;
+
+    /// `+0x7C` -> script context index / selector.
+    ///
+    /// Низкий байт используется для получения Lua context/manager:
+    /// `movzx ecx, byte ptr [this+7Ch]`.
+    pub const SCRIPT_CONTEXT_INDEX: usize = 0x7C;
+
+    /// `+0x80` -> auxiliary code/state field.
+    ///
+    /// В add/init path участвует как дополнительный аргумент/state.
+    pub const AUX_CODE_OR_STATE: usize = 0x80;
+
+    /// `+0x88` -> provider/list-like pointer.
+    ///
+    /// В direct police child path используется как источник списка script entries.
+    pub const SCRIPT_PROVIDER_OR_LIST: usize = 0x88;
+}
+
+// =============================================================================
+//  Police-script owner singleton
+// =============================================================================
+
+pub mod police_script_owner {
+    /// `+0x00` -> root/sentinel pointer.
+    pub const ROOT_OR_SENTINEL: usize = 0x00;
+
+    /// `+0x08` -> count/state-like field.
+    pub const COUNT_OR_STATE: usize = 0x08;
+
+    /// `+0x10` -> active child pointer.
+    pub const ACTIVE_CHILD: usize = 0x10;
+}
+
+pub mod police_script_owner_node {
+    pub const LINK_00: usize = 0x00;
+    pub const LINK_08: usize = 0x08;
+    pub const CHILD_OR_LINK_10: usize = 0x10;
+    pub const FLAGS_18: usize = 0x18;
+    pub const SENTINEL_BYTE_19: usize = 0x19;
+    pub const SIZE: usize = 0x30;
+}
+
+pub mod vehicle_common {
+    /// `+0x00` -> primary vtable.
+    pub const VTABLE: usize = 0x00;
+
+    /// `+0x24` -> packed table_id.
+    pub const TABLE_ID: usize = 0x24;
+
+    /// Legacy alias: читать low byte как u8.
+    pub const ENTITY_TYPE: usize = TABLE_ID;
+
+    /// `+0x28` -> entity flags.
+    pub const ENTITY_FLAGS: usize = 0x28;
+
+    /// `+0x78` -> frame pointer.
+    pub const FRAME: usize = 0x78;
+
+    /// `+0x80` -> owner pointer.
+    pub const OWNER: usize = 0x80;
+
+    /// `+0x258` -> physics provider pointer.
+    pub const PHYSICS_PROVIDER: usize = 0x258;
+}
+
+pub mod car {
+    /// create-instance alloc size
+    pub const SIZE: usize = 0x1258;
+
+    /// nested/subobject areas confirmed in ctor
+    pub const SUBOBJ_E0: usize = 0x0E0;
+    pub const SUBOBJ_1E0: usize = 0x1E0;
+    pub const SUBOBJ_1E8: usize = 0x1E8;
+    pub const SUBOBJ_1F8: usize = 0x1F8;
+    pub const SUBOBJ_210: usize = 0x210;
+
+    /// color data
+    pub const COLOR_FLAGS: usize = 0x944;
+    pub const COLOR1_RGB: usize = 0x954;
+    pub const COLOR1_ALPHA: usize = 0x95C;
+    pub const COLOR2_RGB: usize = 0x960;
+    pub const COLOR2_ALPHA: usize = 0x968;
+
+    /// spawn timestamp
+    pub const SPAWN_TIMESTAMP: usize = 0x1248;
+
+    // provisional legacy fields
+    pub const SPEED: usize = 0x360;
+    pub const ANIM_PARAM1: usize = 0x388;
+    pub const ANIM_PARAM2: usize = 0x394;
+}
+
+pub mod car_vehicle {
+    /// create-instance alloc size
+    pub const SIZE: usize = 0x2F0;
+
+    /// multiple inheritance sub-vtable slots
+    pub const VTABLE_SUB_A8: usize = 0x0A8;
+    pub const VTABLE_SUB_B0: usize = 0x0B0;
+    pub const VTABLE_SUB_B8: usize = 0x0B8;
+    pub const VTABLE_SUB_C0: usize = 0x0C0;
+
+    /// generic container block (`0x58`)
+    pub const CONTAINER_1D0: usize = 0x1D0;
+    pub const CONTAINER_1D0_ROOT: usize = 0x1D0 + 0x40;
+    pub const CONTAINER_1D0_STATE_A: usize = 0x1D0 + 0x48;
+    pub const CONTAINER_1D0_STATE_B: usize = 0x1D0 + 0x50;
+
+    /// smart/refcounted slot
+    pub const SMART_PTR_2A8: usize = 0x2A8;
+
+    /// tail/config block
+    pub const FIELD_2B0: usize = 0x2B0;
+    pub const FIELD_2B8: usize = 0x2B8;
+    pub const FIELD_2BC: usize = 0x2BC;
+    pub const FIELD_2C0: usize = 0x2C0;
+    pub const FIELD_2C8: usize = 0x2C8;
+    pub const FIELD_2D0: usize = 0x2D0;
+    pub const FIELD_2D8: usize = 0x2D8;
+    pub const FIELD_2E0: usize = 0x2E0;
+    pub const FIELD_2E8: usize = 0x2E8;
+}
+
+/// Generic smart-pointer slot helpers.
+pub mod smart_ptr_slot {
+    /// `+0x00` -> stored refcounted object pointer.
+    pub const PTR: usize = 0x00;
+}
+
+/// Generic refcounted object conventions observed in engine.
+pub mod refcounted_object {
+    /// `+0x08` -> refcount (`i32`) in many engine-owned refcounted objects.
+    pub const REFCOUNT: usize = 0x08;
+}
+
+// Generic 0x58-byte container with 0x30-byte sentinel/root.
+/// Paired helpers:
+/// - `M2DE_InitContainer58_WithSentinel30`
+/// - `M2DE_TeardownContainer58_WithSentinel30`
+pub mod container58 {
+    /// `+0x08..+0x18` -> first vector-like storage (begin/end/capacity)
+    pub const VEC1_BEGIN: usize = 0x08;
+    pub const VEC1_END: usize = 0x10;
+    pub const VEC1_CAPACITY: usize = 0x18;
+
+    /// `+0x28..+0x38` -> second vector-like storage (begin/end/capacity)
+    pub const VEC2_BEGIN: usize = 0x28;
+    pub const VEC2_END: usize = 0x30;
+    pub const VEC2_CAPACITY: usize = 0x38;
+
+    /// `+0x40` -> sentinel/root pointer
+    pub const ROOT: usize = 0x40;
+
+    /// `+0x48` -> count/state-like field
+    pub const COUNT_OR_STATE_A: usize = 0x48;
+
+    /// `+0x50` -> count/state-like field
+    pub const COUNT_OR_STATE_B: usize = 0x50;
+
+    /// Full container size
+    pub const SIZE: usize = 0x58;
 }
