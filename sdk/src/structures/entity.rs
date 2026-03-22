@@ -90,13 +90,14 @@ pub struct CEntity {
     /// Указатель на таблицу виртуальных методов.
     pub vtable: *const c_void, // +0x00
 
-    /// Player-only: три указателя на heap-объекты (шаг ~0x20/0x40).
-    /// NULL для всех остальных типов entity.
-    /// Устанавливается CPlayerEntity_Constructor.
-    /// Runtime подтверждено: только Player имеет эти поля != NULL.
-    pub player_data_08: usize, // +0x08
-    pub player_data_10: usize, // +0x10
-    pub player_data_18: usize, // +0x18
+    /// Расширенные указатели на дополнительные системы.
+    /// NULL для большинства entity.
+    /// Ненулевые для: Player, C_CarVehicle.
+    /// Точная семантика пока не установлена — возможно привязка к
+    /// расширенным системам управления/физики/контроллеров.
+    pub ext_ptr_1: usize, // +0x08
+    pub ext_ptr_2: usize, // +0x10
+    pub ext_ptr_3: usize, // +0x18
 
     /// Байт состояния (обнулён в конструкторе).
     pub state_flags: u8, // +0x20
@@ -206,7 +207,8 @@ impl CEntity {
 /// Actor добавляет:
 /// - `frame_node` (+0x78) — указатель на трансформ/позицию в мире
 /// - `owner` (+0x80) — NULL = на ногах, vehicle* = в машине
-/// - `entity_subtype` (+0xA0) — подтип entity (Player=6)
+/// - `component_88/90/98` (+0x88/90/98) — расширенные компоненты (NULL у базового Actor, ненулевые у C_Car/C_CarVehicle)
+/// - `entity_subtype` (+0xA0) — подтип entity (Player=6, CarVehicle=3, Car=varies)
 ///
 /// Runtime подтверждено: НЕ Actor-derived типы:
 /// - Sound (0x29) — мусор в +0x78, не heap ptr
@@ -236,20 +238,17 @@ pub struct CActorFields {
     /// Направление: `frame+0x34/0x44/0x54` (forward vector).
     pub frame_node: *mut c_void, // +0x78
 
-    /// Владелец/контейнер. NULL = на ногах, vehicle* = в транспорте.
+    /// Указатель на owner/контейнер. NULL = на ногах, vehicle* = в транспорте.
     pub owner: *mut c_void, // +0x80
 
-    /// Неизвестно (обнулено в конструкторе). Runtime: всегда 0.
-    pub _zero_88: u64, // +0x88
-
-    /// Неизвестно (обнулено). Actor::OnStateUpdate читает +0x90. Runtime: всегда 0.
-    pub _zero_90: u64, // +0x90
-
-    /// Неизвестно (обнулено). Runtime: всегда 0.
-    pub _zero_98: u64, // +0x98
+    /// Расширенные компоненты Actor (NULL у базового Actor).
+    /// Ненулевые у C_Car, C_CarVehicle — дополнительные системы.
+    pub component_88: usize, // +0x88
+    pub component_90: usize, // +0x90
+    pub component_98: usize, // +0x98
 
     /// Подтип entity (устанавливается после конструирования).
-    /// Runtime: Player=6, NPC=?
+    /// Runtime: Player=6, CarVehicle=3, Car=varies (0x36/0x37/0x3A)
     pub entity_subtype: u32, // +0xA0
     pub _pad_a4: u32, // +0xA4
 }
@@ -461,7 +460,8 @@ pub struct CTypeDescriptor {
 /// - +0xB0 указывает в ДРУГОЙ регион (отдельная аллокация, НЕ из блока 2648 байт)
 /// - +0xD8 может быть NULL (опциональный компонент)
 /// - Smart ptr slots: slot[-1] активен, slots[2-4] пусты
-/// - +0x08/10/18: Player-only поля (три heap ptr), NULL у всех остальных типов
+/// - +0x08/10/18: Расширенные указатели (Player, CarVehicle), NULL у остальных
+/// - +0x88/90/98: Расширенные компоненты Actor (C_Car, C_CarVehicle), NULL у базового Actor
 /// - tree_1_count (+0x48): 2 для Player, 0 для остальных
 /// - Sound/ScriptEntity НЕ Actor-derived (мусор/script data в +0x78)
 /// ```

@@ -18,12 +18,13 @@ pub mod game_manager {
 // =============================================================================
 
 pub mod entity {
-    /// `+0x08` -> Player-only pointer 1 (NULL для всех остальных).
-    pub const PLAYER_DATA_08: usize = 0x08;
-    /// `+0x10` -> Player-only pointer 2.
-    pub const PLAYER_DATA_10: usize = 0x10;
-    /// `+0x18` -> Player-only pointer 3.
-    pub const PLAYER_DATA_18: usize = 0x18;
+    /// `+0x08` -> Расширенный указатель 1.
+    /// Ненулевой у Player и C_CarVehicle. NULL у остальных.
+    pub const EXT_PTR_1: usize = 0x08;
+    /// `+0x10` -> Расширенный указатель 2.
+    pub const EXT_PTR_2: usize = 0x10;
+    /// `+0x18` -> Расширенный указатель 3.
+    pub const EXT_PTR_3: usize = 0x18;
 
     /// `+0x20` -> state/alive flags byte.
     pub const STATE_FLAGS: usize = 0x20;
@@ -64,9 +65,16 @@ pub mod entity {
     /// `+0x80` -> owner entity pointer.
     pub const OWNER: usize = 0x80;
 
+    /// `+0x88` -> Компонент Actor-расширение 1.
+    /// NULL у чистого Actor. Ненулевой у C_Car, C_CarVehicle.
+    pub const COMPONENT_88: usize = 0x88;
+    pub const COMPONENT_90: usize = 0x90;
+    pub const COMPONENT_98: usize = 0x98;
+
     /// `+0xA0` -> Entity subtype (Actor layer). Значения:
     /// - Player = 6
-    /// - NPC = ?
+    /// - CarVehicle = 3
+    /// - Car = varies (0x36, 0x37, 0x3A)
     /// Устанавливается после конструирования.
     pub const ENTITY_SUBTYPE: usize = 0xA0;
 }
@@ -850,52 +858,112 @@ pub mod vehicle_common {
 }
 
 pub mod car {
-    /// create-instance alloc size
+    /// Размер аллокации C_Car.
     pub const SIZE: usize = 0x1258;
 
-    /// nested/subobject areas confirmed in ctor
-    pub const SUBOBJ_E0: usize = 0x0E0;
-    pub const SUBOBJ_1E0: usize = 0x1E0;
-    pub const SUBOBJ_1E8: usize = 0x1E8;
-    pub const SUBOBJ_1F8: usize = 0x1F8;
-    pub const SUBOBJ_210: usize = 0x210;
+    /// Embedded sub-vtables (множественное наследование).
+    pub const SUB_VTABLE_1: usize = 0xE0;   // 0x141850298
+    pub const SUB_VTABLE_2: usize = 0x1E0;  // 0x141850478
+    pub const SUB_VTABLE_3: usize = 0x1E8;  // 0x1418504C0
+    pub const SUB_VTABLE_4: usize = 0x1F8;  // 0x1418504E0
+    pub const SUB_VTABLE_5: usize = 0x210;  // 0x1418504F0
 
-    /// color data
+    /// Vector-like component storage.
+    pub const VEC_BEGIN: usize = 0xB0;
+    pub const VEC_END: usize = 0xB8;
+    pub const VEC_CAPACITY: usize = 0xC0;
+
+    /// Self reference (= this). Подтверждено 3 образцами runtime.
+    pub const SELF_REF: usize = 0x2F0;
+
+    /// Color data.
+    pub const COLOR_CONFIG: usize = 0x940;
     pub const COLOR_FLAGS: usize = 0x944;
     pub const COLOR1_RGB: usize = 0x954;
     pub const COLOR1_ALPHA: usize = 0x95C;
+    pub const COLOR1_FLOATS: usize = 0x948;
     pub const COLOR2_RGB: usize = 0x960;
     pub const COLOR2_ALPHA: usize = 0x968;
+    pub const COLOR2_FLOATS: usize = 0x950;
 
-    /// spawn timestamp
+    /// Car data block.
+    pub const DATA_BLOCK_START: usize = 0xEE0;
+    pub const FLOAT_1_0_F54: usize = 0xF54;
+    pub const HELPER_OBJ_PTR: usize = 0x11A8;
+
+    /// Spawn data.
     pub const SPAWN_TIMESTAMP: usize = 0x1248;
+    pub const SPAWN_TICK: usize = 0x1258;
 
-    // provisional legacy fields
+    // Provisional legacy fields
     pub const SPEED: usize = 0x360;
     pub const ANIM_PARAM1: usize = 0x388;
     pub const ANIM_PARAM2: usize = 0x394;
 }
 
 pub mod car_vehicle {
-    /// create-instance alloc size
+    /// Размер аллокации C_CarVehicle.
     pub const SIZE: usize = 0x2F0;
 
-    /// multiple inheritance sub-vtable slots
-    pub const VTABLE_SUB_A8: usize = 0x0A8;
-    pub const VTABLE_SUB_B0: usize = 0x0B0;
-    pub const VTABLE_SUB_B8: usize = 0x0B8;
-    pub const VTABLE_SUB_C0: usize = 0x0C0;
+    /// Multiple inheritance sub-vtables.
+    pub const SUB_VTABLE_1: usize = 0xA8;
+    pub const SUB_VTABLE_2: usize = 0xB0;
+    pub const SUB_VTABLE_3: usize = 0xB8;
+    pub const SUB_VTABLE_4: usize = 0xC0;
 
-    /// generic container block (`0x58`)
+    /// Указатель на physics/dynamics.
+    pub const PHYSICS_PTR: usize = 0xC8;
+
+    /// 6 transform слотов по 12 байт (Vec3).
+    pub const TRANSFORM_SLOTS_BASE: usize = 0xD0;
+    pub const TRANSFORM_SLOT_SIZE: usize = 12;
+    pub const TRANSFORM_SLOT_COUNT: usize = 6;
+
+    /// 3 inline string слота по 0x20 байт: { u8 flag, char[31] name }.
+    pub const CLOTH_SLOT: usize = 0x118;
+    pub const BODY_SLOT: usize = 0x138;
+    pub const LOOK_SLOT: usize = 0x158;
+    pub const NAME_SLOT_SIZE: usize = 0x20;
+
+    /// Дополнительные transform данные.
+    pub const TRANSFORM_7: usize = 0x184;
+    pub const TRANSFORM_8: usize = 0x190;
+
+    /// Ссылочные указатели.
+    pub const REF_PTR_1A0: usize = 0x1A0;
+    pub const REF_PTR_1A8: usize = 0x1A8;
+
+    /// Sentinel / control.
+    pub const SENTINEL_1C4: usize = 0x1C4;
+
+    /// Container58 (RB-tree + vectors).
+    pub const CONTAINER: usize = 0x1D0;
     pub const CONTAINER_1D0: usize = 0x1D0;
     pub const CONTAINER_1D0_ROOT: usize = 0x1D0 + 0x40;
     pub const CONTAINER_1D0_STATE_A: usize = 0x1D0 + 0x48;
     pub const CONTAINER_1D0_STATE_B: usize = 0x1D0 + 0x50;
 
-    /// smart/refcounted slot
+    /// Масштаб / конфигурация.
+    pub const SCALE_FACTOR: usize = 0x234;
+
+    /// Steering scale factors (= 1.0).
+    pub const STEER_SCALE_1: usize = 0x25C;
+    pub const STEER_SCALE_2: usize = 0x26C;
+
+    /// Smart pointer (refcounted).
+    pub const SMART_PTR: usize = 0x2A8;
     pub const SMART_PTR_2A8: usize = 0x2A8;
 
-    /// tail/config block
+    /// Активный ref ptr.
+    pub const REF_PTR_2B0: usize = 0x2B0;
+
+    /// Sentinel.
+    pub const SENTINEL_2BC: usize = 0x2BC;
+
+    /// Коэффициент демпфирования (0.3).
+    pub const DAMPING_FACTOR: usize = 0x2E0;
+
+    /// tail/config block (legacy names)
     pub const FIELD_2B0: usize = 0x2B0;
     pub const FIELD_2B8: usize = 0x2B8;
     pub const FIELD_2BC: usize = 0x2BC;
