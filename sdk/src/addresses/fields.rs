@@ -217,11 +217,14 @@ pub mod player {
     /// `+0x344` -> death type / death mode (`i32`) [provisional].
     pub const DEATH_TYPE: usize = 0x344;
 
-    /// `+0x3D8` -> byte mode/state field.
+    /// `+0x3D8` -> player state / flags dword.
     ///
-    /// Подтверждённый predicate:
-    /// `M2DE_CPlayer_IsMode3D8_Not3Or4` проверяет что значение НЕ равно 3 и НЕ равно 4.
-    pub const MODE_3D8: usize = 0x3D8;
+    /// Low byte участвует в predicate:
+    /// - значение != 3
+    /// - значение != 4
+    ///
+    /// Также higher bits читаются как flags, например `0x40000`.
+    pub const STATE_FLAGS_3D8: usize = 0x3D8;
 
     /// `+0x430` -> state code dword.
     ///
@@ -251,6 +254,33 @@ pub mod player {
     /// - `M2DE_CPlayer_StateFlags490_SetBit14`
     /// - `M2DE_CPlayer_StateFlags490_SetBit15`
     pub const STATE_FLAGS_490: usize = 0x490;
+
+    /// `+0x438` -> player state flags dword used heavily by Character_Update.
+    ///
+    /// Наблюдаемые маски:
+    /// - 0x40
+    /// - 0x10
+    /// - 0x20000
+    /// - 0x8000
+    /// - 0x10000
+    ///
+    /// Семантика пока не закреплена.
+    pub const STATE_FLAGS_438: usize = 0x438;
+
+    /// `+0x43C` -> auxiliary player state field.
+    pub const FIELD_43C: usize = 0x43C;
+
+    /// `+0x440` -> auxiliary player state field.
+    pub const FIELD_440: usize = 0x440;
+
+    /// `+0x448` -> auxiliary player state field.
+    pub const FIELD_448: usize = 0x448;
+
+    /// `+0x510` -> player state flags dword.
+    ///
+    /// В Character_Update используется bit 4 / bit 3-like логика,
+    /// зависящая от результата `sub_1400C46F0`.
+    pub const STATE_FLAGS_510: usize = 0x510;
 }
 
 // =============================================================================

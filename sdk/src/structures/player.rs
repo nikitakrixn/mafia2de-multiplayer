@@ -196,8 +196,9 @@ impl CHuman {
 ///
 /// Отличия от Player:
 /// - Нет ext_ptr_1/2/3 (всегда NULL)
-/// - Нет Player-specific полей от +0x338
-/// - Другая vtable (меньше методов)
+/// - Другая vtable implementation
+/// - Нет Player-specific хвоста после базовой human-части
+/// - Factory type = 0x0E
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CHumanNPC {
@@ -242,9 +243,9 @@ impl CHumanNPC {
 /// - Расширенная vtable с дополнительными методами
 ///
 /// Player-specific поля (подтверждены vtable):
-/// - +0x338: death_position (Vec3)
-/// - +0x344: death_type (i32)
-/// - +0x3D8: mode_3d8 (u8)
+/// - +0x338: death_position (Vec3) [PROVISIONAL]
+/// - +0x344: death_type (i32) [PROVISIONAL]
+/// - +0x3D8: state_flags_3d8 (u32 dword, low byte checked)
 /// - +0x430: state_code_430 (u32)
 /// - +0x464: field_464 (u32)
 /// - +0x490: state_flags_490 (u32 bitfield)
@@ -257,21 +258,32 @@ pub struct CPlayer {
     /// Player-specific данные от +0x260 до +0x337.
     pub _player_data_260: [u8; 0xD8], // +0x260..+0x337
 
-    /// Death position (Vec3).
+    /// [PROVISIONAL] Possibly death position or respawn-related vector.
     pub death_position: [f32; 3], // +0x338
 
-    /// Death type / death mode.
+    /// [PROVISIONAL] Possibly death type / death mode.
     pub death_type: i32, // +0x344
 
-    /// Неизвестные поля между death_type и mode_3d8.
+    /// Неизвестные поля между +0x348 и +0x3D7.
     pub _unk_348: [u8; 0x90], // +0x348..+0x3D7
 
-    /// Mode/state byte.
-    /// Проверяется vtable[94]: `IsMode3D8_Not3Or4` (значение != 3 && != 4).
-    pub mode_3d8: u8, // +0x3D8
+    /// Player state / flags dword.
+    ///
+    /// ВАЖНО:
+    /// это НЕ просто byte-mode.
+    ///
+    /// Подтверждено:
+    /// - low byte участвует в predicate `!= 3 && != 4`
+    /// - higher bits читаются как flags, например `0x40000`
+    ///
+    /// См.:
+    /// - `sub_1400C47F0`
+    /// - `sub_1400CA3E0`
+    /// - `M2DE_Character_Update`
+    pub state_flags_3d8: u32, // +0x3D8
 
     /// Padding до state_code_430.
-    pub _pad_3d9: [u8; 0x57], // +0x3D9..+0x42F
+    pub _pad_3dc: [u8; 0x54], // +0x3DC..+0x42F
 
     /// State code dword.
     /// Проверяется vtable[83]: `IsStateCode430_Equal10` (значение == 10).
@@ -308,7 +320,7 @@ assert_field_offsets!(CPlayer {
     base             == 0x000,
     death_position   == 0x338,
     death_type       == 0x344,
-    mode_3d8         == 0x3D8,
+    state_flags_3d8  == 0x3D8,
     state_code_430   == 0x430,
     field_464        == 0x464,
     state_flags_490  == 0x490,
@@ -333,11 +345,18 @@ impl CPlayer {
         self.base.entity_subtype == 6
     }
 
-    /// Проверка mode_3d8 (не равен 3 и не равен 4).
+    /// Проверка low byte у state_flags_3d8:
+    /// значение не равно 3 и не равно 4.
     ///
-    /// Соответствует vtable[94]: `M2DE_CPlayer_IsMode3D8_Not3Or4`.
-    pub fn is_mode_3d8_not_3_or_4(&self) -> bool {
-        self.mode_3d8 != 3 && self.mode_3d8 != 4
+    /// Соответствует helper'у `sub_1400C47F0`.
+    pub fn is_state_3d8_lowbyte_not_3_or_4(&self) -> bool {
+        let low = (self.state_flags_3d8 & 0xFF) as u8;
+        low != 3 && low != 4
+    }
+
+    /// Проверка конкретного флага в state_flags_3d8.
+    pub fn has_state_flag_3d8(&self, mask: u32) -> bool {
+        (self.state_flags_3d8 & mask) != 0
     }
 
     /// Проверка state_code_430 (равен 10).
