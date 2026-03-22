@@ -1,50 +1,43 @@
-//! Поиск entity по имени через native path
+//! Entity system — поиск сущностей, type helpers и alias cache.
 //!
-//! Использует M2DE_EntityManager_FindByName напрямую.
-//! Возвращает Script Wrapper pointer, из которого можно
-//! получить native entity через wrapper+0x10.
+//! Движок использует FNV-1 64-bit hash для имён entity.
+//! Поиск идёт через `C_ScriptWrapperManager`.
+//!
+//! ВАЖНО:
+//! - wrapper+0x10 = native entity pointer
+//! - player НЕ ищется через FindByName
+//! - native runtime type = factory type byte из `entity+0x24`
 
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+use super::{base, entity_ref::EntityRef, entity_types::FactoryType};
 use crate::addresses;
-use crate::addresses::fields::script_wrapper;
+use crate::addresses::fields::{entity, script_wrapper};
 use crate::memory;
-use super::base;
 use common::logger;
 
-/// FNV-1a хеш, используемый движком для entity names.
-pub fn fnv1a_hash(name: &[u8]) -> u64 {
-    let mut hash: u64 = 0xCBF29CE484222325;
-    for &byte in name {
-        hash = (byte as u64) ^ hash.wrapping_mul(0x100000001B3);
-    }
-    hash
-}
+// =============================================================================
+//  Entity lookup
+// =============================================================================
 
-/// Найти entity по имени через native path.
-/// Возвращает указатель на Script Wrapper (refcounted).
+/// Найти entity по имени через `M2DE_EntityManager_FindByName`.
 ///
-/// ⚠️ Wrapper != native entity. Native = *(wrapper + 0x10).
-///
-/// Пример:
-/// ```ignore
-/// let wrapper = find_entity_by_name("Joe")?;
-/// let native = unsafe { memory::read_ptr(wrapper + 0x10)? };
-/// // native — это C_Human* для NPC
-/// ```
+/// Возвращает указатель на `C_ScriptWrapper`.
 pub fn find_entity_by_name(name: &str) -> Option<usize> {
     let base = base();
 
-    // Получить ScriptWrapperManager
-    let mgr = unsafe {
-        memory::read_ptr(base + addresses::globals::SCRIPT_WRAPPER_MANAGER)?
-    };
+    let mgr = unsafe { memory::read_ptr(base + addresses::globals::SCRIPT_WRAPPER_MANAGER)? };
 
-    // Вызвать M2DE_EntityManager_FindByName(mgr, name)
     let c_name = std::ffi::CString::new(name).ok()?;
 
+    // Локально запоминаем hash -> name.
+    let hash = super::hash::fnv1_64(name.as_bytes());
+    observe_hashed_name(hash, name);
+
     type FindByNameFn = unsafe extern "C" fn(usize, *const i8) -> usize;
-    let func: FindByNameFn = unsafe {
-        memory::fn_at(base + addresses::functions::entity_manager::FIND_BY_NAME)
-    };
+    let func: FindByNameFn =
+        unsafe { memory::fn_at(base + addresses::functions::entity_manager::FIND_BY_NAME) };
 
     let wrapper = unsafe { func(mgr, c_name.as_ptr()) };
 
@@ -52,39 +45,209 @@ pub fn find_entity_by_name(name: &str) -> Option<usize> {
         logger::debug(&format!("[entity] '{}' не найден", name));
         None
     } else {
-        logger::debug(&format!(
-            "[entity] '{}' → wrapper=0x{:X}",
-            name, wrapper
-        ));
+        logger::debug(&format!("[entity] '{}' -> wrapper=0x{:X}", name, wrapper));
+
+        if let Some(native) = unsafe { memory::read_ptr(wrapper + script_wrapper::NATIVE) } {
+            register_entity_alias(native, name);
+        }
+
         Some(wrapper)
     }
 }
 
 /// Найти native entity pointer по имени.
-/// Возвращает C_Human*/C_Car*/etc. напрямую.
 pub fn find_native_entity(name: &str) -> Option<usize> {
     let wrapper = find_entity_by_name(name)?;
     unsafe { memory::read_ptr(wrapper + script_wrapper::NATIVE) }
 }
 
-/// Получить тип entity по имени.
-/// 0x0E = NPC human, 0x10 = player, 0x12 = physics, etc.
-pub fn get_entity_type(name: &str) -> Option<u8> {
+/// Найти typed entity ref по имени.
+pub fn find_entity_ref_by_name(name: &str) -> Option<EntityRef> {
     let native = find_native_entity(name)?;
-    unsafe { memory::read_value::<u8>(native + addresses::fields::player::ENTITY_TYPE) }
+    EntityRef::from_ptr(native)
 }
 
-/// Проверить что entity жива (для C_Human).
-pub fn is_entity_alive(name: &str) -> Option<bool> {
-    let native = find_native_entity(name)?;
-    unsafe {
-        memory::read_value::<u8>(native + addresses::fields::player::IS_DEAD)
-            .map(|v| v == 0)
-    }
+/// Получить packed table_id по имени.
+pub fn get_entity_table_id(name: &str) -> Option<u32> {
+    find_entity_ref_by_name(name)?.table_id()
 }
 
-/// Прочитать здоровье entity (для C_Human).
+/// Получить factory type byte по имени.
+pub fn get_entity_factory_type(name: &str) -> Option<u8> {
+    find_entity_ref_by_name(name)?.factory_type_byte()
+}
+
+/// Получить FactoryType enum по имени.
+pub fn get_entity_factory_type_enum(name: &str) -> Option<FactoryType> {
+    find_entity_ref_by_name(name)?.factory_type()
+}
+
+/// Прочитать здоровье entity (для human/player).
 pub fn get_entity_health(name: &str) -> Option<f32> {
-    let native = find_native_entity(name)?;
-    unsafe { memory::read_value::<f32>(native + addresses::fields::player::CURRENT_HEALTH) }
+    find_entity_ref_by_name(name)?.health()
+}
+
+/// Проверить что entity жива (для human/player).
+pub fn is_entity_alive(name: &str) -> Option<bool> {
+    find_entity_ref_by_name(name)?.is_alive()
+}
+
+/// Имя factory type для debug/logging.
+pub fn factory_type_name(ft: u8) -> &'static str {
+    FactoryType::from_byte(ft)
+        .map(|t| t.display_name())
+        .unwrap_or("UNKNOWN")
+}
+
+/// Извлечь factory type byte из packed table_id.
+#[inline]
+pub fn table_id_factory_type(table_id: u32) -> u8 {
+    (table_id & 0xFF) as u8
+}
+
+/// Извлечь instance id из packed table_id.
+#[inline]
+pub fn table_id_instance_id(table_id: u32) -> u32 {
+    table_id >> 8
+}
+
+/// Прочитать factory type byte напрямую из native entity.
+pub fn native_factory_type_byte(entity_ptr: usize) -> Option<u8> {
+    if entity_ptr == 0 || !memory::is_valid_ptr(entity_ptr) {
+        return None;
+    }
+    unsafe { memory::read_value::<u8>(entity_ptr + entity::TABLE_ID) }
+}
+
+/// Прочитать FactoryType enum напрямую из native entity.
+pub fn native_factory_type(entity_ptr: usize) -> Option<FactoryType> {
+    FactoryType::from_byte(native_factory_type_byte(entity_ptr)?)
+}
+
+// =============================================================================
+//  Runtime alias cache
+// =============================================================================
+
+/// Кеш: `FNV-1 hash имени -> строковое имя`.
+static HASH_TO_NAME: OnceLock<Mutex<HashMap<u64, String>>> = OnceLock::new();
+
+/// Кеш: `table_id -> строковое имя`.
+static TABLE_ID_TO_NAME: OnceLock<Mutex<HashMap<u32, String>>> = OnceLock::new();
+
+fn hash_to_name() -> &'static Mutex<HashMap<u64, String>> {
+    HASH_TO_NAME.get_or_init(|| Mutex::new(HashMap::with_capacity(2048)))
+}
+
+fn table_id_to_name() -> &'static Mutex<HashMap<u32, String>> {
+    TABLE_ID_TO_NAME.get_or_init(|| Mutex::new(HashMap::with_capacity(2048)))
+}
+
+/// Сохраняет замеченную строку и её hash.
+pub fn observe_hashed_name(hash: u64, name: &str) {
+    if hash == 0 || name.is_empty() || name.len() > 256 {
+        return;
+    }
+
+    let Ok(mut map) = hash_to_name().try_lock() else {
+        return;
+    };
+
+    map.entry(hash).or_insert_with(|| name.to_string());
+}
+
+/// Если движок нашёл DB record по `name_hash`,
+/// связываем `table_id -> строковое имя`.
+pub fn observe_db_record_name_hash(db_record_ptr: usize, name_hash: u64) {
+    if db_record_ptr == 0 || !memory::is_valid_ptr(db_record_ptr) {
+        return;
+    }
+
+    let Some(name) = lookup_name_by_hash(name_hash) else {
+        return;
+    };
+
+    let Some(table_id) = (unsafe { memory::read_value::<u32>(db_record_ptr + entity::TABLE_ID) })
+    else {
+        return;
+    };
+
+    register_table_id_alias(table_id, &name);
+}
+
+/// Явно регистрирует alias: `table_id -> name`.
+pub fn register_table_id_alias(table_id: u32, name: &str) {
+    if table_id == 0 || name.is_empty() {
+        return;
+    }
+
+    let Ok(mut map) = table_id_to_name().lock() else {
+        return;
+    };
+
+    map.entry(table_id).or_insert_with(|| name.to_string());
+}
+
+/// Регистрирует alias по native entity pointer.
+pub fn register_entity_alias(entity_ptr: usize, name: &str) {
+    if entity_ptr == 0 || !memory::is_valid_ptr(entity_ptr) || name.is_empty() {
+        return;
+    }
+
+    let Some(table_id) = (unsafe { memory::read_value::<u32>(entity_ptr + entity::TABLE_ID) })
+    else {
+        return;
+    };
+
+    register_table_id_alias(table_id, name);
+}
+
+/// Ищет строку по FNV-1 hash.
+pub fn lookup_name_by_hash(hash: u64) -> Option<String> {
+    let Ok(map) = hash_to_name().lock() else {
+        return None;
+    };
+    map.get(&hash).cloned()
+}
+
+/// Ищет alias по `table_id`.
+pub fn lookup_known_name_by_table_id(table_id: u32) -> Option<String> {
+    let Ok(map) = table_id_to_name().lock() else {
+        return None;
+    };
+    map.get(&table_id).cloned()
+}
+
+/// Ищет alias по native entity pointer.
+pub fn lookup_known_name_for_entity(entity_ptr: usize) -> Option<String> {
+    if entity_ptr == 0 || !memory::is_valid_ptr(entity_ptr) {
+        return None;
+    }
+
+    let table_id = unsafe { memory::read_value::<u32>(entity_ptr + entity::TABLE_ID) }?;
+
+    lookup_known_name_by_table_id(table_id)
+}
+
+/// Статистика alias cache.
+pub fn alias_cache_stats() -> (usize, usize) {
+    let hash_count = hash_to_name().lock().map(|m| m.len()).unwrap_or(0);
+
+    let table_count = table_id_to_name().lock().map(|m| m.len()).unwrap_or(0);
+
+    (hash_count, table_count)
+}
+
+/// Полный дамп alias cache в лог.
+pub fn dump_alias_cache() {
+    let (hash_count, table_count) = alias_cache_stats();
+    logger::info(&format!(
+        "[entity-alias] hash->name: {}, table_id->name: {}",
+        hash_count, table_count
+    ));
+
+    if let Ok(map) = table_id_to_name().lock() {
+        for (table_id, name) in map.iter().take(128) {
+            logger::info(&format!("  tid=0x{:08X} -> {}", table_id, name));
+        }
+    }
 }

@@ -4,20 +4,27 @@
 //! Скрывает за собой цепочки указателей, вызовы движка
 //! и прочую низкоуровневую механику.
 
-pub mod entity;
 pub mod callbacks;
 pub mod camera;
-pub mod player;
+pub mod entity;
+pub mod entity_ref;
+pub mod entity_types;
+mod hash;
 pub mod lua;
-pub mod render;
 pub mod npc;
+pub mod player;
+pub mod police;
+pub mod render;
+pub mod script_entity;
 pub mod sds;
+pub mod world;
 
+pub use entity_types::{EntityMessageType, EntityType, FactoryType};
 pub use player::Player;
 
-use std::sync::OnceLock;
 use crate::{addresses, memory};
 use common::logger;
+use std::sync::OnceLock;
 
 /// Кэш базового адреса модуля игры.
 /// Инициализируется один раз при первом обращении.
@@ -53,7 +60,9 @@ pub fn log_module_info() {
     match memory::get_module_info(addresses::GAME_MODULE) {
         Some(info) => logger::info(&format!(
             "Модуль игры: base=0x{:X}, size=0x{:X} ({:.1} МБ)",
-            info.base, info.size, info.size as f64 / (1024.0 * 1024.0),
+            info.base,
+            info.size,
+            info.size as f64 / (1024.0 * 1024.0),
         )),
         None => logger::error("Не удалось получить информацию о модуле игры!"),
     }
