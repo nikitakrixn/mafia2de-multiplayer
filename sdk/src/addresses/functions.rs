@@ -6,9 +6,9 @@
 //! - R8  = 3-й аргумент или XMM2
 //! - R9  = 4-й аргумент или XMM3
 
-// ═══════════════════════════════════════════════════════════════════════════
+//=============================================================================
 //  Engine System
-// ═══════════════════════════════════════════════════════════════════════════
+//=============================================================================
 
 pub mod engine {
     /// Точка входа игры.
@@ -52,12 +52,12 @@ pub mod engine {
     pub const AI_NAVIGATION_HANDLER: usize = 0xDD_5690;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  Player
-// ═══════════════════════════════════════════════════════════════════════════
+//=============================================================================
+//  Player TODO: нужно полностью пересмотреть и отрефакторить этот модуль, он сейчас в очень сыром виде
+//=============================================================================
 
 pub mod player {
-    // ── WrapperPlayer-level (НЕ вызывать с Player.ptr!) ─────────────
+    // WrapperPlayer-level
 
     /// ⚠️ Принимает C_WrapperPlayer*, не C_Human*!
     /// `void(WrapperPlayer*, float cents)`
@@ -74,7 +74,7 @@ pub mod player {
     /// IDA: `0x1410C9560`
     pub const WRAPPER_ADD_WEAPON: usize = 0x10C_9560;
 
-    // ── Inventory-level (принимает Inventory*) ──────────────────────
+    // Inventory-level (принимает Inventory*)
     // ⚠️ Вызывать ТОЛЬКО из игрового потока!
 
     /// `i64(Inventory*)` — получить центы
@@ -89,7 +89,7 @@ pub mod player {
     /// IDA: `0x140D7E8D0`
     pub const INVENTORY_ADD_MONEY_NOTIFY: usize = 0xD7_E8D0;
 
-    // ── Slot/Core level ─────────────────────────────────────────────
+    // Slot/Core level
 
     /// `void(MoneySlot*, i64 cents)` — добавить в слот
     /// IDA: `0x140D7E800`
@@ -99,13 +99,13 @@ pub mod player {
     /// IDA: `0x140DCE920`
     pub const MONEY_CORE_SET: usize = 0xDC_E920;
 
-    // ── Weapon — inventory-level ────────────────────────────────────
+    // Weapon — inventory-level
 
     /// `char(Inventory*, u32 weapon_id, i32 ammo)` — добавить оружие.
     ///
     /// Логика:
-    /// - Если оружие уже есть → добавляет только патроны
-    /// - Если нового типа → создаёт WeaponItem, пробует slot[2] и slot[3]
+    /// - Если оружие уже есть -> добавляет только патроны
+    /// - Если нового типа -> создаёт WeaponItem, пробует slot[2] и slot[3]
     /// - Патроны капаются на max из tables/weapons.tbl
     ///
     /// Строка: `"C_HumanInventory::AddWeapon(int, int)"`
@@ -136,7 +136,7 @@ pub mod player_control {
 
     /// `bool(PlayerControlRef*, u8 locked, u8 play_anim_flag)`
     /// IDA: `0x140DB1B40`
-    /// 
+    ///
     /// ВАЖНО: Эта функция проверяет текущее состояние через IS_LOCKED
     /// и ничего не делает, если состояние уже соответствует запрошенному.
     /// Для принудительной блокировки используйте SET_LOCKED_INTERNAL.
@@ -144,7 +144,7 @@ pub mod player_control {
 
     /// `i64(control_component+112, u8 locked, u8 flags)`
     /// IDA: `0x140DB1BE0`
-    /// 
+    ///
     /// Внутренняя функция блокировки управления, вызываемая из SET_LOCKED.
     /// Принимает указатель на (control_component + 112), а не на сам компонент!
     /// Всегда выполняет блокировку/разблокировку, не проверяя текущее состояние.
@@ -167,15 +167,15 @@ pub mod player_control {
     pub const SET_FIGHT_HINT: usize = 0xDC_D0F0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Garage
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod garage {
     /// Получить ID машины по имени (0–33).
     /// Регистрирует все 34 машины.
     ///
-    /// `i32(const char* name)` → vehicle ID или -1
+    /// `i32(const char* name)` -> vehicle ID или -1
     ///
     /// IDA: `0x1410_1D0A0` (`M2DE_GetVehicleIDByName`)
     pub const GET_VEHICLE_ID_BY_NAME: usize = 0x101_D0A0;
@@ -226,9 +226,9 @@ pub mod garage {
     pub const VECTOR_COPY_RANGE: usize = 0x102_BEC0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Managers
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod managers {
     /// Получить ResourceManager*.
@@ -242,9 +242,9 @@ pub mod managers {
     pub const GET_GAME_CALLBACK_MANAGER: usize = 0x3A_EEC0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  HUD
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod hud {
     /// Показать popup "± $ X.XX" на экране.
@@ -291,7 +291,7 @@ pub mod entity {
     /// - если у entity есть physics/provider по `entity + 0x258`,
     ///   вызывает его virtual method (`vtable + 0xA8`) и пишет позицию в `out`
     /// - иначе использует fallback через frame/transform node:
-    ///   `entity + 0x78` → frame
+    ///   `entity + 0x78` -> frame
     ///   - `frame + 0x64` = x
     ///   - `frame + 0x74` = y
     ///   - `frame + 0x84` = z
@@ -327,9 +327,9 @@ pub mod entity {
     pub const SET_POS_RAW: usize = 0x3B_9660;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Tables
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod tables {
     /// Конструктор TableManager — загружает все .tbl файлы.
@@ -337,22 +337,22 @@ pub mod tables {
     /// IDA: `0x1400_F1480` (`M2DE_TableManager_Constructor`)
     pub const CONSTRUCTOR: usize = 0xF_1480;
 
-    /// Загрузка /tables/vehicles.tbl → TableManager+0x60.
+    /// Загрузка /tables/vehicles.tbl -> TableManager+0x60.
     ///
     /// IDA: `0x1400_DEAD0`
     pub const LOAD_VEHICLES: usize = 0xD_EAD0;
 
-    /// Загрузка /tables/weapons.tbl → TableManager+0x40.
+    /// Загрузка /tables/weapons.tbl -> TableManager+0x40.
     ///
     /// IDA: `0x1400_DEBE0`
     pub const LOAD_WEAPONS: usize = 0xD_EBE0;
 
-    /// Загрузка /tables/police_offences.tbl → TableManager+0x38.
+    /// Загрузка /tables/police_offences.tbl -> TableManager+0x38.
     ///
     /// IDA: `0x1400_DE140`
     pub const LOAD_POLICE_OFFENCES: usize = 0xD_E140;
 
-    /// Загрузка /tables/attack_params.tbl → TableManager+0x50.
+    /// Загрузка /tables/attack_params.tbl -> TableManager+0x50.
     ///
     /// IDA: `0x1400_DC490`
     pub const LOAD_ATTACK_PARAMS: usize = 0xD_C490;
@@ -363,9 +363,9 @@ pub mod tables {
     pub const GET_RESOURCE_LOADER: usize = 0x18_5480;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Profiling
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod profiling {
     /// IDA: `0x1404_0E7F0`
@@ -376,9 +376,9 @@ pub mod profiling {
     pub const CREATE_PROFILE: usize = 0x41_1BE0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Lua Bindings (НЕ вызывать напрямую — принимают lua_State*)
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod lua_bindings {
     /// IDA: `0x140C_6FF70` (`M2DE_Lua_Game_GetActivePlayer`)
@@ -393,15 +393,15 @@ pub mod lua_bindings {
     pub const GET_PLAYER_FROM_STACK: usize = 0x7B_1A50;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  GameCallbackManager VTable Methods
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod callback_manager {
     /// Деструктор.
     /// IDA: `0x1403_9FC70`
     pub const DESTRUCTOR: usize = 0x39_FC70;
-    /// GetSize() → 8.
+    /// GetSize() -> 8.
     /// IDA: `0x1403_AC3D0`
     pub const GET_SIZE: usize = 0x3A_C3D0;
     /// RegisterFunction.
@@ -409,18 +409,18 @@ pub mod callback_manager {
     pub const REGISTER_FUNCTION: usize = 0x3A_06D0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  GarageManager VTable Methods
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod garage_manager_methods {
-    /// GetSize() → 7.
+    /// GetSize() -> 7.
     /// IDA: `0x1400_A78D0`
     pub const GET_SIZE: usize = 0xA_78D0;
-    /// GetClassName() → "C_GarageManager".
+    /// GetClassName() -> "C_GarageManager".
     /// IDA: `0x1410_22F70`
     pub const GET_CLASS_NAME: usize = 0x102_2F70;
-    /// GetSomeFloat() → 0.005f.
+    /// GetSomeFloat() -> 0.005f.
     /// IDA: `0x1400_A7D80`
     pub const GET_FLOAT: usize = 0xA_7D80;
     /// Unknown method.
@@ -428,9 +428,9 @@ pub mod garage_manager_methods {
     pub const METHOD1: usize = 0x102_72D0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Raw Lua API (Mafia II: DE Lua 5.1.2, modified)
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod lua {
     /// `int(lua_State* L, const char* buff, size_t sz, const char* name, int extra)`
@@ -481,9 +481,9 @@ pub mod script_machine {
     pub const CALL_STRING: usize = 0xA1C_530;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 // Callbacks
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod callbacks {
     /// Регистрирует новый тип callback-события в `GameCallbackManager`.
@@ -559,7 +559,7 @@ pub mod callbacks {
     /// - `callback_object`
     /// - `callback_function`
     ///
-    /// Специальный случай: `event_id == -1` → удалить из всех событий.
+    /// Специальный случай: `event_id == -1` -> удалить из всех событий.
     ///
     /// IDA: `0x1403A55A0`
     pub const UNREGISTER_FUNCTION: usize = 0x3A_55A0;
@@ -817,9 +817,9 @@ pub mod entity_messages {
     pub const HUMAN_SEND_ENTER_VEHICLE_LIKE: usize = 0xDA_4C80;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Render Device
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod render {
     /// Полный конструктор `M2DE_C_RenderDeviceD3D11`.
@@ -920,9 +920,9 @@ pub mod render {
     pub const CREATE_DXGI_FACTORY1_THUNK: usize = 0x153_F0B5;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Camera System
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod camera {
     /// Инициализация всей камерной системы.
@@ -978,9 +978,9 @@ pub mod camera {
     pub const UPDATE: usize = 0x29_BAC0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  DirectInput System
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod input {
     /// Инициализация DirectInput8 manager.
@@ -1033,9 +1033,9 @@ pub mod input {
     pub const KEYBOARD_DEVICE_CTOR: usize = 0x79_A890;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Human / Health
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 pub mod human {
     /// `bool(C_Human*)` — is entity dead.
@@ -1085,9 +1085,9 @@ pub mod human {
     pub const GET_PLAYER_INSTANCE: usize = 0x0C_33C0;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+//=============================================================================
 //  Physics Provider
-// ═══════════════════════════════════════════════════════════════════════════
+//=============================================================================
 
 pub mod physics {
     /// Получить текущий physics state через property accessor.
@@ -1096,7 +1096,7 @@ pub mod physics {
     pub const GET_PHYS_STATE: usize = 0xDC_CEC0;
 
     /// Установить physics state.
-    /// Проверяет текущий, если отличается → provider->vtable[52].
+    /// Проверяет текущий, если отличается -> provider->vtable[52].
     /// IDA: `0x140DCD100`
     pub const SET_PHYS_STATE: usize = 0xDC_D100;
 }
@@ -1114,7 +1114,7 @@ pub mod physics_state {
 //=============================================================================
 
 pub mod entity_manager {
-    /// Найти entity по имени (FNV-1a хеш → кеш → БД → factory).
+    /// Найти/создать wrapper по имени (FNV-1 64-bit хеш -> кеш -> БД -> factory).
     /// `__int64(ScriptWrapperManager*, const char* name)`
     /// Возвращает script wrapper или NULL.
     /// IDA: `0x1410C7070`
@@ -1122,22 +1122,47 @@ pub mod entity_manager {
 
     /// Найти/создать wrapper по tableID.
     /// `__int64(ScriptWrapperManager*, uint32 tableID)`
-    /// TODO: exact address
-    pub const GET_OR_CREATE_WRAPPER: usize = 0;
+    /// IDA: `0x1410C6E60`
+    pub const GET_OR_CREATE_WRAPPER: usize = 0x10C_6E60;
 
-    /// FNV-1a хеш или числовой парсинг имени.
+    /// Хеш или парсинг имени. FNV-1 64-bit.
     /// `void(uint64* out, const char* name)`
     /// IDA: `0x140A76940`
-    pub const PARSE_NAME_OR_FNV1A: usize = 0xA7_6940;
+    pub const PARSE_ID_OR_FNV1_64: usize = 0xA7_6940;
 
-    /// Создать CleanEntity (type 114).
-    /// Из script context, НЕ для прямого вызова из DLL.
-    /// IDA: `0x140C7BFA0`
-    pub const CREATE_CLEAN_ENTITY_IMPL: usize = 0xC7_BFA0;
+    /// Создать script wrapper из DB record.
+    /// `__int64(ScriptWrapperManager*, EntityDBRecord*)`
+    /// IDA: `0x1410CDC90`
+    pub const CREATE_SCRIPT_WRAPPER: usize = 0x10C_DC90;
 
-    /// Конструктор CleanEntity (320 bytes).
-    /// IDA: `0x140DF1760`
-    pub const CLEAN_ENTITY_CONSTRUCT: usize = 0xDF_1760;
+    /// Поиск в БД по tableID.
+    /// `__int64(EntityDatabase*, uint32 tableID)`
+    /// IDA: `0x1403E92A0`
+    pub const DB_LOOKUP_BY_TABLE_ID: usize = 0x3E_92A0;
+
+    /// Поиск в БД по FNV-1 64-bit name hash (vtable[8]).
+    /// `__int64(EntityDatabase*, uint64 nameHash)`
+    /// IDA: `0x1403E92E0`
+    pub const DB_LOOKUP_BY_NAME_HASH: usize = 0x3E_92E0;
+
+    /// Внутренний hash table lookup.
+    /// `__int64(HashTable*, uint32 key24bit)`
+    /// IDA: `0x1403E1C90`
+    pub const HASH_TABLE_LOOKUP: usize = 0x3E_1C90;
+
+    /// Master init — создаёт все менеджеры.
+    /// IDA: `0x1403DD280`
+    pub const INIT_ALL_MANAGERS: usize = 0x3D_D280;
+
+    /// GetModuleNameById — switch/case для 49 модулей.
+    /// `const char*(uint32 module_id)`
+    /// IDA: `0x14044FB40`
+    pub const GET_MODULE_NAME_BY_ID: usize = 0x44_FB40;
+
+    /// C_ServiceIdentity::Init
+    /// `void(ServiceIdentity*, uint32 module_id)`
+    /// IDA: `0x1404444F0`
+    pub const SERVICE_IDENTITY_INIT: usize = 0x44_44F0;
 }
 
 pub mod npc {
@@ -1193,7 +1218,7 @@ pub mod sds {
 
 pub mod type_registry {
     /// Создать native entity по type ID.
-    /// Linked list lookup → call create function.
+    /// Linked list lookup -> call create function.
     /// IDA: `0x1403A4DE0`
     pub const CREATE_BY_TYPE_ID: usize = 0x3A_4DE0;
 }
@@ -1202,12 +1227,294 @@ pub mod car_spawn {
     /// Создать C_Car entity из загруженного SDS slot.
     /// IDA: `0x1403EDDB0`
     pub const CREATE_WORLD_ENTITY_TYPE18: usize = 0x3E_DDB0;
-    
+
     /// Привязать entity к frame node по имени.
     /// IDA: `0x1403B9570`
     pub const ENTITY_ATTACH_TO_FRAME: usize = 0x3B_9570;
-    
+
     /// Установить entity ID (+ WorldEntityManager registration).
     /// IDA: `0x1403B91C0`
     pub const ENTITY_SET_ID: usize = 0x3B_91C0;
+}
+
+// =============================================================================
+//  Entity Constructors
+// =============================================================================
+
+pub mod entity_constructors {
+    /// C_Entity base конструктор. Sets type -> 0x01 (intermediate).
+    /// IDA: `0x14039B710`
+    pub const BASE_ENTITY: usize = 0x39_B710;
+
+    /// C_Actor constructor. Sets type -> 0x03 -> 0x05 (intermediate).
+    /// IDA: `0x14039A7E0`
+    pub const ACTOR_ENTITY: usize = 0x39_A7E0;
+
+    /// C_Human base constructor. Allocates 2648B component block.
+    /// IDA: `0x140D730B0`
+    pub const HUMAN_BASE: usize = 0xD7_30B0;
+
+    /// C_HumanNPC constructor. Sets type -> 0x0E.
+    /// IDA: `0x140D712E0`
+    pub const HUMAN_NPC: usize = 0xD7_12E0;
+
+    /// C_Player constructor. Sets type -> 0x10.
+    /// IDA: `0x1400B9160`
+    pub const PLAYER: usize = 0x0B_9160;
+
+    /// C_Car constructor. Sets type -> 0x12. xor r14d,r14d; lea edx,[r14+12h].
+    /// IDA: `0x1400EE6C0`
+    pub const CAR: usize = 0x0E_E6C0;
+
+    /// C_Car CreateInstance (alloc + construct).
+    /// IDA: `0x140109030`
+    pub const CAR_CREATE_INSTANCE: usize = 0x10_9030;
+
+    /// C_CutsceneEnt constructor. Sets type -> 0x68. xor ecx,ecx; lea edx,[rcx+68h].
+    /// IDA: `0x1400EDF30`
+    pub const CUTSCENE_ENT: usize = 0x0E_DF30;
+
+    /// C_CutsceneEnt CreateInstance (alloc 0xC8 + construct).
+    /// IDA: `0x140109000`
+    pub const CUTSCENE_ENT_CREATE_INSTANCE: usize = 0x10_9000;
+
+    /// C_Door constructor. Sets type -> 0x26.
+    /// IDA: `0x1400EF4F0`
+    pub const DOOR: usize = 0x0E_F4F0;
+
+    /// C_Lift constructor. Sets type -> 0x28.
+    /// IDA: `0x1400F00B0`
+    pub const LIFT: usize = 0x0F_00B0;
+
+    /// C_Telephone constructor. Sets type -> 0x5F.
+    /// IDA: `0x1400F1750`
+    pub const TELEPHONE: usize = 0x0F_1750;
+
+    /// C_TrafficCar constructor. Sets type -> 0x15.
+    /// IDA: `0x140C125B0`
+    pub const TRAFFIC_CAR: usize = 0xC1_25B0;
+
+    /// StaticEntity constructor. Sets type -> 0x6C.
+    /// IDA: `0x140C0E870`
+    pub const STATIC_ENTITY: usize = 0xC0_E870;
+
+    /// C_Cutscene constructor. Sets type -> 0x49.
+    /// IDA: `0x140C781A0`
+    pub const CUTSCENE: usize = 0xC7_81A0;
+
+    /// FrameWrapper constructor. Sets type -> 0x37.
+    /// IDA: `0x140C78330`
+    pub const FRAME_WRAPPER: usize = 0xC7_8330;
+
+    /// C_CleanEntity constructor. Sets type -> 0x6F.
+    /// IDA: `0x140C78590`
+    pub const CLEAN_ENTITY: usize = 0xC7_8590;
+
+    /// LightEntity constructor. Sets type -> 0x47.
+    /// IDA: `0x140DF2410`
+    pub const LIGHT_ENTITY: usize = 0xDF_2410;
+
+    /// C_Pinup constructor. Sets type -> 0x6A.
+    /// IDA: `0x140DF2750`
+    pub const PINUP: usize = 0xDF_2750;
+
+    /// C_ActionPointCrossing constructor. Sets type -> 0x34.
+    /// IDA: `0x140DF2B30`
+    pub const ACTION_POINT_CROSSING: usize = 0xDF_2B30;
+
+    /// C_StaticParticle constructor. Sets type -> 0x42.
+    /// IDA: `0x140DF2CC0`
+    pub const STATIC_PARTICLE: usize = 0xDF_2CC0;
+
+    /// C_ActionPointSearch constructor. Sets type -> 0x3F.
+    /// IDA: `0x140DF1490`
+    pub const ACTION_POINT_SEARCH: usize = 0xDF_1490;
+
+    /// C_StaticWeapon constructor. Sets type -> 0x30.
+    /// IDA: `0x1410186B0`
+    pub const STATIC_WEAPON: usize = 0x101_86B0;
+
+    /// C_ActorDetector constructor. Sets type -> 0x65.
+    /// IDA: `0x14045E5E0`
+    pub const ACTOR_DETECTOR: usize = 0x45_E5E0;
+
+    /// C_FireTarget constructor. Sets type -> 0x46.
+    /// IDA: `0x140E455A0`
+    pub const FIRE_TARGET: usize = 0xE4_55A0;
+
+    /// C_Wardrobe constructor. Sets type -> 0x25.
+    /// IDA: `0x140FF7AF0`
+    pub const WARDROBE: usize = 0xFF_7AF0;
+
+    /// C_PhysicsScene constructor. Sets type -> 0x73.
+    /// IDA: `0x140FE0030`
+    pub const PHYSICS_SCENE: usize = 0xFE_0030;
+
+    /// TranslocatedCar constructor. Sets type -> 0x71.
+    /// IDA: `0x14039BCA0`
+    pub const TRANSLOCATED_CAR: usize = 0x39_BCA0;
+
+    /// C_ScriptEntity constructor. Sets type -> 0x62.
+    /// IDA: `0x14039BDE0`
+    pub const SCRIPT_ENTITY: usize = 0x39_BDE0;
+
+    /// C_ActionPointRoadBlock constructor. Sets type -> 0x1A.
+    /// IDA: `0x140C270F0`
+    pub const ACTION_POINT_ROADBLOCK: usize = 0xC2_70F0;
+
+    /// M2DE_Entity_SetTypeID — clears low byte of +0x24, then ORs new type.
+    /// `void(C_Entity* this_rcx, u32 type_edx)`
+    /// IDA: `0x1403B99F0`
+    pub const SET_TYPE_ID: usize = 0x3B_99F0;
+}
+
+// =============================================================================
+//  ScriptEntity family
+// =============================================================================
+
+pub mod script_entity {
+    /// Базовый top-level constructor `C_ScriptEntity`.
+    ///
+    /// Final type = `0x62`
+    /// Base alloc size = `0x90`
+    ///
+    /// IDA: `0x14039BDE0`
+    pub const BASE_CONSTRUCT: usize = 0x39_BDE0;
+
+    /// Инициализация уже выделенного блока как ScriptEntity-like object.
+    ///
+    /// Используется перед заменой vtable у child/direct derived paths.
+    ///
+    /// IDA: `0x14039BE40`
+    pub const INIT_IN_PLACE: usize = 0x39_BE40;
+
+    /// Direct police-script child create-instance path (Sub5).
+    ///
+    /// Alloc size = `0x90`
+    ///
+    /// IDA: `0x140EBFD00`
+    pub const POLICE_CHILD_CREATE_INSTANCE: usize = 0xEB_FD00;
+
+    /// Direct police-script child ctor (Sub5).
+    ///
+    /// IDA: `0x1400B3B50`
+    pub const POLICE_CHILD_CONSTRUCT: usize = 0x0B_3B50;
+
+    /// Secondary init path for police child.
+    ///
+    /// IDA: `0x1400B3B80`
+    pub const POLICE_CHILD_CONSTRUCT2: usize = 0x0B_3B80;
+
+    /// Scalar deleting dtor for police child.
+    ///
+    /// IDA: `0x1400B3B90`
+    pub const POLICE_CHILD_SCALAR_DTOR: usize = 0x0B_3B90;
+
+    /// Heavy add/init Lua bridge path.
+    ///
+    /// Observed Lua-side sequence:
+    /// - load `scripts[this+0x78]`
+    /// - call `onGameInit`
+    /// - call `AddPoliceman(self, guid_a, guid_b, number, vec3)`
+    ///
+    /// IDA: `0x1400B3DA0`
+    pub const POLICE_CHILD_INIT_AND_ADD_POLICEMAN: usize = 0x0B_3DA0;
+
+    /// Remove-path Lua bridge.
+    ///
+    /// Observed Lua-side sequence:
+    /// - load `scripts[this+0x78]`
+    /// - call `RemovePoliceman(self, guid)`
+    ///
+    /// IDA: `0x1400B4300`
+    pub const POLICE_CHILD_CALL_REMOVE_POLICEMAN_BY_GUID: usize = 0x0B_4300;
+
+    /// Lua bridge helper:
+    /// alloc 4 bytes, copy `u32`, wrap as typed `C_EntityGuid`, push to Lua.
+    ///
+    /// IDA: `0x1403B1630`
+    pub const LUA_PUSH_ENTITY_GUID_COMPONENT: usize = 0x3B_1630;
+}
+
+// =============================================================================
+//  PoliceScriptOwner singleton path (provisional reverse names)
+// =============================================================================
+
+pub mod police_script_owner {
+    /// Lazy singleton create/get path.
+    ///
+    /// If global owner is NULL:
+    /// - alloc `0x18`
+    /// - init owner storage
+    /// - store in global
+    /// - register atexit shutdown callback
+    ///
+    /// IDA: `0x1400B3A50`
+    pub const GET_OR_CREATE: usize = 0x0B_3A50;
+
+    /// Initializes owner storage object (`0x18` bytes).
+    ///
+    /// This is NOT a classic C++ ctor with vtable.
+    /// It allocates and initializes a `0x30`-byte root/sentinel node object,
+    /// then sets owner fields:
+    /// - `owner+0x00 = root`
+    /// - `owner+0x08 = 0`
+    /// - `owner+0x10 = 0`
+    ///
+    /// IDA: `0x140EAC480`
+    pub const INIT: usize = 0xEA_C480;
+
+    /// Atexit shutdown path for singleton owner.
+    ///
+    /// IDA: `0x1400B3250`
+    pub const ATEXIT_SHUTDOWN: usize = 0x0B_3250;
+
+    /// Recursive free helper for `0x30`-byte owner nodes.
+    ///
+    /// IDA: `0x1400B3AF0`
+    pub const FREE_NODE_SUBTREE: usize = 0x0B_3AF0;
+
+    /// Owner dispatch by code from `[rdx+8]`.
+    ///
+    /// Observed:
+    /// - `code == 2` -> destroy child
+    /// - `code == 6` -> init child
+    ///
+    /// IDA: `0x140EC4A10`
+    pub const DISPATCH: usize = 0xEC_4A10;
+
+    /// Child destroy/reset path.
+    ///
+    /// IDA: `0x140EC4220`
+    pub const DESTROY_CHILD: usize = 0xEC_4220;
+
+    /// Child init path.
+    ///
+    /// Creates child using `/scripts/common/Police/`,
+    /// stores it at `owner+0x10`, then calls generic entity activation helper.
+    ///
+    /// IDA: `0x140EC4330`
+    pub const INIT_CHILD: usize = 0xEC_4330;
+
+    /// Trivial dispatch branch: returns success immediately.
+    ///
+    /// IDA: `0x140EC50A0`
+    pub const CODE1_NOOP: usize = 0xEC_50A0;
+
+    /// Tiny getter: `return *(u32*)(rcx + 0x10)`.
+    ///
+    /// In this owner/police-related cluster this behaves like:
+    /// - entity guid
+    /// - packed identity
+    /// - code/key used for later Lua/entity lookup
+    ///
+    /// IDA: `0x140EC8350`
+    pub const NODE_GET_ENTITY_GUID: usize = 0xEC_8350;
+
+    /// Owner-side forwarder into active child:
+    /// - child = owner->active_child (`[rcx+0x10]`)
+    /// - tail-jump into child-side remove path
+    ///
+    /// IDA: `0x140EE14A0`
+    pub const REMOVE_POLICEMAN_BY_GUID: usize = 0xEE_14A0;
 }

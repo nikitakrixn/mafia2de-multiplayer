@@ -1,7 +1,7 @@
 //! Глобальные переменные (RVA).
 //!
 //! Все указатели — **двойная косвенность**:
-//! `module_base + RVA` → `*const *mut T`
+//! `module_base + RVA` -> `*const *mut T`
 //!
 //! Чтобы получить объект, нужно дважды разыменовать:
 //! ```ignore
@@ -45,11 +45,6 @@ pub const GAME_CALLBACK_MANAGER: usize = 0x1CA_F038;
 /// IDA: `0x141CD4A28`
 pub const MEMORY_ALLOCATOR: usize = 0x1CD_4A28;
 
-/// Менеджер моделей машин.
-///
-/// IDA: `0x141CAE1D8`
-pub const CAR_MODEL_MANAGER: usize = 0x1CA_E1D8;
-
 /// Трансформация машины по умолчанию.
 ///
 /// IDA: `0x141CBC0D0`
@@ -65,7 +60,7 @@ pub const RESOURCE_LOADER: usize = 0x1CA_52B8;
 /// IDA: `qword_143138FA8`
 /// Доступ: `sub_140D01600()` возвращает этот глобал.
 ///
-/// `+0x98` → Money display component (для popup)
+/// `+0x98` -> Money display component (для popup)
 pub const HUD_MANAGER: usize = 0x313_8FA8;
 
 /// Notify Manager (система нотификаций).
@@ -182,7 +177,7 @@ pub const PLAYER_DATA: usize = 0x1CA_1B38;
 
 /// `g_M2DE_PhysicsWorldManager` — менеджер физического мира.
 ///
-/// Важно: Двойная косвенность: *(module_base + RVA) → PhysicsWorldManager*
+/// Важно: Двойная косвенность: *(module_base + RVA) -> PhysicsWorldManager*
 ///
 /// Содержит список физических объектов.
 /// Используется PlayerActor_GetPosition в режиме 3.
@@ -190,11 +185,24 @@ pub const PLAYER_DATA: usize = 0x1CA_1B38;
 /// IDA: `0x141CABDC8`
 pub const PHYSICS_WORLD_MANAGER: usize = 0x1CA_BDC8;
 
-/// `M2DE_g_EntityDatabase` — глобальная БД всех entity.
+/// `M2DE_g_EntityDatabase` / `M2DE_g_WorldEntityManager` — глобальная БД всех entity.
 ///
-/// Двойная косвенность: *(module_base + RVA) → EntityDB*
-/// Содержит все entity загруженные через SDS.
-/// Используется GetEntityByName и GetEntityByGUID.
+/// ⚠️ ОДИНАРНАЯ косвенность! (НЕ двойная!)
+/// ```text
+/// *(module_base + 0x1CAF788) -> EntityDatabase object directly
+/// ```
+///
+/// Layout (confirmed runtime probe):
+/// ```text
+/// +0x00  vtable (0x14186F360 = WorldEntityManager)
+/// +0x08  ptr    (internal structure 1)
+/// +0x10  ptr    (internal structure 2)
+/// +0x18  u64    entity count (2409 in FreeRide)
+/// +0x38  [entity_ptr; ~4096]  open-addressing hash table
+///        null = empty slot, non-null = direct C_Entity*
+/// ```
+///
+/// Same object as WORLD_ENTITY_MANAGER (0x1CAE1D8). Confirmed runtime.
 ///
 /// IDA: `0x141CAF788`
 pub const ENTITY_DATABASE: usize = 0x1CA_F788;
@@ -210,11 +218,11 @@ pub const ENTITY_WRAPPER_FACTORY_REGISTRY: usize = 0x313_C8B8;
 
 /// `M2DE_g_ScriptWrapperManager` — менеджер Lua script wrappers для entity.
 ///
-/// Двойная косвенность: *(module_base + RVA) → ScriptWrapperManager*
+/// Двойная косвенность: *(module_base + RVA) -> ScriptWrapperManager*
 ///
 /// Lazy-init singleton. Используется для:
-/// - `GetEntityByName` (FNV-1a hash → wrapper)
-/// - `GetEntityByGUID` (tableID → wrapper)
+/// - `GetEntityByName` (FNV-1a hash -> wrapper)
+/// - `GetEntityByGUID` (tableID -> wrapper)
 /// - `CreateCleanEntity` (создание wrapper)
 /// - Кеширование wrappers
 ///
@@ -227,7 +235,7 @@ pub const SCRIPT_WRAPPER_MANAGER: usize = 0x313_60F8;
 
 /// `M2DE_g_SDSManager` — глобальный менеджер SDS системы.
 ///
-/// ⚠️ Двойная косвенность: *(module_base + RVA) → SDSManager*
+/// ⚠️ Двойная косвенность: *(module_base + RVA) -> SDSManager*
 ///
 /// Используется для:
 /// - ActivateStreamMapLine(name)
@@ -292,3 +300,64 @@ pub const CAR_MANAGER: usize = 0x1CA_F7D8;
 /// Используется M2DE_TypeRegistry_CreateByTypeId для аллокации entity.
 /// IDA: `0x141CAE228`
 pub const TYPE_REGISTRY: usize = 0x1CA_E228;
+
+/// `M2DE_g_EntityTypeRegistry` — реестр типов entity 2-12.
+/// ⚠️ Двойная косвенность.
+/// Module ID = 6 (APACK_SCRIPT_MACHINE_MGR). Size: 288 bytes.
+/// IDA: `0x141CAF7C0`
+pub const ENTITY_TYPE_REGISTRY: usize = 0x1CA_F7C0;
+
+/// `M2DE_g_EntityList` — синглтон списка всех entity.
+/// ⚠️ Двойная косвенность.
+/// Module ID = 9 (ENTITY_LIST). Size: 56 bytes. Contains RB-tree.
+/// IDA: `0x141CAF7C8`
+pub const ENTITY_LIST: usize = 0x1CA_F7C8;
+
+/// g_M2DE_EntityIDCounter — 24-bit counter. NOT a pointer, direct dword.
+/// IDA: `0x141C2D450`
+pub const ENTITY_ID_COUNTER: usize = 0x1C2_D450;
+
+/// `g_M2DE_WorldEntityManager` — registers ALL entities.
+/// Double indirection. vtable[1] = RegisterEntity.
+/// IDA: `0x141CAE1D8`
+pub const WORLD_ENTITY_MANAGER: usize = 0x1CA_E1D8;
+
+/// `g_M2DE_StreamingEntityManager` — optional streaming registration.
+/// Double indirection. vtable[+0xB8] = RegisterEntity.
+/// IDA: `0x141CADDB0`
+pub const STREAMING_ENTITY_MANAGER: usize = 0x1CA_DDB0;
+
+/// `M2DE_g_SaveSystemManager` — глобальный save/load manager.
+///
+/// ВАЖНО:
+/// это НЕ police-specific объект.
+/// Подтверждено большим количеством xref:
+/// - массовые `SaveSystem_RegisterHandler`
+/// - SAVE-related logic
+/// - global flags по `+0x30` / `+0x31`
+///
+/// IDA: `qword_141CB11F8`
+pub const SAVE_SYSTEM_MANAGER: usize = 0x1CB_11F8;
+
+/// `M2DE_g_PoliceScriptOwner` — singleton owner для police-script child path.
+///
+/// PROVISIONAL reverse-name.
+///
+/// Confirmed behavior:
+/// - lazy-created через `M2DE_PoliceScriptOwner_GetOrCreate`
+/// - object size = `0x18`
+/// - `+0x10` = active child ptr
+///
+/// IDA: `qword_141C9FBB8`
+pub const POLICE_SCRIPT_OWNER: usize = 0x1C9_FBB8;
+
+/// `M2DE_g_PoliceScriptOwnerShutdownFlag` — shutdown flag owner singleton.
+///
+/// PROVISIONAL reverse-name.
+///
+/// Behavior:
+/// - set to `0` before owner create
+/// - set to `1` during atexit shutdown
+///
+/// IDA: `byte_141C9FBC0`
+pub const POLICE_SCRIPT_OWNER_SHUTDOWN_FLAG: usize = 0x1C9_FBC0;

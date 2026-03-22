@@ -59,3 +59,47 @@ pub mod camera_strings {
     /// Первая: "Distance", индекс 4: "Fov".
     pub const PARAM_NAMES_TABLE: usize = 0x18E_D230;
 }
+
+pub mod entity_strings {
+    /// "C_EntityGuid"
+    pub const C_ENTITY_GUID: usize = 0x186_C238;
+    /// "C_EntityGuid: %u"
+    pub const C_ENTITY_GUID_FMT: usize = 0x186_C220;
+    /// "EntityType"
+    pub const ENTITY_TYPE: usize = 0x186_C278;
+    /// "C_WrapE_EntityType"
+    pub const WRAP_ENTITY_TYPE: usize = 0x186_C288;
+    /// "C_WrapE_EntityMessageType"
+    pub const WRAP_ENTITY_MSG_TYPE: usize = 0x186_C418;
+    /// "C_EntityMessageDispatcher"
+    pub const ENTITY_MSG_DISPATCHER: usize = 0x186_E498;
+    /// "C_CleanEntity"
+    pub const C_CLEAN_ENTITY: usize = 0x18E_A460;
+    /// "C_ScriptEntity"
+    pub const C_SCRIPT_ENTITY: usize = 0x1C2_D408;
+    /// "entitywrapper"
+    pub const ENTITYWRAPPER: usize = 0x191_9BA0;
+    /// "ENTITY_LIST"
+    pub const ENTITY_LIST_MODULE: usize = 0x187_2E00;
+    /// "ENTITY_MSG_DISPATCHER"
+    pub const ENTITY_MSG_DISPATCHER_MODULE: usize = 0x187_2F50;
+}
+
+pub mod police_strings {
+    /// "/scripts/common/Police/"
+    pub const POLICE_DIR: usize = 0x18F_5B28;
+
+    /// "/scripts/common/Police/PoliceMan.lua"
+    pub const POLICEMAN_LUA: usize = 0x184_B360;
+
+    /// "AddPoliceman"
+    pub const ADD_POLICEMAN: usize = 0x184_B3A0;
+
+    /// "onGameInit"
+    pub const ON_GAME_INIT: usize = 0x184_B390;
+}
+
+pub mod phonecall_strings {
+    /// "/scripts/common/phonecalls.lua"
+    pub const PHONECALLS_LUA: usize = 0x18E_B158;
+}
