@@ -1,4 +1,6 @@
 pub mod egui_input;
+pub mod multiplayer_demo;
+pub mod multiplayer_ui;
 pub mod state;
 pub mod state_backup;
 pub mod ui_new;

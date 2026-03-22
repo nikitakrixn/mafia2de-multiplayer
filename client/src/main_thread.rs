@@ -11,9 +11,11 @@ use crate::lua_queue::{self, QueuedLuaCommand};
 
 const MAX_LUA_PER_TICK: usize = 8;
 const STATE_REFRESH_INTERVAL_MS: u64 = 250;
+const PING_UPDATE_INTERVAL_MS: u64 = 2000; // Обновляем пинг каждые 2 секунды
 
 static IN_DRAIN: AtomicBool = AtomicBool::new(false);
 static LAST_STATE_REFRESH_MS: AtomicU64 = AtomicU64::new(0);
+static LAST_PING_UPDATE_MS: AtomicU64 = AtomicU64::new(0);
 static START_TIME: OnceLock<Instant> = OnceLock::new();
 
 fn uptime_ms() -> u64 {
@@ -37,6 +39,7 @@ enum ExecResult {
 pub fn on_main_thread_tick() {
     drain_lua_queue(MAX_LUA_PER_TICK);
     refresh_state_if_needed();
+    update_ping_if_needed();
     crate::player_tracker::update_main_thread();
     crate::player_events::process_pending();
     crate::hooks::try_deferred_present_hook();
@@ -53,6 +56,21 @@ fn refresh_state_if_needed() {
 
     LAST_STATE_REFRESH_MS.store(now, Ordering::Release);
     let _ = crate::state::refresh_from_runtime();
+}
+
+fn update_ping_if_needed() {
+    let now = uptime_ms();
+    let last = LAST_PING_UPDATE_MS.load(Ordering::Acquire);
+
+    if now.saturating_sub(last) < PING_UPDATE_INTERVAL_MS {
+        return;
+    }
+
+    LAST_PING_UPDATE_MS.store(now, Ordering::Release);
+    
+    // Симулируем обновление пинга в демо-режиме
+    // TODO: заменить на реальное обновление пинга от сервера
+    crate::overlay::multiplayer_demo::simulate_ping_updates();
 }
 
 pub fn drain_lua_queue(max_per_tick: usize) -> usize {

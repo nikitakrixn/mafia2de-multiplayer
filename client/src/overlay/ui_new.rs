@@ -7,12 +7,14 @@
 //!   - текущее состояние игры
 //!
 //! - уведомления сверху по центру
+//! - мультиплеер UI (меню, чат, список игроков)
 //!
 //! Рисуем через `egui::Painter` напрямую:
 //! без окон, без интерактива, с минимальной нагрузкой на кадр.
 
 use egui::{Align2, Color32, FontId, Pos2, RichText, Vec2};
 
+use super::multiplayer_ui;
 use super::state::Snapshot;
 
 // =============================================================================
@@ -36,6 +38,9 @@ const BG_OVERLAY: Color32 = Color32::from_rgba_premultiplied(0, 0, 0, 180);
 ///
 /// Вызывается из render-thread каждый кадр после сбора snapshot'а.
 pub fn draw_overlay(ctx: &egui::Context, snap: &Snapshot) {
+    // Обработка горячих клавиш для мультиплеера
+    multiplayer_ui::handle_hotkeys();
+
     // Базовый debug-блок слева сверху
     if snap.show_debug {
         draw_debug(ctx, snap);
@@ -45,6 +50,9 @@ pub fn draw_overlay(ctx: &egui::Context, snap: &Snapshot) {
     if !snap.notification.is_empty() {
         draw_notification(ctx, &snap.notification);
     }
+
+    // Мультиплеер UI (меню, чат, список игроков)
+    multiplayer_ui::draw_multiplayer_ui(ctx);
 }
 
 // =============================================================================
