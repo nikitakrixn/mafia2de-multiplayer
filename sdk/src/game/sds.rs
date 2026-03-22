@@ -1,8 +1,8 @@
 //! SDS (Streaming Data System) — загрузка и управление ресурсами мира.
 
-use crate::game::base;
 use crate::addresses;
 use crate::addresses::fields::sds_line_cache as slc;
+use crate::game::base;
 use crate::memory;
 use common::logger;
 use std::ffi::CString;
@@ -34,9 +34,8 @@ pub fn activate_stream_map_line(name: &str) -> bool {
     };
 
     type ActivateFn = unsafe extern "C" fn(usize, *mut usize, *const i8) -> *mut usize;
-    let func: ActivateFn = unsafe {
-        memory::fn_at(base + addresses::functions::sds::ACTIVATE_STREAM_MAP_LINE)
-    };
+    let func: ActivateFn =
+        unsafe { memory::fn_at(base + addresses::functions::sds::ACTIVATE_STREAM_MAP_LINE) };
 
     let mut result: usize = 0;
     let ret = unsafe { func(loader_ctx, &mut result, c_name.as_ptr()) };
@@ -60,12 +59,12 @@ pub fn find_line_index(name: &str) -> Option<u32> {
     let target_hash = fnv1a_sds_hash(name.as_bytes());
     let base = base();
 
-    let mgr2 = unsafe {
-        memory::read_ptr(base + addresses::globals::SDS_LINE_MANAGER)?
-    };
+    let mgr2 = unsafe { memory::read_ptr(base + addresses::globals::SDS_LINE_MANAGER)? };
     let cache_begin = unsafe { memory::read_ptr_raw(mgr2 + slc::CACHE_BEGIN)? };
     let cache_end = unsafe { memory::read_ptr_raw(mgr2 + slc::CACHE_END)? };
-    if cache_begin == 0 || cache_end <= cache_begin { return None; }
+    if cache_begin == 0 || cache_end <= cache_begin {
+        return None;
+    }
 
     let count = (cache_end - cache_begin) / slc::ENTRY_SIZE;
 
@@ -78,7 +77,11 @@ pub fn find_line_index(name: &str) -> Option<u32> {
             memory::read_value::<u64>(cache_begin + mid * slc::ENTRY_SIZE + slc::ENTRY_HASH)
                 .unwrap_or(0)
         };
-        if h < target_hash { lo = mid + 1; } else { hi = mid; }
+        if h < target_hash {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
     }
 
     if lo < count {

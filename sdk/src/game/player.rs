@@ -11,12 +11,13 @@
 use std::ffi::{CStr, CString};
 use std::time::{Duration, Instant};
 
-use common::logger;
+use super::base;
+use super::entity_types::{EntityType, FactoryType};
 use crate::addresses;
 use crate::addresses::constants;
 use crate::addresses::fields;
 use crate::memory;
-use super::base;
+use common::logger;
 
 /// Обёртка над указателем на C_Human в памяти игры.
 ///
@@ -45,9 +46,9 @@ impl std::fmt::Display for Vec3 {
 }
 
 impl Player {
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Получение указателя на игрока
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Получить активного игрока через GameManager.
     ///
@@ -97,9 +98,9 @@ impl Player {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Базовые аксессоры
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Сырой указатель на C_Human. Для сравнений и передачи между потоками.
     pub fn as_ptr(&self) -> usize {
@@ -127,9 +128,35 @@ impl Player {
         unsafe { memory::read_ptr(self.ptr + fields::player::CONTROL_COMPONENT) }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    /// Packed table_id игрока.
+    pub fn table_id(&self) -> Option<u32> {
+        unsafe { memory::read_value::<u32>(self.ptr + fields::player::TABLE_ID) }
+    }
+
+    /// Factory type byte из packed table_id.
+    pub fn factory_type_byte(&self) -> Option<u8> {
+        self.table_id().map(|tid| (tid & 0xFF) as u8)
+    }
+
+    /// Typed factory type.
+    pub fn factory_type(&self) -> Option<FactoryType> {
+        FactoryType::from_byte(self.factory_type_byte()?)
+    }
+
+    /// Lua-facing entity type.
+    pub fn entity_type(&self) -> Option<EntityType> {
+        let ft = self.factory_type()?;
+        EntityType::from_factory_type(ft as u8)
+    }
+
+    /// Name hash (`entity + 0x30`).
+    pub fn name_hash(&self) -> Option<u64> {
+        unsafe { memory::read_value::<u64>(self.ptr + addresses::fields::entity::NAME_HASH) }
+    }
+
+    // =============================================================================
     //  Деньги — чтение (прямое чтение памяти)
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Прочитать текущий баланс в центах.
     /// $600.00 = 60000 центов.
@@ -157,9 +184,9 @@ impl Player {
         })
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Деньги — запись (прямая запись в память)
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Установить баланс напрямую в память.
     /// Без HUD-уведомления, без обновления статистики.
@@ -187,7 +214,11 @@ impl Player {
     pub fn add_money(&self, delta_cents: i64) -> Option<i64> {
         let current = self.get_money_cents()?;
         let new_amount = current + delta_cents;
-        if self.set_money(new_amount) { Some(new_amount) } else { None }
+        if self.set_money(new_amount) {
+            Some(new_amount)
+        } else {
+            None
+        }
     }
 
     /// Прибавить/вычесть доллары напрямую в памяти.
@@ -195,9 +226,9 @@ impl Player {
         self.add_money(dollars as i64 * 100)
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Деньги — через игровые функции
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Добавить деньги через функцию движка (тихо, без HUD).
     ///
@@ -210,9 +241,8 @@ impl Player {
         };
 
         type ModifyMoneyFn = unsafe extern "C" fn(usize, i64, u8) -> u8;
-        let func: ModifyMoneyFn = unsafe {
-            memory::fn_at(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY)
-        };
+        let func: ModifyMoneyFn =
+            unsafe { memory::fn_at(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY) };
 
         unsafe { func(inv, cents, 1) };
         true
@@ -225,10 +255,8 @@ impl Player {
     /// через прямой доступ к g_HUDManager.
     fn show_money_notification(&self, cents: i64) {
         unsafe {
-            // g_HUDManager → +0x98 → money display component
-            let hud_mgr = match memory::read_ptr(
-                base() + addresses::globals::HUD_MANAGER,
-            ) {
+            // g_HUDManager -> +0x98 -> money display component
+            let hud_mgr = match memory::read_ptr(base() + addresses::globals::HUD_MANAGER) {
                 Some(p) => p,
                 None => {
                     logger::debug("show_money_notification: HUD-менеджер не готов");
@@ -236,9 +264,8 @@ impl Player {
                 }
             };
 
-            let money_display = match memory::read_ptr(
-                hud_mgr + fields::hud_manager::MONEY_DISPLAY,
-            ) {
+            let money_display = match memory::read_ptr(hud_mgr + fields::hud_manager::MONEY_DISPLAY)
+            {
                 Some(p) => p,
                 None => {
                     logger::debug("show_money_notification: компонент денег NULL");
@@ -254,9 +281,8 @@ impl Player {
             );
 
             type UpdateFn = unsafe extern "C" fn(usize, i64, i64) -> i64;
-            let update: UpdateFn = memory::fn_at(
-                base() + addresses::functions::hud::UPDATE_MONEY_COUNTER,
-            );
+            let update: UpdateFn =
+                memory::fn_at(base() + addresses::functions::hud::UPDATE_MONEY_COUNTER);
 
             update(money_display, cents, 0);
         }
@@ -283,9 +309,9 @@ impl Player {
         self.add_money_with_hud(dollars as i64 * 100)
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Позиция
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Получить мировую позицию через функцию движка.
     ///
@@ -299,9 +325,7 @@ impl Player {
             let mut out = Vec3::default();
 
             type GetPosFn = unsafe extern "C" fn(usize, *mut Vec3) -> *mut Vec3;
-            let func: GetPosFn = memory::fn_at(
-                base() + addresses::functions::entity::GET_POS,
-            );
+            let func: GetPosFn = memory::fn_at(base() + addresses::functions::entity::GET_POS);
 
             let ret = func(self.ptr, &mut out as *mut Vec3);
             if ret.is_null() {
@@ -354,18 +378,16 @@ impl Player {
 
         unsafe {
             type SetPosFn = unsafe extern "C" fn(usize, *const Vec3);
-            let func: SetPosFn = memory::fn_at(
-                base() + addresses::functions::entity::SET_POS,
-            );
+            let func: SetPosFn = memory::fn_at(base() + addresses::functions::entity::SET_POS);
 
             func(self.ptr, pos as *const Vec3);
             true
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Оружие
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Добавить оружие с патронами.
     ///
@@ -394,10 +416,10 @@ impl Player {
 
         let result = unsafe { func(inv, weapon_id, ammo as i32) };
         if result != 0 {
-            logger::debug("  → оружие добавлено / патроны обновлены");
+            logger::debug("  -> оружие добавлено / патроны обновлены");
             true
         } else {
-            logger::warn("  → add_weapon вернул 0 (слоты заняты или невалидный ID)");
+            logger::warn("  -> add_weapon вернул 0 (слоты заняты или невалидный ID)");
             false
         }
     }
@@ -413,17 +435,16 @@ impl Player {
         };
 
         type AddAmmoFn = unsafe extern "C" fn(usize, u32, u32);
-        let func: AddAmmoFn = unsafe {
-            memory::fn_at(base() + addresses::functions::player::INVENTORY_ADD_AMMO)
-        };
+        let func: AddAmmoFn =
+            unsafe { memory::fn_at(base() + addresses::functions::player::INVENTORY_ADD_AMMO) };
 
         unsafe { func(inv, weapon_id, ammo) };
         true
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Патроны
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Включить/выключить бесконечные патроны.
     pub fn set_unlimited_ammo(&self, enabled: bool) -> bool {
@@ -440,9 +461,9 @@ impl Player {
         unsafe { memory::read_value::<u8>(inv + fields::inventory::UNLIMITED_AMMO).map(|v| v != 0) }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Оружие в руках
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Проверить, есть ли оружие в руках.
     pub fn has_weapon_in_hand(&self) -> Option<bool> {
@@ -524,9 +545,9 @@ impl Player {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Physics State
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Получить текущее состояние физики.
     pub fn get_phys_state(&self) -> Option<u32> {
@@ -543,28 +564,31 @@ impl Player {
     /// Установить состояние физики.
     /// Безопасный путь через движковую функцию.
     pub fn set_phys_state(&self, state: u32) -> bool {
-        let Some(prop_acc) = (unsafe { memory::read_ptr(self.ptr + fields::player::CONTROL_COMPONENT) }) else {
+        let Some(prop_acc) =
+            (unsafe { memory::read_ptr(self.ptr + fields::player::CONTROL_COMPONENT) })
+        else {
             return false;
         };
 
         type SetPhysStateFn = unsafe extern "C" fn(usize, u32) -> u64;
-        let func: SetPhysStateFn = unsafe {
-            memory::fn_at(base() + addresses::functions::physics::SET_PHYS_STATE)
-        };
+        let func: SetPhysStateFn =
+            unsafe { memory::fn_at(base() + addresses::functions::physics::SET_PHYS_STATE) };
 
         unsafe { func(prop_acc, state) };
         true
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Direction basis from frame matrix
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Получить forward-вектор персонажа (куда смотрит, в плоскости XY).
     pub fn get_forward(&self) -> Option<Vec3> {
         unsafe {
             let frame = memory::read_ptr_raw(self.ptr + fields::player::FRAME_NODE)?;
-            if frame == 0 { return None; }
+            if frame == 0 {
+                return None;
+            }
             // Col1 = Forward
             let x = memory::read_value::<f32>(frame + fields::entity_frame::FORWARD_X)?;
             let y = memory::read_value::<f32>(frame + fields::entity_frame::FORWARD_Y)?;
@@ -581,7 +605,9 @@ impl Player {
     pub fn get_right(&self) -> Option<Vec3> {
         unsafe {
             let frame = memory::read_ptr_raw(self.ptr + fields::player::FRAME_NODE)?;
-            if frame == 0 { return None; }
+            if frame == 0 {
+                return None;
+            }
             // Col0 = Right
             let x = memory::read_value::<f32>(frame + fields::entity_frame::RIGHT_X)?;
             let y = memory::read_value::<f32>(frame + fields::entity_frame::RIGHT_Y)?;
@@ -594,18 +620,17 @@ impl Player {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Управление (блокировка, стиль)
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Заблокировано ли управление игроком.
     pub fn are_controls_locked(&self) -> Option<bool> {
         let control = self.control_component_ptr()?;
 
         type Fn = unsafe extern "C" fn(usize) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::IS_LOCKED)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::IS_LOCKED) };
 
         Some(unsafe { func(control) != 0 })
     }
@@ -618,9 +643,8 @@ impl Player {
         };
 
         type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED) };
 
         unsafe { func(control, locked as u8, 0) };
         true
@@ -637,9 +661,8 @@ impl Player {
         };
 
         type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED) };
 
         unsafe { func(control, 1, 1) };
         true
@@ -661,7 +684,7 @@ impl Player {
         // Нам нужно прочитать *control (разыменовать), а затем +248
         // v3 = *a1;
         // v5 = *(_QWORD *)(*a1 + 248);
-        
+
         let control_ref = unsafe {
             match memory::read_ptr(control) {
                 Some(ptr) => ptr,
@@ -692,8 +715,11 @@ impl Player {
         };
 
         unsafe { func(internal_ptr + 112, locked as u8, 0) };
-        
-        logger::debug(&format!("[player] lock_controls_force({}) called successfully", locked));
+
+        logger::debug(&format!(
+            "[player] lock_controls_force({}) called successfully",
+            locked
+        ));
         true
     }
 
@@ -704,16 +730,19 @@ impl Player {
         let control = self.control_component_ptr()?;
 
         type Fn = unsafe extern "C" fn(usize) -> *const i8;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::GET_STYLE_STR)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::GET_STYLE_STR) };
 
         let ptr = unsafe { func(control) };
         if ptr.is_null() {
             return None;
         }
 
-        Some(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned())
+        Some(
+            unsafe { CStr::from_ptr(ptr) }
+                .to_string_lossy()
+                .into_owned(),
+        )
     }
 
     /// Установить стиль управления по имени.
@@ -729,23 +758,22 @@ impl Player {
         };
 
         type Fn = unsafe extern "C" fn(usize, *const i8) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::SET_STYLE_STR)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::SET_STYLE_STR) };
 
         unsafe { func(control, c_style.as_ptr()) != 0 }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Внутренние хелперы
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Полная цепочка указателей до ячейки с деньгами.
     ///
     /// Путь:
-    /// C_Human → Inventory → slots_start → slot[5] →
-    /// → vec_begin → money_item → wallet.inner →
-    /// → money_container → value (i64 центы)
+    /// C_Human -> Inventory -> slots_start -> slot[5] ->
+    /// -> vec_begin -> money_item -> wallet.inner ->
+    /// -> money_container -> value (i64 центы)
     ///
     /// Любой указатель в цепочке может быть NULL
     /// на ранних стадиях загрузки.
@@ -769,13 +797,17 @@ impl Player {
             let container = memory::read_ptr(inner + fields::wallet_inner::MONEY_CONTAINER_PTR)?;
 
             let addr = container + fields::money_container::VALUE;
-            if memory::is_valid_ptr(addr) { Some(addr) } else { None }
+            if memory::is_valid_ptr(addr) {
+                Some(addr)
+            } else {
+                None
+            }
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Здоровье
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Получить текущее здоровье.
     /// 720.0 = полное на нормальной сложности.
@@ -843,9 +875,9 @@ impl Player {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Флаги: неуязвимость, полубог, смерть
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Жив ли игрок.
     pub fn is_alive(&self) -> Option<bool> {
@@ -855,17 +887,14 @@ impl Player {
     /// Проверить флаг неуязвимости.
     pub fn is_invulnerable(&self) -> Option<bool> {
         unsafe {
-            memory::read_value::<u8>(self.ptr + fields::player::INVULNERABILITY)
-                .map(|v| v != 0)
+            memory::read_value::<u8>(self.ptr + fields::player::INVULNERABILITY).map(|v| v != 0)
         }
     }
 
     /// Установить/снять неуязвимость.
     /// При включённой неуязвимости весь урон пропускается.
     pub fn set_invulnerable(&self, enabled: bool) -> bool {
-        unsafe {
-            memory::write_value(self.ptr + fields::player::INVULNERABILITY, enabled as u8)
-        }
+        unsafe { memory::write_value(self.ptr + fields::player::INVULNERABILITY, enabled as u8) }
     }
 
     /// Проверить режим полубога.
@@ -880,9 +909,9 @@ impl Player {
         unsafe { memory::write_value(self.ptr + fields::player::DEMIGOD, enabled as u8) }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  God Mode (комбинированный)
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Включить/выключить режим бога.
     ///
@@ -901,7 +930,11 @@ impl Player {
         if ok1 && ok2 {
             logger::info(&format!(
                 "God Mode: {}",
-                if enabled { "ВКЛЮЧЁН" } else { "ВЫКЛЮЧЕН" }
+                if enabled {
+                    "ВКЛЮЧЁН"
+                } else {
+                    "ВЫКЛЮЧЕН"
+                }
             ));
             true
         } else {
@@ -915,16 +948,13 @@ impl Player {
         self.is_invulnerable().unwrap_or(false) && self.is_demigod().unwrap_or(false)
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Транспорт
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Проверить, находится ли игрок в транспорте.
     pub fn is_in_vehicle(&self) -> Option<bool> {
-        unsafe {
-            memory::read_ptr_raw(self.ptr + fields::player::OWNER)
-                .map(|owner| owner != 0)
-        }
+        unsafe { memory::read_ptr_raw(self.ptr + fields::player::OWNER).map(|owner| owner != 0) }
     }
 
     /// Получить указатель на текущий транспорт (или None если пешком).
@@ -932,9 +962,9 @@ impl Player {
         unsafe { memory::read_ptr(self.ptr + fields::player::OWNER) }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
     //  Диагностика
-    // ═══════════════════════════════════════════════════════════════
+    // =============================================================================
 
     /// Вывести в лог подробную информацию об игроке.
     /// Полезно при отладке — сразу видно состояние инвентаря,

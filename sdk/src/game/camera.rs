@@ -58,19 +58,19 @@
 //! - Строковая таблица carCameraShoot: `0x1418EE190` (15 записей × 0x20, "Fov" @ index 3)
 //! - Строковая таблица carCameraGamepad: `0x1418EE720` (24 записей × 0x20, "Fov" @ index 10)
 //! - Парсер: `sub_140E7D020` (`M2DE_CameraView_ParseFromXML`)
-//! - Инициализация: `sub_141008230` → `sub_140E767E0` → `sub_140E75CC0` → `sub_140E7D020`
+//! - Инициализация: `sub_141008230` -> `sub_140E767E0` -> `sub_140E75CC0` -> `sub_140E7D020`
 //! - Runtime скан подтвердил все индексы (значения 61..72 в ожидаемых позициях)
 
-use common::logger;
-use crate::{addresses, memory};
 use super::base;
+use crate::{addresses, memory};
+use common::logger;
 
-use addresses::fields::{camera_manager as cm, camera_view as cv};
 use addresses::constants::camera_params;
+use addresses::fields::{camera_manager as cm, camera_view as cv};
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Внутренние хелперы
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Адрес статического объекта CameraManager в памяти процесса.
 ///
@@ -119,29 +119,29 @@ fn is_valid_fov(fov: f32) -> bool {
     fov > 0.0 && fov <= 180.0 && fov.is_finite()
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Все известные FOV-оффсеты
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Все оффсеты базового FOV (абсолютный угол обзора).
 ///
-/// Для каждого: `CameraManager + offset` → `float`.
+/// Для каждого: `CameraManager + offset` -> `float`.
 /// Подтверждено runtime-сканом и строковыми таблицами из IDA.
 const ALL_FOV_OFFSETS: &[usize] = &[
     // Простые car cameras (FOV = params[0])
-    cm::CAR_BUMPER_FOV,         // carCameraBumper
-    cm::CAR_WHEEL_FOV,          // carCameraWheel
-    cm::CAR_HOOD_FOV,           // carCameraHood
-    cm::CAR_LOOKBACK_FOV,       // carCameraLookback
+    cm::CAR_BUMPER_FOV,   // carCameraBumper
+    cm::CAR_WHEEL_FOV,    // carCameraWheel
+    cm::CAR_HOOD_FOV,     // carCameraHood
+    cm::CAR_LOOKBACK_FOV, // carCameraLookback
     // Сложные car cameras (FOV по вычисленному индексу)
-    cm::CAR_DYNAMIC_FOV,        // carCameraDynamic, index 11
-    cm::CAR_DYNAMIC_LONG_FOV,   // carCameraDynamicLong, index 11
-    cm::CAR_SHOOT_FOV,          // carCameraShoot, index 3
-    cm::CAR_GAMEPAD_FOV,        // carCameraGamepad, index 10
+    cm::CAR_DYNAMIC_FOV,      // carCameraDynamic, index 11
+    cm::CAR_DYNAMIC_LONG_FOV, // carCameraDynamicLong, index 11
+    cm::CAR_SHOOT_FOV,        // carCameraShoot, index 3
+    cm::CAR_GAMEPAD_FOV,      // carCameraGamepad, index 10
     // Остальные камеры
-    cm::FPV_FOV,                // fpvCamera
-    cm::DEATH_FOV,              // deathCamera
-    cm::MEELEE_FOV,             // meeleeCamera, index 5
+    cm::FPV_FOV,    // fpvCamera
+    cm::DEATH_FOV,  // deathCamera
+    cm::MEELEE_FOV, // meeleeCamera, index 5
 ];
 
 /// Оффсеты FovMax — дельта FOV на высокой скорости.
@@ -150,35 +150,37 @@ const ALL_FOV_OFFSETS: &[usize] = &[
 /// При принудительной установке FOV обнуляем, чтобы камера
 /// не выходила за целевое значение на скорости.
 const FOV_MAX_OFFSETS: &[usize] = &[
-    cm::CAR_DYNAMIC_FOV_MAX,       // carCameraDynamic, index 16, default ~10
-    cm::CAR_DYNAMIC_LONG_FOV_MAX,  // carCameraDynamicLong, index 16, default ~15
-    cm::CAR_GAMEPAD_FOV_MAX,       // carCameraGamepad, index 14, default ~20
+    cm::CAR_DYNAMIC_FOV_MAX,      // carCameraDynamic, index 16, default ~10
+    cm::CAR_DYNAMIC_LONG_FOV_MAX, // carCameraDynamicLong, index 16, default ~15
+    cm::CAR_GAMEPAD_FOV_MAX,      // carCameraGamepad, index 14, default ~20
 ];
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Чтение текущего состояния
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Проверяет, загружен ли камерный конфиг (playerCamera.xml распарсен).
 ///
 /// Читает Interier DefaultFOV — если это валидный float,
 /// значит `M2DE_CameraManager_LoadPlayerCamera` уже отработал.
 pub fn is_initialized() -> bool {
-    let fov = unsafe {
-        memory::read_value::<f32>(default_fov_addr(cm::INTERIER_VIEW))
-    };
+    let fov = unsafe { memory::read_value::<f32>(default_fov_addr(cm::INTERIER_VIEW)) };
     matches!(fov, Some(v) if is_valid_fov(v))
 }
 
 /// Текущий Interier default FOV (камера в помещении / по умолчанию).
 pub fn get_interier_fov() -> Option<f32> {
-    if !is_initialized() { return None; }
+    if !is_initialized() {
+        return None;
+    }
     unsafe { memory::read_value::<f32>(default_fov_addr(cm::INTERIER_VIEW)) }
 }
 
 /// Текущий Exterier default FOV (камера на улице).
 pub fn get_exterier_fov() -> Option<f32> {
-    if !is_initialized() { return None; }
+    if !is_initialized() {
+        return None;
+    }
     unsafe { memory::read_value::<f32>(default_fov_addr(cm::EXTERIER_VIEW)) }
 }
 
@@ -187,7 +189,9 @@ pub fn get_exterier_fov() -> Option<f32> {
 /// `view_offset` = `cm::INTERIER_VIEW` или `cm::EXTERIER_VIEW`.
 /// State 0 = Stay, 1 = Walk, 2 = Run, и т.д.
 pub fn get_state_fov(view_offset: usize, state: usize) -> Option<f32> {
-    if !is_initialized() || state >= cv::NUM_STATES { return None; }
+    if !is_initialized() || state >= cv::NUM_STATES {
+        return None;
+    }
     unsafe { memory::read_value::<f32>(state_fov_addr(view_offset, state)) }
 }
 
@@ -195,14 +199,16 @@ pub fn get_state_fov(view_offset: usize, state: usize) -> Option<f32> {
 ///
 /// Индексы — см. `constants::camera_params` (0 = Distance, 4 = FOV, и т.д.).
 pub fn get_default_param(view_offset: usize, param_index: usize) -> Option<f32> {
-    if !is_initialized() || param_index >= cv::NUM_PARAMS { return None; }
+    if !is_initialized() || param_index >= cv::NUM_PARAMS {
+        return None;
+    }
     let addr = camera_mgr() + view_offset + cv::DEFAULT_PARAMS + param_index * 4;
     unsafe { memory::read_value::<f32>(addr) }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Запись FOV — Player camera
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Записать FOV для одного PlayerCameraView (Interier или Exterier).
 ///
@@ -241,7 +247,7 @@ pub fn set_player_fov(fov: f32) -> bool {
     let ok_ext = set_view_fov(cm::EXTERIER_VIEW, fov);
 
     if ok_int && ok_ext {
-        logger::info(&format!("[camera] player FOV → {fov:.1}"));
+        logger::info(&format!("[camera] player FOV -> {fov:.1}"));
     } else {
         logger::error("[camera] ошибка записи player FOV");
     }
@@ -253,8 +259,12 @@ pub fn set_player_fov(fov: f32) -> bool {
 ///
 /// Полезно, если нужен разный FOV для помещений и улицы.
 pub fn set_player_fov_separate(interier_fov: f32, exterier_fov: f32) -> bool {
-    if !is_initialized() { return false; }
-    if !is_valid_fov(interier_fov) || !is_valid_fov(exterier_fov) { return false; }
+    if !is_initialized() {
+        return false;
+    }
+    if !is_valid_fov(interier_fov) || !is_valid_fov(exterier_fov) {
+        return false;
+    }
 
     let ok_int = set_view_fov(cm::INTERIER_VIEW, interier_fov);
     let ok_ext = set_view_fov(cm::EXTERIER_VIEW, exterier_fov);
@@ -262,9 +272,9 @@ pub fn set_player_fov_separate(interier_fov: f32, exterier_fov: f32) -> bool {
     ok_int && ok_ext
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Запись FOV — Все камеры
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Установить FOV для ВСЕХ камер: player + car + misc.
 ///
@@ -304,7 +314,7 @@ pub fn set_all_fov(fov: f32) -> bool {
     }
 
     if ok_player && ok_car {
-        logger::info(&format!("[camera] all FOV → {fov:.1}"));
+        logger::info(&format!("[camera] all FOV -> {fov:.1}"));
     } else {
         logger::warn(&format!(
             "[camera] partial FOV write (player={ok_player}, car={ok_car})"
@@ -314,22 +324,26 @@ pub fn set_all_fov(fov: f32) -> bool {
     ok_player && ok_car
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Запись произвольного параметра камеры
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Записать произвольный параметр в DefaultParams + все 15 states.
 ///
 /// Работает только с PlayerCameraView (Interier/Exterier).
 /// Для car cameras используй `set_car_camera_param()`.
 pub fn set_default_param(view_offset: usize, param_index: usize, value: f32) -> bool {
-    if !is_initialized() || param_index >= cv::NUM_PARAMS { return false; }
+    if !is_initialized() || param_index >= cv::NUM_PARAMS {
+        return false;
+    }
 
     let mgr = camera_mgr();
 
     // DefaultParams
     let default_addr = mgr + view_offset + cv::DEFAULT_PARAMS + param_index * 4;
-    unsafe { memory::write_value(default_addr, value); }
+    unsafe {
+        memory::write_value(default_addr, value);
+    }
 
     // Все states + flags
     for n in 0..cv::NUM_STATES {
@@ -354,9 +368,9 @@ pub fn set_car_camera_param(params_offset: usize, param_index: usize, value: f32
     unsafe { memory::write_value(addr, value) }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Диагностика
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Вывести текущее состояние камерной системы в лог.
 ///
@@ -392,7 +406,8 @@ pub fn log_status() {
     // Car camera FOV
     let mgr = camera_mgr();
     let dyn_fov = unsafe { memory::read_value::<f32>(mgr + cm::CAR_DYNAMIC_FOV) }.unwrap_or(0.0);
-    let dyn_max = unsafe { memory::read_value::<f32>(mgr + cm::CAR_DYNAMIC_FOV_MAX) }.unwrap_or(0.0);
+    let dyn_max =
+        unsafe { memory::read_value::<f32>(mgr + cm::CAR_DYNAMIC_FOV_MAX) }.unwrap_or(0.0);
     logger::info(&format!(
         "[camera] carDynamic: Fov={dyn_fov:.1}, FovMax={dyn_max:.1}"
     ));
@@ -411,10 +426,26 @@ pub fn scan_car_camera_params() {
     let mgr = camera_mgr();
 
     let cameras: &[(&str, usize, usize)] = &[
-        ("carCameraDynamic",     cm::CAR_DYNAMIC_PARAMS,      cm::CAR_DYNAMIC_PARAM_COUNT),
-        ("carCameraDynamicLong", cm::CAR_DYNAMIC_LONG_PARAMS,  cm::CAR_DYNAMIC_LONG_PARAM_COUNT),
-        ("carCameraShoot",       cm::CAR_SHOOT_PARAMS,         cm::CAR_SHOOT_PARAM_COUNT),
-        ("carCameraGamepad",     cm::CAR_GAMEPAD_PARAMS,       cm::CAR_GAMEPAD_PARAM_COUNT),
+        (
+            "carCameraDynamic",
+            cm::CAR_DYNAMIC_PARAMS,
+            cm::CAR_DYNAMIC_PARAM_COUNT,
+        ),
+        (
+            "carCameraDynamicLong",
+            cm::CAR_DYNAMIC_LONG_PARAMS,
+            cm::CAR_DYNAMIC_LONG_PARAM_COUNT,
+        ),
+        (
+            "carCameraShoot",
+            cm::CAR_SHOOT_PARAMS,
+            cm::CAR_SHOOT_PARAM_COUNT,
+        ),
+        (
+            "carCameraGamepad",
+            cm::CAR_GAMEPAD_PARAMS,
+            cm::CAR_GAMEPAD_PARAM_COUNT,
+        ),
     ];
 
     for &(name, params_offset, count) in cameras {
@@ -426,7 +457,11 @@ pub fn scan_car_camera_params() {
             let addr = mgr + params_offset + i * 4;
             let val = unsafe { memory::read_value::<f32>(addr) }.unwrap_or(0.0);
 
-            let marker = if (50.0..=120.0).contains(&val) { " ◄ FOV?" } else { "" };
+            let marker = if (50.0..=120.0).contains(&val) {
+                " ◄ FOV?"
+            } else {
+                ""
+            };
             logger::info(&format!(
                 "  [{i:2}] +0x{:04X} = {val:12.4}{marker}",
                 params_offset + i * 4

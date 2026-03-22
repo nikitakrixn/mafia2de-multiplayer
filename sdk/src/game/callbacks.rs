@@ -10,16 +10,15 @@
 use common::logger;
 
 use crate::{
-    addresses,
-    memory,
+    addresses, memory,
     structures::{CallbackEventDesc, CallbackFunctionEntry, GameCallbackManager},
 };
 
 use super::base;
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Типы для удобного доступа
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Информация об одном зарегистрированном событии.
 ///
@@ -68,9 +67,9 @@ pub struct CallbackFunctionInfo {
     pub reserved: i32,
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Чтение реестра
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Указатель на глобальный GameCallbackManager.
 pub fn get_manager_ptr() -> Option<usize> {
@@ -164,7 +163,8 @@ pub fn get_functions_for_event(event_id: i32) -> Vec<CallbackFunctionInfo> {
     for i in 0..func_count {
         let entry_addr = event.funcs_begin + i * entry_size;
 
-        let Some(entry) = (unsafe { memory::read_value::<CallbackFunctionEntry>(entry_addr) }) else {
+        let Some(entry) = (unsafe { memory::read_value::<CallbackFunctionEntry>(entry_addr) })
+        else {
             continue;
         };
 
@@ -184,9 +184,9 @@ pub fn get_functions_for_event(event_id: i32) -> Vec<CallbackFunctionInfo> {
     result
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Дамп в лог
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Вывести в лог ключевые lifecycle-события.
 ///
@@ -222,8 +222,7 @@ pub fn dump_interesting_events() {
         if let Some(event) = find_event_by_id(id) {
             logger::info(&format!(
                 "  \"{}\" id={} dispatch={} funcs={} addr=0x{:X}",
-                event.name, event.event_id, event.in_dispatch,
-                event.func_count, event.desc_addr,
+                event.name, event.event_id, event.in_dispatch, event.func_count, event.desc_addr,
             ));
         }
     }
@@ -261,8 +260,7 @@ pub fn dump_registry() {
     for (i, event) in events.iter().enumerate() {
         logger::info(&format!(
             "[callbacks][{i:02}] id={} dispatch={} funcs={} \"{}\" addr=0x{:X}",
-            event.event_id, event.in_dispatch, event.func_count,
-            event.name, event.desc_addr,
+            event.event_id, event.in_dispatch, event.func_count, event.name, event.desc_addr,
         ));
 
         // Для каждого события — его callback'и (debug-уровень, чтобы не засорять)
@@ -270,17 +268,22 @@ pub fn dump_registry() {
             logger::debug(&format!(
                 "  [{j:02}] obj=0x{:X} fn=0x{:X} prio={} flags=0x{:02X} mask=0x{:X} \
                  float={} int={} addr=0x{:X}",
-                func.callback_object, func.callback_function,
-                func.priority, func.flags, func.config_mask,
-                func.float_param, func.int_param, func.entry_addr,
+                func.callback_object,
+                func.callback_function,
+                func.priority,
+                func.flags,
+                func.config_mask,
+                func.float_param,
+                func.int_param,
+                func.entry_addr,
             ));
         }
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Вспомогательные функции
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Прочитать null-terminated строку из фиксированного буфера.
 fn fixed_c_string(bytes: &[u8]) -> String {

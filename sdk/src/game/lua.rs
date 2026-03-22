@@ -13,33 +13,33 @@ use std::ffi::{CStr, CString};
 
 use common::logger;
 
-use crate::{addresses, memory};
-use crate::addresses::fields;
 use super::base;
+use crate::addresses::fields;
+use crate::{addresses, memory};
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Типы Lua API
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// luaL_loadbuffer с 5-м параметром (особенность этой сборки).
 /// Всегда передаём 0 в extra.
 type LuaLoadBufferFn = unsafe extern "C" fn(
-    usize,      // lua_State*
-    *const i8,  // buffer
-    usize,      // size
-    *const i8,  // chunk name
-    usize,      // extra (всегда 0)
+    usize,     // lua_State*
+    *const i8, // buffer
+    usize,     // size
+    *const i8, // chunk name
+    usize,     // extra (всегда 0)
 ) -> i32;
 
 type LuaLoadStringFn = unsafe extern "C" fn(usize, *const i8) -> i32;
-type LuaPcallFn      = unsafe extern "C" fn(usize, i32, i32, i32) -> i32;
-type LuaTolStringFn  = unsafe extern "C" fn(usize, i32, *mut usize) -> *const i8;
-type LuaSetTopFn     = unsafe extern "C" fn(usize, i32);
-type LuaGetTopFn     = unsafe extern "C" fn(usize) -> i32;
+type LuaPcallFn = unsafe extern "C" fn(usize, i32, i32, i32) -> i32;
+type LuaTolStringFn = unsafe extern "C" fn(usize, i32, *mut usize) -> *const i8;
+type LuaSetTopFn = unsafe extern "C" fn(usize, i32);
+type LuaGetTopFn = unsafe extern "C" fn(usize) -> i32;
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Получение указателей на Lua API функции
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 fn lua_loadbuffer() -> LuaLoadBufferFn {
     unsafe { memory::fn_at(base() + addresses::functions::lua::LOADBUFFER) }
@@ -65,9 +65,9 @@ fn lua_gettop() -> LuaGetTopFn {
     unsafe { memory::fn_at(base() + addresses::functions::lua::GETTOP) }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Stack guard — автоматическое восстановление стека при выходе
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Восстанавливает вершину Lua стека при выходе из scope.
 /// Защищает от утечки элементов стека при ошибках.
@@ -82,9 +82,9 @@ impl Drop for LuaStackGuard {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Обнаружение Lua State
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Информация о цепочке до Lua State.
 /// Полезна для диагностики — видно все промежуточные указатели.
@@ -101,17 +101,13 @@ pub struct LuaChainInfo {
 /// Пройти цепочку до ScriptMachine[index].
 ///
 /// Путь:
-/// g_ScriptMachineManager → vector (manager+0x08) →
-/// → array[index] → ScriptMachine → lua_State (sm+0x70)
+/// g_ScriptMachineManager -> vector (manager+0x08) ->
+/// -> array[index] -> ScriptMachine -> lua_State (sm+0x70)
 pub fn discover(index: usize) -> Option<LuaChainInfo> {
     unsafe {
-        let manager = memory::read_ptr(
-            base() + addresses::globals::SCRIPT_MACHINE_MANAGER,
-        )?;
+        let manager = memory::read_ptr(base() + addresses::globals::SCRIPT_MACHINE_MANAGER)?;
 
-        let vector = memory::read_ptr(
-            manager + fields::script_machine_manager::VECTOR,
-        )?;
+        let vector = memory::read_ptr(manager + fields::script_machine_manager::VECTOR)?;
 
         let begin = memory::read_ptr_raw(vector + fields::std_vector::BEGIN)?;
         let end = memory::read_ptr_raw(vector + fields::std_vector::END)?;
@@ -126,9 +122,7 @@ pub fn discover(index: usize) -> Option<LuaChainInfo> {
         }
 
         let machine = memory::read_ptr(begin + index * 8)?;
-        let lua_state = memory::read_ptr(
-            machine + fields::script_machine::LUA_STATE,
-        )?;
+        let lua_state = memory::read_ptr(machine + fields::script_machine::LUA_STATE)?;
 
         Some(LuaChainInfo {
             manager,
@@ -167,17 +161,16 @@ pub fn log_chain() {
         Some(info) => {
             logger::info(&format!(
                 "Lua: manager=0x{:X} vector=0x{:X} sm=0x{:X} L=0x{:X} (machines: {})",
-                info.manager, info.vector, info.machine,
-                info.lua_state, info.machine_count,
+                info.manager, info.vector, info.machine, info.lua_state, info.machine_count,
             ));
         }
         None => logger::warn("Lua: цепочка не готова"),
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Выполнение Lua кода
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Выполнить произвольный Lua chunk.
 ///
@@ -190,16 +183,15 @@ pub fn exec(code: &str) -> Result<(), String> {
 
 /// Выполнить chunk с указанным именем (для диагностики ошибок).
 pub fn exec_named(code: &str, chunk_name: &str) -> Result<(), String> {
-    let info = discover_main()
-        .ok_or_else(|| "Lua VM не готова".to_string())?;
+    let info = discover_main().ok_or_else(|| "Lua VM не готова".to_string())?;
     let l = info.lua_state;
 
     // Запоминаем вершину стека — восстановим при выходе
     let old_top = unsafe { lua_gettop()(l) };
     let _guard = LuaStackGuard { l, top: old_top };
 
-    let chunk_name = CString::new(chunk_name)
-        .map_err(|_| "имя chunk'а содержит NUL-байт".to_string())?;
+    let chunk_name =
+        CString::new(chunk_name).map_err(|_| "имя chunk'а содержит NUL-байт".to_string())?;
 
     // Загрузить chunk в стек
     let load_status = unsafe {
@@ -222,10 +214,7 @@ pub fn exec_named(code: &str, chunk_name: &str) -> Result<(), String> {
     // Вызвать загруженный chunk
     let call_status = unsafe { lua_pcall()(l, 0, 0, 0) };
     if call_status != 0 {
-        return Err(format!(
-            "lua_pcall({call_status}): {}",
-            last_lua_error(l),
-        ));
+        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l),));
     }
 
     Ok(())
@@ -240,15 +229,14 @@ pub fn eval_chunk(code: &str) -> Result<Option<String>, String> {
 
 /// Выполнить chunk с именем и забрать один результат.
 pub fn eval_chunk_named(code: &str, chunk_name: &str) -> Result<Option<String>, String> {
-    let info = discover_main()
-        .ok_or_else(|| "Lua VM не готова".to_string())?;
+    let info = discover_main().ok_or_else(|| "Lua VM не готова".to_string())?;
     let l = info.lua_state;
 
     let old_top = unsafe { lua_gettop()(l) };
     let _guard = LuaStackGuard { l, top: old_top };
 
-    let chunk_name = CString::new(chunk_name)
-        .map_err(|_| "имя chunk'а содержит NUL-байт".to_string())?;
+    let chunk_name =
+        CString::new(chunk_name).map_err(|_| "имя chunk'а содержит NUL-байт".to_string())?;
 
     let load_status = unsafe {
         lua_loadbuffer()(
@@ -270,10 +258,7 @@ pub fn eval_chunk_named(code: &str, chunk_name: &str) -> Result<Option<String>, 
     // nresults=1 — просим один результат
     let call_status = unsafe { lua_pcall()(l, 0, 1, 0) };
     if call_status != 0 {
-        return Err(format!(
-            "lua_pcall({call_status}): {}",
-            last_lua_error(l),
-        ));
+        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l),));
     }
 
     // Читаем результат с вершины стека
@@ -307,15 +292,13 @@ pub fn eval_expression(expr: &str) -> Result<String, String> {
 /// Этот метод нужен если по какой-то причине loadbuffer
 /// ведёт себя странно.
 pub fn exec_via_loadstring(code: &str) -> Result<(), String> {
-    let info = discover_main()
-        .ok_or_else(|| "Lua VM не готова".to_string())?;
+    let info = discover_main().ok_or_else(|| "Lua VM не готова".to_string())?;
     let l = info.lua_state;
 
     let old_top = unsafe { lua_gettop()(l) };
     let _guard = LuaStackGuard { l, top: old_top };
 
-    let code = CString::new(code)
-        .map_err(|_| "код содержит NUL-байт".to_string())?;
+    let code = CString::new(code).map_err(|_| "код содержит NUL-байт".to_string())?;
 
     let load_status = unsafe { lua_loadstring()(l, code.as_ptr()) };
     if load_status != 0 {
@@ -327,18 +310,15 @@ pub fn exec_via_loadstring(code: &str) -> Result<(), String> {
 
     let call_status = unsafe { lua_pcall()(l, 0, 0, 0) };
     if call_status != 0 {
-        return Err(format!(
-            "lua_pcall({call_status}): {}",
-            last_lua_error(l),
-        ));
+        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l),));
     }
 
     Ok(())
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Вспомогательные функции
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Прочитать сообщение об ошибке с вершины Lua стека.
 ///

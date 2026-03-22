@@ -13,13 +13,8 @@
 use common::logger;
 
 use crate::{
-    addresses,
-    memory,
-    structures::{
-        CRenderDeviceD3D11,
-        SwapChainManager,
-        SwapChainWrapper,
-    },
+    addresses, memory,
+    structures::{CRenderDeviceD3D11, SwapChainManager, SwapChainWrapper},
 };
 
 use super::base;
@@ -49,9 +44,9 @@ pub struct RenderRuntimeInfo {
     pub back_buffer_ptr: usize,
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Чтение основных объектов
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Указатель на глобальный M2DE_C_RenderDeviceD3D11.
 pub fn get_render_device_ptr() -> Option<usize> {
@@ -91,9 +86,9 @@ pub fn get_swapchain_wrapper() -> Option<SwapChainWrapper> {
     unsafe { memory::read_value::<SwapChainWrapper>(ptr) }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Отдельные указатели на DX-объекты
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// IDXGISwapChain1* — нужен для Present hook.
 pub fn get_swapchain_ptr() -> Option<usize> {
@@ -144,9 +139,9 @@ pub fn get_backbuffer_texture_ptr() -> Option<usize> {
     memory::is_valid_ptr(ptr).then_some(ptr)
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Параметры рендера
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// HWND окна игры.
 pub fn get_hwnd() -> Option<usize> {
@@ -178,14 +173,14 @@ pub fn is_tearing_supported() -> Option<bool> {
     Some(mgr.tearing_supported != 0)
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Проверка готовности
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Готов ли render path для overlay.
 ///
-/// Проверяет всю цепочку: render device → device → context →
-/// → swapchain → RTV. Если хотя бы одно звено NULL — не готов.
+/// Проверяет всю цепочку: render device -> device -> context ->
+/// -> swapchain -> RTV. Если хотя бы одно звено NULL — не готов.
 pub fn is_overlay_ready() -> bool {
     get_render_device_ptr().is_some()
         && get_d3d_device_ptr().is_some()
@@ -194,7 +189,7 @@ pub fn is_overlay_ready() -> bool {
         && get_backbuffer_rtv_ptr().is_some()
 }
 
-/// D3D_FEATURE_LEVEL → человекочитаемое имя.
+/// D3D_FEATURE_LEVEL -> человекочитаемое имя.
 pub fn feature_level_name(level: u32) -> &'static str {
     match level {
         0x9100 => "9.1",
@@ -208,9 +203,9 @@ pub fn feature_level_name(level: u32) -> &'static str {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Диагностика
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Собрать полный снимок состояния рендера.
 pub fn get_runtime_info() -> Option<RenderRuntimeInfo> {
@@ -253,23 +248,17 @@ pub fn dump_runtime_info() {
 
     logger::info(&format!(
         "[render] device=0x{:X} factory=0x{:X} d3d_device=0x{:X} context=0x{:X}",
-        info.render_device_ptr,
-        info.dxgi_factory_ptr,
-        info.d3d_device_ptr,
-        info.d3d_context_ptr,
+        info.render_device_ptr, info.dxgi_factory_ptr, info.d3d_device_ptr, info.d3d_context_ptr,
     ));
 
     logger::info(&format!(
         "[render] wrapper=0x{:X} swapchain=0x{:X} hwnd=0x{:X}",
-        info.swapchain_wrapper_ptr,
-        info.swapchain_ptr,
-        info.hwnd,
+        info.swapchain_wrapper_ptr, info.swapchain_ptr, info.hwnd,
     ));
 
     logger::info(&format!(
         "[render] {}x{} rtv=0x{:X} dsv=0x{:X} backbuffer=0x{:X}",
-        info.width, info.height,
-        info.rtv_ptr, info.dsv_ptr, info.back_buffer_ptr,
+        info.width, info.height, info.rtv_ptr, info.dsv_ptr, info.back_buffer_ptr,
     ));
 
     logger::info(&format!(

@@ -1,99 +1,138 @@
-use crate::game::entity;
-use crate::game::player::Vec3;
-use crate::addresses::fields;
-use crate::addresses::constants::entity_types;
+use crate::addresses::functions;
+use crate::game::{
+    entity,
+    entity_ref::EntityRef,
+    entity_types::{EntityType, FactoryType},
+    player::Vec3,
+};
 use crate::memory;
 use common::logger;
 
+/// Высокоуровневая обёртка над humanoid entity по имени.
+///
+/// Подходит для Joe / Henry / других NPC, доступных через FindByName.
 pub struct Npc {
-    native: usize,
+    entity: EntityRef,
     name: String,
 }
 
 impl Npc {
+    /// Найти NPC по имени.
+    ///
+    /// Пропускает только human/player factory types.
     pub fn find(name: &str) -> Option<Self> {
-        let native = entity::find_native_entity(name)?;
+        let entity = entity::find_entity_ref_by_name(name)?;
 
-        // Проверить что это human (type 0x0E или 0x10)
-        let entity_type = unsafe {
-            memory::read_value::<u8>(native + fields::player::ENTITY_TYPE)?
+        let Some(ft) = entity.factory_type() else {
+            logger::warn(&format!("[npc] '{}' has unknown factory type", name));
+            return None;
         };
-        if entity_type != entity_types::HUMAN_NPC
-            && entity_type != entity_types::HUMAN_PLAYER
-        {
+
+        if !matches!(ft, FactoryType::HumanNpc | FactoryType::Player) {
             logger::warn(&format!(
-                "[npc] '{}' is not a human (type=0x{:02X})", name, entity_type
+                "[npc] '{}' is not humanoid (factory={})",
+                name,
+                ft.display_name()
             ));
             return None;
         }
 
-        Some(Self { native, name: name.to_string() })
+        Some(Self {
+            entity,
+            name: name.to_string(),
+        })
     }
 
-    pub fn ptr(&self) -> usize { self.native }
+    /// Сырой native pointer.
+    pub fn ptr(&self) -> usize {
+        self.entity.ptr()
+    }
+
+    /// Typed low-level entity reference.
+    pub fn entity(&self) -> EntityRef {
+        self.entity
+    }
+
+    /// FactoryType enum.
+    pub fn factory_type(&self) -> Option<FactoryType> {
+        self.entity.factory_type()
+    }
+
+    /// Lua-facing entity type.
+    pub fn entity_type(&self) -> Option<EntityType> {
+        self.entity.lua_entity_type()
+    }
 
     /// Жив ли NPC.
     pub fn is_alive(&self) -> bool {
-        unsafe {
-            memory::read_value::<u8>(self.native + fields::player::IS_DEAD)
-                .map(|v| v == 0)
-                .unwrap_or(false)
-        }
+        self.entity.is_alive().unwrap_or(false)
     }
 
     /// Текущее здоровье.
     pub fn health(&self) -> f32 {
-        unsafe {
-            memory::read_value::<f32>(self.native + fields::player::CURRENT_HEALTH)
-                .unwrap_or(0.0)
-        }
+        self.entity.health().unwrap_or(0.0)
     }
 
     /// Установить здоровье.
     pub fn set_health(&self, hp: f32) {
-        unsafe { memory::write_value(self.native + fields::player::CURRENT_HEALTH, hp); }
+        unsafe {
+            memory::write_value(
+                self.entity.ptr() + crate::addresses::fields::player::CURRENT_HEALTH,
+                hp,
+            );
+        }
     }
 
     /// Сделать неуязвимым.
     pub fn set_invulnerable(&self, enabled: bool) {
-        unsafe { memory::write_value(self.native + fields::player::INVULNERABILITY, enabled as u8); }
+        unsafe {
+            memory::write_value(
+                self.entity.ptr() + crate::addresses::fields::player::INVULNERABILITY,
+                enabled as u8,
+            );
+        }
     }
 
     /// Установить полубога.
     pub fn set_demigod(&self, enabled: bool) {
-        unsafe { memory::write_value(self.native + fields::player::DEMIGOD, enabled as u8); }
+        unsafe {
+            memory::write_value(
+                self.entity.ptr() + crate::addresses::fields::player::DEMIGOD,
+                enabled as u8,
+            );
+        }
     }
 
     /// Получить позицию.
     pub fn get_position(&self) -> Option<Vec3> {
-        unsafe {
-            let mut out = Vec3::default();
-            type GetPosFn = unsafe extern "C" fn(usize, *mut Vec3) -> *mut Vec3;
-            let func: GetPosFn = memory::fn_at(
-                crate::game::base() + crate::addresses::functions::entity::GET_POS,
-            );
-            let ret = func(self.native, &mut out);
-            if ret.is_null() { None } else { Some(out) }
-        }
+        self.entity.position()
     }
 
-    /// Телепортировать NPC.
+    /// Телепортировать NPC через native SetPos.
     pub fn set_position(&self, pos: &Vec3) {
         unsafe {
             type SetPosFn = unsafe extern "C" fn(usize, *const Vec3);
-            let func: SetPosFn = memory::fn_at(
-                crate::game::base() + crate::addresses::functions::entity::SET_POS,
-            );
-            func(self.native, pos);
+            let func: SetPosFn = memory::fn_at(crate::game::base() + functions::entity::SET_POS);
+            func(self.entity.ptr(), pos);
         }
     }
 
     /// Вывести инфо в лог.
     pub fn log_info(&self) {
         let pos = self.get_position().unwrap_or_default();
+        let ft = self
+            .factory_type()
+            .map(|t| t.display_name())
+            .unwrap_or("UNKNOWN");
+
         logger::info(&format!(
-            "[npc] {} | ptr=0x{:X} | HP={:.0} | alive={} | pos={}",
-            self.name, self.native, self.health(), self.is_alive(), pos,
+            "[npc] {} | ptr=0x{:X} | type={} | HP={:.0} | alive={} | pos={}",
+            self.name,
+            self.entity.ptr(),
+            ft,
+            self.health(),
+            self.is_alive(),
+            pos,
         ));
     }
 }
