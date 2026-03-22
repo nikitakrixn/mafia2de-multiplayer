@@ -82,7 +82,7 @@ pub fn process_pending() {
             return;
         }
     };
-    
+
     for ev in &drained {
         log_event(ev);
     }

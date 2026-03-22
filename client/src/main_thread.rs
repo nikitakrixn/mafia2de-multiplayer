@@ -17,10 +17,7 @@ static LAST_STATE_REFRESH_MS: AtomicU64 = AtomicU64::new(0);
 static START_TIME: OnceLock<Instant> = OnceLock::new();
 
 fn uptime_ms() -> u64 {
-    START_TIME
-        .get_or_init(Instant::now)
-        .elapsed()
-        .as_millis() as u64
+    START_TIME.get_or_init(Instant::now).elapsed().as_millis() as u64
 }
 
 struct ReentrancyGuard;
@@ -104,10 +101,7 @@ fn exec_one(cmd: QueuedLuaCommand) -> ExecResult {
             if err.contains("Lua VM not ready") {
                 ExecResult::NotReady(cmd)
             } else {
-                logger::error(&format!(
-                    "[lua-main] ошибка: {} -> {}",
-                    cmd.chunk_name, err
-                ));
+                logger::error(&format!("[lua-main] ошибка: {} -> {}", cmd.chunk_name, err));
                 ExecResult::Failed
             }
         }

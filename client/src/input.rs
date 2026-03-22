@@ -3,10 +3,10 @@
 use std::time::Duration;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 
-use common::logger;
 use crate::overlay::egui_input::just_pressed;
 use crate::state;
 use crate::utils;
+use common::logger;
 
 const INPUT_POLL_MS: u64 = 16;
 

@@ -3,30 +3,26 @@
 mod events;
 mod hooks;
 mod human_messages;
-pub mod input;
+mod input;
 mod lua_queue;
 mod main_thread;
-pub mod overlay;
+mod overlay;
 mod player_events;
 mod player_tracker;
+mod state;
 mod utils;
-pub mod state;
 
+use common::logger;
 use std::ffi::c_void;
 use windows::Win32::Foundation::HINSTANCE;
 use windows::Win32::System::Console::AllocConsole;
-use common::logger;
 
 const DLL_PROCESS_ATTACH: u32 = 1;
 const DLL_PROCESS_DETACH: u32 = 0;
 
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
-extern "system" fn DllMain(
-    _module: HINSTANCE,
-    reason: u32,
-    _reserved: *mut c_void,
-) -> i32 {
+extern "system" fn DllMain(_module: HINSTANCE, reason: u32, _reserved: *mut c_void) -> i32 {
     match reason {
         DLL_PROCESS_ATTACH => {
             std::thread::spawn(initialize);
@@ -42,7 +38,9 @@ extern "system" fn DllMain(
 }
 
 fn initialize() {
-    unsafe { let _ = AllocConsole(); }
+    unsafe {
+        let _ = AllocConsole();
+    }
 
     if let Err(e) = logger::init(
         logger::Level::Debug,

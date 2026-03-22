@@ -90,10 +90,14 @@ pub fn sync_from_game() {
     let now = uptime_ms();
 
     // Проверяем наличие активного игрока
-    let Some(player) = Player::get_active() else { return; };
-    if !player.is_ready() { return; }
+    let Some(player) = Player::get_active() else {
+        return;
+    };
+    if !player.is_ready() {
+        return;
+    }
 
-    // ── Позиция игрока (каждые 500мс) ──
+    // Позиция игрока (каждые 500мс)
     let last_pos = s.last_pos_update_ms.load(Ordering::Relaxed);
     if now.saturating_sub(last_pos) >= POS_UPDATE_INTERVAL_MS {
         if let Some(pos) = player.get_position() {
@@ -126,10 +130,15 @@ pub fn snapshot() -> Snapshot {
     let s = state();
 
     // Уведомление — показываем 3 секунды
-    let notification = s.notification.lock().ok()
-        .and_then(|n| n.as_ref()
-            .filter(|(_, t)| t.elapsed().as_secs() < 3)
-            .map(|(text, _)| text.clone()))
+    let notification = s
+        .notification
+        .lock()
+        .ok()
+        .and_then(|n| {
+            n.as_ref()
+                .filter(|(_, t)| t.elapsed().as_secs() < 3)
+                .map(|(text, _)| text.clone())
+        })
         .unwrap_or_default();
 
     let game_state = match crate::state::get() {
@@ -139,7 +148,8 @@ pub fn snapshot() -> Snapshot {
         crate::state::GameSessionState::InGame => "В игре",
         crate::state::GameSessionState::Paused => "Пауза",
         crate::state::GameSessionState::ShuttingDown => "Выход",
-    }.to_string();
+    }
+    .to_string();
 
     Snapshot {
         show_debug: s.show_debug.load(Ordering::Relaxed),

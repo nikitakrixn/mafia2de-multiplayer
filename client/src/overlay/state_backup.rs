@@ -7,7 +7,6 @@ use std::mem::ManuallyDrop;
 use windows::Win32::Graphics::Direct3D::D3D_PRIMITIVE_TOPOLOGY;
 use windows::Win32::Graphics::Direct3D11::*;
 
-
 pub(crate) unsafe fn borrow_context(ptr: usize) -> ManuallyDrop<ID3D11DeviceContext> {
     ManuallyDrop::new(unsafe { std::mem::transmute::<usize, ID3D11DeviceContext>(ptr) })
 }
@@ -72,7 +71,9 @@ impl D3D11StateBackup {
 
         let mut depth_stencil_state: Option<ID3D11DepthStencilState> = None;
         let mut stencil_ref = 0u32;
-        unsafe { ctx.OMGetDepthStencilState(Some(&mut depth_stencil_state), Some(&mut stencil_ref)) };
+        unsafe {
+            ctx.OMGetDepthStencilState(Some(&mut depth_stencil_state), Some(&mut stencil_ref))
+        };
 
         let rasterizer_state = unsafe { ctx.RSGetState().ok() };
 
@@ -85,8 +86,7 @@ impl D3D11StateBackup {
 
         let mut num_sr = 0u32;
         unsafe { ctx.RSGetScissorRects(&mut num_sr, None) };
-        let mut scissor_rects =
-            vec![windows::Win32::Foundation::RECT::default(); num_sr as usize];
+        let mut scissor_rects = vec![windows::Win32::Foundation::RECT::default(); num_sr as usize];
         if num_sr > 0 {
             unsafe { ctx.RSGetScissorRects(&mut num_sr, Some(scissor_rects.as_mut_ptr())) };
         }

@@ -90,11 +90,7 @@ pub fn set(next: GameSessionState) -> GameSessionState {
     let prev = decode_state(prev_raw);
 
     if prev != next {
-        logger::info(&format!(
-            "[state] {} -> {}",
-            prev.as_str(),
-            next.as_str()
-        ));
+        logger::info(&format!("[state] {} -> {}", prev.as_str(), next.as_str()));
     }
 
     prev
@@ -119,22 +115,15 @@ fn mark_shutting_down() {
 // Lifecycle event -> state transition
 pub fn on_event(event_id: i32) {
     match event_id {
-        ev::LOADING_PROCESS_STARTED
-        | ev::MISSION_BEFORE_OPEN
-        | ev::MISSION_BEFORE_CLOSE => {
+        ev::LOADING_PROCESS_STARTED | ev::MISSION_BEFORE_OPEN | ev::MISSION_BEFORE_CLOSE => {
             set(GameSessionState::Loading);
         }
 
-        ev::MISSION_AFTER_OPEN
-        | ev::LOADING_PROCESS_FINISHED
-        | ev::GAME_INIT => {
+        ev::MISSION_AFTER_OPEN | ev::LOADING_PROCESS_FINISHED | ev::GAME_INIT => {
             let _ = refresh_from_runtime();
         }
 
-        ev::MISSION_AFTER_CLOSE
-        | ev::NO_GAME_START
-        | ev::NO_GAME_END
-        | ev::GAME_DONE => {
+        ev::MISSION_AFTER_CLOSE | ev::NO_GAME_START | ev::NO_GAME_END | ev::GAME_DONE => {
             set(GameSessionState::FrontendMenu);
         }
 

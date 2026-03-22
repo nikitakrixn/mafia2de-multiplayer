@@ -209,12 +209,10 @@ pub fn render_frame() {
         egui_directx11::split_output(full_output);
 
     // Рендерим egui
-    if let Err(e) = inner.egui_renderer.render(
-        &*ctx_d3d,
-        &*rtv,
-        &inner.egui_ctx,
-        renderer_output,
-    ) {
+    if let Err(e) = inner
+        .egui_renderer
+        .render(&*ctx_d3d, &*rtv, &inner.egui_ctx, renderer_output)
+    {
         if frame % 600 == 0 {
             logger::warn(&format!("[overlay] ошибка рендера: {e:?}"));
         }

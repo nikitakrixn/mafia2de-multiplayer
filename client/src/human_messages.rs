@@ -5,9 +5,7 @@
 //! интересные `message_id` в `PlayerEvent`.
 
 use sdk::{
-    addresses::constants::human_messages as hm,
-    game::Player,
-    structures::EntityMessageHeader,
+    addresses::constants::human_messages as hm, game::Player, structures::EntityMessageHeader,
 };
 
 use crate::{
@@ -36,11 +34,9 @@ fn is_interesting_message(id: u32) -> bool {
 fn is_spam_message(id: u32) -> bool {
     matches!(
         id,
-        hm::HUMAN_MODE_CHANGE
-            | hm::HUMAN_TICK
-            | hm::HUMAN_SETTLED
+        hm::HUMAN_MODE_CHANGE | hm::HUMAN_TICK | hm::HUMAN_SETTLED
     ) || (id >> 16) == 5
-      || (id >> 16) == 18
+        || (id >> 16) == 18
 }
 
 #[allow(dead_code)]
@@ -76,7 +72,10 @@ pub fn message_name(id: u32) -> &'static str {
 pub fn process_broadcast(entity_ptr: usize, msg_ptr: usize) {
     // Быстрая отсечка по состоянию сессии — не тратим время
     // на разбор сообщений в меню/загрузке
-    if !matches!(state::get(), GameSessionState::InGame | GameSessionState::Paused) {
+    if !matches!(
+        state::get(),
+        GameSessionState::InGame | GameSessionState::Paused
+    ) {
         return;
     }
 

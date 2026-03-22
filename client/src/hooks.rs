@@ -18,10 +18,10 @@ use sdk::{addresses, memory};
 //  Типы функций
 // =============================================================================
 
-type GameTickAlwaysCallback     = unsafe extern "C" fn(usize, usize);
-type FireEventByIdFn            = unsafe extern "C" fn(usize, i32, usize) -> usize;
-type EntityBroadcastFn          = unsafe extern "C" fn(usize, usize) -> u8;
-type Present1Fn                 = unsafe extern "system" fn(*mut c_void, u32, u32, *const c_void) -> i32;
+type GameTickAlwaysCallback = unsafe extern "C" fn(usize, usize);
+type FireEventByIdFn = unsafe extern "C" fn(usize, i32, usize) -> usize;
+type EntityBroadcastFn = unsafe extern "C" fn(usize, usize) -> u8;
+type Present1Fn = unsafe extern "system" fn(*mut c_void, u32, u32, *const c_void) -> i32;
 
 // =============================================================================
 //  Оригиналы функций
@@ -30,9 +30,9 @@ type Present1Fn                 = unsafe extern "system" fn(*mut c_void, u32, u3
 static HOOK_INSTALLED: AtomicBool = AtomicBool::new(false);
 
 static ORIGINAL_GAME_TICK_ALWAYS: OnceLock<GameTickAlwaysCallback> = OnceLock::new();
-static ORIGINAL_FIRE_EVENT_BY_ID: OnceLock<FireEventByIdFn>       = OnceLock::new();
-static ORIGINAL_ENTITY_BROADCAST: OnceLock<EntityBroadcastFn>     = OnceLock::new();
-static ORIGINAL_PRESENT1:         OnceLock<Present1Fn>            = OnceLock::new();
+static ORIGINAL_FIRE_EVENT_BY_ID: OnceLock<FireEventByIdFn> = OnceLock::new();
+static ORIGINAL_ENTITY_BROADCAST: OnceLock<EntityBroadcastFn> = OnceLock::new();
+static ORIGINAL_PRESENT1: OnceLock<Present1Fn> = OnceLock::new();
 
 // =============================================================================
 //  Detour функции
@@ -152,8 +152,7 @@ pub fn install() -> Result<(), String> {
     }
 
     unsafe {
-        MinHook::enable_all_hooks()
-            .map_err(|e| map_status("enable_all_hooks", e))?;
+        MinHook::enable_all_hooks().map_err(|e| map_status("enable_all_hooks", e))?;
     }
 
     logger::info("[hooks] all hooks installed and enabled");
@@ -168,8 +167,7 @@ fn install_present1_hook() -> Result<(), String> {
         return Ok(());
     }
 
-    let sc_ptr = sdk::game::render::get_swapchain_ptr()
-        .ok_or("swapchain not ready")?;
+    let sc_ptr = sdk::game::render::get_swapchain_ptr().ok_or("swapchain not ready")?;
 
     let vtable = unsafe { *(sc_ptr as *const *const usize) };
     if vtable.is_null() {
@@ -216,8 +214,7 @@ pub fn uninstall() -> Result<(), String> {
     }
 
     unsafe {
-        MinHook::disable_all_hooks()
-            .map_err(|e| map_status("disable_all_hooks", e))?;
+        MinHook::disable_all_hooks().map_err(|e| map_status("disable_all_hooks", e))?;
     }
 
     logger::info("[hooks] all hooks disabled");

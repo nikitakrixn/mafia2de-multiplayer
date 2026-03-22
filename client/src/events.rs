@@ -102,11 +102,7 @@ pub fn process_fired_event(event_id: i32) {
     }
 
     if should_log_event(event_id) {
-        logger::info(&format!(
-            "[events] {} ({})",
-            event_name(event_id),
-            event_id
-        ));
+        logger::info(&format!("[events] {} ({})", event_name(event_id), event_id));
     }
 
     crate::state::on_event(event_id);

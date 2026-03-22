@@ -63,9 +63,9 @@ fn draw_debug(ctx: &egui::Context, snap: &Snapshot) {
 
     // Цвет FPS зависит от производительности
     let fps_color = match snap.fps as u32 {
-        51.. => Color32::from_rgb(100, 255, 100),      // хороший FPS
-        31..=50 => Color32::from_rgb(255, 200, 100),   // средний FPS
-        _ => Color32::from_rgb(255, 100, 100),         // низкий FPS
+        51.. => Color32::from_rgb(100, 255, 100),    // хороший FPS
+        31..=50 => Color32::from_rgb(255, 200, 100), // средний FPS
+        _ => Color32::from_rgb(255, 100, 100),       // низкий FPS
     };
 
     painter.text(
