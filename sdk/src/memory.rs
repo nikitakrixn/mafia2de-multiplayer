@@ -42,9 +42,9 @@ pub fn get_module_info(module_name: &str) -> Option<ModuleInfo> {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Проверка указателей
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 const MIN_VALID_ADDR: usize = 0x10000;
 const MAX_VALID_ADDR: usize = 0x7FFF_FFFF_FFFF;
@@ -97,9 +97,45 @@ pub unsafe fn read_value<T: Copy>(addr: usize) -> Option<T> {
     Some(unsafe { std::ptr::read(addr as *const T) })
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+/// Безопасно читает значение типа `T` без требования выравнивания.
+///
+/// Полезно для packed-структур, стековых временных объектов движка
+/// и вообще любых полей, где игра может передать не-aligned адрес.
+///
+/// # Safety
+/// Вызывающий всё ещё обязан убедиться, что адрес вообще читаем.
+pub unsafe fn read_value_unaligned<T: Copy>(addr: usize) -> Option<T> {
+    if !is_valid_ptr(addr) {
+        return None;
+    }
+    Some(unsafe { std::ptr::read_unaligned(addr as *const T) })
+}
+
+/// Читает указатель без требования выравнивания.
+///
+/// Возвращает сырое значение без проверки, указывает ли оно на валидную память.
+pub unsafe fn read_ptr_raw_unaligned(addr: usize) -> Option<usize> {
+    if !is_valid_ptr(addr) {
+        return None;
+    }
+    Some(unsafe { std::ptr::read_unaligned(addr as *const usize) })
+}
+
+/// Читает указатель без требования выравнивания и проверяет результат.
+pub unsafe fn read_ptr_unaligned(addr: usize) -> Option<usize> {
+    unsafe {
+        let value = read_ptr_raw_unaligned(addr)?;
+        if is_valid_ptr(value) {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+// =============================================================================
 //  Отладка
-// ═══════════════════════════════════════════════════════════════════════════
+// =============================================================================
 
 /// Дампит `count` байт начиная с `addr` в hex-формате.
 ///
@@ -184,7 +220,10 @@ pub unsafe fn write_value<T: Copy>(addr: usize, value: T) -> bool {
 /// - `addr` указывает на корректную функцию
 /// - сигнатура `T` точно соответствует реальной calling convention и параметрам
 pub unsafe fn fn_at<T: Copy>(addr: usize) -> T {
-    debug_assert!(is_valid_ptr(addr), "fn_at: invalid function address 0x{addr:X}");
+    debug_assert!(
+        is_valid_ptr(addr),
+        "fn_at: invalid function address 0x{addr:X}"
+    );
     let ptr = addr as *const ();
     unsafe { std::mem::transmute_copy(&ptr) }
 }

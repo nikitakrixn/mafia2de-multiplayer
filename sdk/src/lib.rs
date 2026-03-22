@@ -22,7 +22,7 @@
 pub(crate) mod macros;
 
 pub mod addresses;
-pub mod structures;
 pub mod game;
 pub mod memory;
 pub mod patterns;
+pub mod structures;
