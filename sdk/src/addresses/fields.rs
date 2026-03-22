@@ -18,6 +18,13 @@ pub mod game_manager {
 // =============================================================================
 
 pub mod entity {
+    /// `+0x08` -> Player-only pointer 1 (NULL для всех остальных).
+    pub const PLAYER_DATA_08: usize = 0x08;
+    /// `+0x10` -> Player-only pointer 2.
+    pub const PLAYER_DATA_10: usize = 0x10;
+    /// `+0x18` -> Player-only pointer 3.
+    pub const PLAYER_DATA_18: usize = 0x18;
+
     /// `+0x20` -> state/alive flags byte.
     pub const STATE_FLAGS: usize = 0x20;
 
@@ -39,6 +46,17 @@ pub mod entity {
 
     /// `+0x30` -> FNV-1 64-bit name hash.
     pub const NAME_HASH: usize = 0x30;
+
+    /// `+0x38` -> Parent/container reference.
+    pub const PARENT_REF: usize = 0x38;
+
+    /// `+0x40` -> RB-tree 1 root sentinel.
+    pub const TREE_1_ROOT: usize = 0x40;
+    /// `+0x48` -> Tree 1 entry count (Player=2, rest=0).
+    pub const TREE_1_COUNT: usize = 0x48;
+
+    /// `+0x50` -> RB-tree 2 root sentinel.
+    pub const TREE_2_ROOT: usize = 0x50;
 
     /// `+0x78` -> frame/transform node pointer.
     pub const FRAME_NODE: usize = 0x78;

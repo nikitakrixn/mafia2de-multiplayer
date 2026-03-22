@@ -63,6 +63,15 @@ pub mod entity {
 
     /// Vtable observer-объекта script wrapper.
     pub const ENTITY_OBSERVER: usize = 0x191_9A78;
+
+    /// Вторичный vtable-интерфейс C_Entity (пространственный/трансформный).
+    ///
+    /// Это НЕ отдельный объект, а вторая секция в основной vtable C_Entity.
+    /// Смещение от начала vtable: слот [32] = +0x100 байт.
+    ///
+    /// В C_Actor слоты [32-48] переопределены реализациями через frame_node.
+    /// DATA XREF из M2DE_CActor_DestructorCore.
+    pub const ENTITY_SPATIAL_INTERFACE: usize = 0x186_CBC8;
 }
 
 pub mod human {

@@ -1518,3 +1518,126 @@ pub mod police_script_owner {
     /// IDA: `0x140EE14A0`
     pub const REMOVE_POLICEMAN_BY_GUID: usize = 0xEE_14A0;
 }
+
+// =============================================================================
+//  Entity Base — виртуальные методы C_Entity / C_Actor
+// =============================================================================
+
+pub mod entity_vtable {
+    /// C_Entity scalar deleting destructor. Освобождает 0x78 байт.
+    /// Vtable slot [0].
+    /// IDA: `0x14039F310`
+    pub const ENTITY_SCALAR_DTOR: usize = 0x39_F310;
+
+    /// C_Entity::SetParentRef — записывает entity+0x38, уведомляет WEM.
+    /// Vtable slot [3].
+    /// IDA: `0x1403AF940`
+    pub const ENTITY_SET_PARENT_REF: usize = 0x3A_F940;
+
+    /// C_Entity::Activate — ORs entity_flags+0x28 с 0x20.
+    /// Vtable slot [4].
+    /// IDA: `0x1403A8B90`
+    pub const ENTITY_ACTIVATE: usize = 0x3A_8B90;
+
+    /// C_Entity::Deactivate (базовая реализация).
+    /// Vtable slot [5].
+    /// IDA: `0x1403A7530`
+    pub const ENTITY_DEACTIVATE_BASE: usize = 0x3A_7530;
+
+    /// C_Entity::ProcessMessage_Internal — основной обработчик сообщений (672 байт).
+    /// Vtable slot [13].
+    /// IDA: `0x1403AB0A0`
+    pub const ENTITY_PROCESS_MESSAGE: usize = 0x3A_B0A0;
+
+    /// C_Entity::LoadFromStream — десериализация entity message registry.
+    /// Vtable slot [16].
+    /// IDA: `0x1403A9D00`
+    pub const ENTITY_LOAD_FROM_STREAM: usize = 0x3A_9D00;
+
+    /// C_Entity::UnregisterMessages — jmp в UnregisterImpl.
+    /// Vtable slot [23].
+    /// IDA: `0x1403B0400`
+    pub const ENTITY_UNREGISTER_MESSAGES: usize = 0x3B_0400;
+
+    // === C_Actor переопределения (пространственный интерфейс) ===
+
+    /// C_Actor scalar deleting destructor.
+    /// Vtable slot [0].
+    /// IDA: `0x14039EE40`
+    pub const ACTOR_SCALAR_DTOR: usize = 0x39_EE40;
+
+    /// C_Actor::GetFrameNode — возвращает entity+0x78.
+    /// Vtable slot [2].
+    /// IDA: `0x1400C3390`
+    pub const ACTOR_GET_FRAME_NODE: usize = 0x0C_3390;
+
+    /// C_Actor::Deactivate — с очисткой frame.
+    /// Vtable slot [5].
+    /// IDA: `0x1403A7100`
+    pub const ACTOR_DEACTIVATE: usize = 0x3A_7100;
+
+    /// C_Actor::SetPos — через frame_node (+0x78).
+    /// Vtable slot [32].
+    /// IDA: `0x1403B9660`
+    pub const ACTOR_SET_POS: usize = 0x3B_9660;
+
+    /// C_Actor::SetRotation — делегирует в frame.
+    /// Vtable slot [33].
+    /// IDA: `0x1403B8F20`
+    pub const ACTOR_SET_ROTATION: usize = 0x3B_8F20;
+
+    /// C_Actor::SetScale — делегирует в frame.
+    /// Vtable slot [34].
+    /// IDA: `0x1403B98C0`
+    pub const ACTOR_SET_SCALE: usize = 0x3B_98C0;
+
+    /// C_Actor::SetDir — делегирует в frame.
+    /// Vtable slot [35].
+    /// IDA: `0x1403B99B0`
+    pub const ACTOR_SET_DIR: usize = 0x3B_99B0;
+
+    /// C_Actor::GetPos — из frame.
+    /// Vtable slot [36].
+    /// IDA: `0x140122E90`
+    pub const ACTOR_GET_POS: usize = 0x12_2E90;
+
+    /// C_Actor::GetDir — из frame.
+    /// Vtable slot [37].
+    /// IDA: `0x14011D920`
+    pub const ACTOR_GET_DIR: usize = 0x11_D920;
+
+    /// C_Actor::GetRotation — из frame.
+    /// Vtable slot [38].
+    /// IDA: `0x140123810`
+    pub const ACTOR_GET_ROTATION: usize = 0x12_3810;
+
+    /// C_Actor::GetBoundRadius — float из frame+0x68.
+    /// Vtable slot [39].
+    /// IDA: `0x1401239C0`
+    pub const ACTOR_GET_BOUND_RADIUS: usize = 0x12_39C0;
+
+    /// C_Actor::SetFrameNode — замена указателя +0x78.
+    /// Vtable slot [44].
+    /// IDA: `0x1403B91B0`
+    pub const ACTOR_SET_FRAME_NODE: usize = 0x3B_91B0;
+
+    /// C_Actor::OnFrameUpdate — читает frame (+0x78).
+    /// Vtable slot [7].
+    /// IDA: `0x1403B2280`
+    pub const ACTOR_ON_FRAME_UPDATE: usize = 0x3B_2280;
+
+    /// C_Actor::OnStateUpdate — читает +0x90.
+    /// Vtable slot [8].
+    /// IDA: `0x1403B24A0`
+    pub const ACTOR_ON_STATE_UPDATE: usize = 0x3B_24A0;
+
+    /// C_Actor::InitGameModule — устанавливает GameModule_base_vtable.
+    /// Vtable slot [50].
+    /// IDA: `0x14039FBC0`
+    pub const ACTOR_INIT_GAME_MODULE: usize = 0x39_FBC0;
+
+    /// M2DE_BaseEntity_DestroyWithMessageRegistryCleanup.
+    /// Вызывается из деструктора, очищает подписки на сообщения.
+    /// IDA: `0x14039BAF0`
+    pub const BASE_ENTITY_DESTROY_CLEANUP: usize = 0x39_BAF0;
+}

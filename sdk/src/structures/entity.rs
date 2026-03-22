@@ -1,59 +1,164 @@
-//! Entity system structures — infrastructure + base classes.
+//! Структуры системы сущностей — базовые классы и инфраструктура.
 //!
-//! Sources:
-//! - M2DE_EntityManager_FindByName (inline FNV-1 + binary search)
-//! - M2DE_EntityManager_CreateScriptWrapper (factory dispatch)
-//! - M2DE_ScriptWrapperMgr_GetOrCreateWrapper (cache layout)
-//! - M2DE_CHuman_BaseConstructor (component allocation, health init)
-//! - M2DE_CHumanNPC_Constructor (self_ref, entity_table)
-//! - M2DE_CPlayerEntity_Constructor (type=0x10, player vtable)
-//! - M2DE_Register_CleanEntity_TypeDescriptor (TypeRegistry system)
-//! - Runtime: Joe/Henry -> entity_type=0x0E, health=1000.0
+//! Источники подтверждения:
+//! - M2DE_BaseEntity_Construct (0x14039B710) — конструктор, инициализация полей
+//! - Деструктор vtable[0] (0x14039F310) — `GlobalFree(this, 0x78)` = размер 0x78
+//! - M2DE_ActorEntity_Construct (0x14039A7E0) — Actor overlay
+//! - M2DE_CHuman_BaseConstructor (0x140D730B0) — компоненты Human
+//! - M2DE_Entity_SetTypeID (0x1403B99F0) — packed table_id
+//! - Runtime: сканирование 2415 entity в FreeRide
+//!
+//! КЛЮЧЕВОЕ ОТКРЫТИЕ — двойной интерфейс в vtable:
+//!   Слоты [3-16]  = управление entity (activate/deactivate/messages)
+//!   Слоты [32-48] = пространственный интерфейс (SetPos/GetPos/SetRot...)
+//!   В C_Entity обе секции одинаковы (stubs).
+//!   В C_Actor вторая секция работает через frame_node (+0x78).
 
 use std::ffi::c_void;
 
 use crate::macros::assert_field_offsets;
 
-/// C_Entity — корень иерархии сущностей.
+// =============================================================================
+//  C_Entity — корень иерархии всех сущностей (0x78 байт)
+// =============================================================================
+
+/// `C_Entity` — базовый класс для ВСЕХ сущностей Mafia II: DE.
 ///
-/// ВАЖНО: head до `+0x78` пока ещё восстановлен не полностью.
-/// Поэтому здесь используется консервативный layout:
-/// - подтверждённые поля выделены явно
-/// - остальное оставлено raw/padding
+/// Размер: **0x78 байт** (120 decimal). Подтверждено деструктором:
+/// ```asm
+/// mov edx, 78h     ; размер для GlobalFree
+/// call M2DE_GlobalFree
+/// ```
 ///
-/// Подтверждено:
-/// - `+0x20` state_flags
-/// - `+0x24` packed table_id
-/// - `+0x28` entity_flags
-/// - `+0x30` name_hash
-/// - actor fields начинаются с `+0x78`
+/// Vtable: `M2DE_VT_CEntity` (0x14186CAC8), ~110 виртуальных методов.
+/// Конструктор: `M2DE_BaseEntity_Construct` (0x14039B710).
+///
+/// ## Двойной интерфейс в vtable
+///
+/// Vtable содержит **дублированную секцию**:
+/// - Слоты [3-16] = первичный интерфейс управления entity
+/// - Слоты [32-48] = пространственный/трансформный интерфейс
+///
+/// В базовом `C_Entity` обе секции содержат одинаковые stubs.
+/// `C_Actor` переопределяет вторую секцию реальными реализациями
+/// через `frame_node` (+0x78).
+///
+/// ## Ключевые виртуальные методы (подтверждённые)
+///
+/// | Слот | Имя | Уверенность |
+/// |------|------|-------------|
+/// | [0] | ScalarDeletingDestructor | 100% |
+/// | [2] | GetFrameNode | 95% (Actor) |
+/// | [3] | SetParentRef | 85% |
+/// | [4] | Activate | 90% |
+/// | [5] | Deactivate | 90% |
+/// | [13] | ProcessMessage_Internal | 80% |
+/// | [16] | LoadFromStream | 85% |
+/// | [22] | HandleMessage | 95% |
+/// | [23] | UnregisterMessages | 85% |
+/// | [32] | SetPos | 100% |
+/// | [36] | GetPos | 100% |
+/// | [44] | SetFrameNode | 90% |
+/// | [47] | IsDead | 100% |
+/// | [50] | Update | 95% |
+/// | [82] | ApplyDamage | 95% |
+///
+/// ## Конструктор инициализирует
+///
+/// ```text
+/// +0x00 = vtable M2DE_VT_CEntity
+/// +0x08..+0x18 = NULL (три qword'а)
+/// +0x20 = 0 (state_flags byte)
+/// +0x24 = 0 → потом packed table_id
+/// +0x28 = entity_flags (биты streaming)
+/// +0x30 = 0 (name_hash)
+/// +0x38 = 0 (parent_ref)
+/// +0x40 = alloc(0x38) → RB-tree sentinel 1 (hierarchy)
+/// +0x48 = 0
+/// +0x50 = alloc(0x30) → RB-tree sentinel 2 (subscriptions)
+/// +0x58..+0x70 = 0
+/// ```
+///
+/// RB-tree sentinel инициализируется как self-linked:
+/// ```asm
+/// mov [rax], rax       ; left = self
+/// mov [rax+8], rax     ; right = self
+/// mov [rax+10h], rax   ; parent = self
+/// mov word ptr [rax+18h], 101h  ; чёрный + is_sentinel
+/// ```
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CEntity {
-    /// Primary vtable.
+    /// Указатель на таблицу виртуальных методов.
     pub vtable: *const c_void, // +0x00
 
-    /// Неполностью доревершенный head C_Entity.
-    pub _unknown_08: [u8; 0x18], // +0x08..+0x1F
+    /// Player-only: три указателя на heap-объекты (шаг ~0x20/0x40).
+    /// NULL для всех остальных типов entity.
+    /// Устанавливается CPlayerEntity_Constructor.
+    /// Runtime подтверждено: только Player имеет эти поля != NULL.
+    pub player_data_08: usize, // +0x08
+    pub player_data_10: usize, // +0x10
+    pub player_data_18: usize, // +0x18
 
-    /// State/alive flags byte.
+    /// Байт состояния (обнулён в конструкторе).
     pub state_flags: u8, // +0x20
-    pub _pad_21: [u8; 3], // +0x21
+    /// НЕ инициализируется конструктором — содержит мусор от аллокатора.
+    /// Runtime: Sound имеет ASCII "urce" (от "resource").
+    pub _gap_21: [u8; 3], // +0x21..+0x23
 
-    /// Packed table_id: `(instance_id << 8) | factory_type`.
+    /// Упакованный идентификатор: `(instance_id << 8) | factory_type`.
+    ///
+    /// Младший байт = factory type:
+    /// - `0x0E` = HumanNPC
+    /// - `0x10` = Player
+    /// - `0x12` = Car (статичная)
+    /// - `0x70` = CarVehicle (управляемая)
+    /// - и т.д.
+    ///
+    /// Старшие 24 бита = instance_id (глобальный счётчик).
     pub table_id: u32, // +0x24
 
-    /// Entity flags.
+    /// Флаги entity (битовое поле).
+    ///
+    /// - bit 5 (0x20): активирована
+    /// - bit 17 (0x20000): streaming state 1
+    /// - bit 18 (0x40000): streaming state 2
     pub entity_flags: u32, // +0x28
-    pub _pad_2C: u32, // +0x2C
+    /// НЕ инициализируется конструктором — содержит мусор от аллокатора.
+    pub _gap_2c: u32, // +0x2C
 
-    /// FNV-1 64-bit name hash.
+    /// FNV-1 64-bit хеш имени entity (0 для безымянных entity).
+    /// Runtime: HumanNPC, LightEntity, ScriptEntity имеют name_hash=0.
     pub name_hash: u64, // +0x30
 
-    /// Raw entity head tail.
+    /// Ссылка на parent/container.
     ///
-    /// Сюда попадает область до actor layer (`+0x78`).
-    pub _unknown_38: [u8; 0x40], // +0x38..+0x77
+    /// Устанавливается через vtable[3] (`SetParentRef`),
+    /// при этом уведомляется WorldEntityManager.
+    /// Runtime: NULL для Sound, ScriptEntity.
+    pub parent_ref: usize, // +0x38
+
+    /// RB-дерево 1 — корень sentinel'а (иерархия entity).
+    ///
+    /// Аллоцируется 0x38 байт. Sentinel самоссылается:
+    /// `[0]=self, [8]=self, [10h]=self, word[18h]=0x0101`.
+    pub tree_1_root: usize, // +0x40
+
+    /// Количество записей в дереве 1.
+    /// Runtime: 0 для большинства entity, 2 для Player.
+    pub tree_1_count: usize, // +0x48
+
+    /// RB-дерево 2 — корень sentinel'а (подписки на сообщения).
+    ///
+    /// Аллоцируется 0x30 байт. Тот же self-linked паттерн.
+    pub tree_2_root: usize, // +0x50
+
+    /// Всегда 0 в runtime (подтверждено дампом всех типов).
+    pub _zero_58: usize, // +0x58
+    pub _zero_60: usize, // +0x60
+    pub _zero_68: usize, // +0x68
+    pub _zero_70: usize, // +0x70
+    // Итого: 0x78 байт. Поля C_Actor начинаются с +0x78.
 }
 
 assert_field_offsets!(CEntity {
@@ -62,58 +167,96 @@ assert_field_offsets!(CEntity {
     table_id     == 0x24,
     entity_flags == 0x28,
     name_hash    == 0x30,
+    parent_ref   == 0x38,
+    tree_1_root  == 0x40,
+    tree_2_root  == 0x50,
+    _zero_68     == 0x68,
+    _zero_70     == 0x70,
 });
 
 impl CEntity {
-    /// Native factory type byte (low byte of table_id).
+    /// Factory type byte — младший байт packed table_id.
     pub fn factory_type(&self) -> u8 {
         (self.table_id & 0xFF) as u8
     }
 
-    /// Upper 24-bit instance id.
+    /// Instance ID — старшие 24 бита packed table_id.
     pub fn instance_index(&self) -> u32 {
         self.table_id >> 8
+    }
+
+    /// Проверка флага активации (bit 5).
+    pub fn is_activated(&self) -> bool {
+        (self.entity_flags & 0x20) != 0
+    }
+
+    /// Проверка наличия streaming state.
+    pub fn has_streaming_flag(&self) -> bool {
+        (self.entity_flags & 0x60000) != 0
     }
 }
 
 // =============================================================================
-//  C_Actor — extends C_Entity with transform and owner (44 bytes)
+//  C_Actor — расширяет C_Entity трансформацией и owner'ом
 // =============================================================================
 
-/// C_Actor layer — adds frame node, owner, and sub-type.
+/// Поля `C_Actor` — начинаются с +0x78 от начала entity.
 ///
-/// Initialized by M2DE_ActorEntity_Construct (0x14039A7E0).
-/// Vtable: off_14186D050 (M2DE_vtbl_CActor).
-/// Zeroes +0x78..+0xA0, sets alive flags at +0x24.
+/// Конструктор: `M2DE_ActorEntity_Construct` (0x14039A7E0).
+/// Vtable: `M2DE_VT_CActor` (0x14186D050).
 ///
-/// Fields start at offset +0x78 from entity base.
-/// Use with CEntity: `entity_ptr + sizeof(CEntity)` for actor fields.
+/// Actor добавляет:
+/// - `frame_node` (+0x78) — указатель на трансформ/позицию в мире
+/// - `owner` (+0x80) — NULL = на ногах, vehicle* = в машине
+///
+/// Позиция читается из frame_node:
+/// ```text
+/// frame + 0x64 = X (float)
+/// frame + 0x74 = Y (float)
+/// frame + 0x84 = Z (float)
+/// ```
+///
+/// Ключевые vtable методы Actor (вторая секция, слоты 32-48):
+/// - [32] SetPos — `M2DE_CActor_SetPos_ViaFrame`
+/// - [33] SetRotation — через frame_node
+/// - [34] SetScale — через frame_node
+/// - [35] SetDir — через frame_node
+/// - [36] GetPos — `M2DE_CActor_GetPos_ViaFrame`
+/// - [39] GetBoundRadius — `frame+0x68` (float)
+/// - [44] SetFrameNode — простая замена указателя +0x78
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CActorFields {
-    /// Frame/transform node — world position.
-    /// Position: frame+0x64 (X), frame+0x74 (Y), frame+0x84 (Z)
+    /// Указатель на frame/transform node.
+    ///
+    /// Позиция: `frame+0x64` (X), `frame+0x74` (Y), `frame+0x84` (Z).
+    /// Направление: `frame+0x34/0x44/0x54` (forward vector).
     pub frame_node: *mut c_void, // +0x78
 
-    /// Owner entity. NULL=on foot, vehicle*=in car.
+    /// Владелец/контейнер. NULL = на ногах, vehicle* = в транспорте.
     pub owner: *mut c_void, // +0x80
 
-    pub _unknown_88: u64, // +0x88  zeroed
-    pub _unknown_90: u64, // +0x90  zeroed
-    pub _unknown_98: u64, // +0x98  zeroed
+    /// Неизвестно (обнулено в конструкторе).
+    pub _unk_88: u64, // +0x88
 
-    /// Entity sub-type (set after construction).
+    /// Неизвестно (обнулено). Actor::OnStateUpdate читает +0x90.
+    pub _unk_90: u64, // +0x90
+
+    /// Неизвестно (обнулено).
+    pub _unk_98: u64, // +0x98
+
+    /// Подтип entity (устанавливается после конструирования).
     pub entity_subtype: u32, // +0xA0
-    pub _pad_A4: u32, // +0xA4
+    pub _pad_a4: u32, // +0xA4
 }
 
 // =============================================================================
-//  Entity GUID
+//  C_EntityGuid — уникальный идентификатор сущности
 // =============================================================================
 
-/// Entity GUID — уникальный идентификатор сущности.
+/// GUID сущности для Lua-скриптов.
 ///
-/// Lua: `C_EntityGuid`. Format: `"C_EntityGuid: %u"`.
+/// Lua: `C_EntityGuid`. Формат: `"%u"`.
 /// Подтверждено из `M2DE_LuaW_WrappersList_GetEntityByGUID`:
 /// ```c
 /// M2DE_FormatString("C_EntityGuid: %u", *ThisObject);
@@ -125,30 +268,26 @@ pub struct CEntityGuid {
 }
 
 // =============================================================================
-//  Entity Database
+//  Запись в EntityDatabase
 // =============================================================================
 
-/// Entity database record — запись в глобальной БД (M2DE_g_EntityDatabase).
-///
-/// table_id — упакованный формат:
-///   Bits [7:0]  = factory type byte (для wrapper factory dispatch)
-///   Bits [31:8] = instance index
+/// Запись entity в глобальной БД (`M2DE_g_EntityDatabase`).
 ///
 /// Подтверждено из:
-/// - FindByName: `mov r9d, [rax+24h]` (table_id as dword)
-/// - CreateScriptWrapper: `movzx ebx, byte ptr [rdx+24h]` (low byte = type)
+/// - FindByName: `mov r9d, [rax+24h]` (table_id)
+/// - CreateScriptWrapper: `movzx ebx, byte ptr [rdx+24h]` (factory type)
 /// - GetOrCreateWrapper: `mov rcx, [rax+30h]` (name_hash)
-/// - Runtime scan: factory_type == entity_type at native+0x24 for ALL entities
+/// - Runtime: factory_type совпадает для всех 2415 entity
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CEntityDBRecord {
-    pub _unknown_00: [u8; 0x24],
-    /// Packed: (instance_index << 8) | factory_type_byte.
+    pub _unk_00: [u8; 0x24],
+    /// Упакованный ID: `(instance_index << 8) | factory_type_byte`.
     pub table_id: u32, // +0x24
     /// Bit 5 (0x20) = has_script_wrapper / spawnable.
     pub flags: u32, // +0x28
-    pub _unknown_2C: u32, // +0x2C
-    /// FNV-1 64-bit hash of entity name.
+    pub _unk_2c: u32, // +0x2C
+    /// FNV-1 64-bit хеш имени entity.
     pub name_hash: u64, // +0x30
 }
 
@@ -156,192 +295,154 @@ impl CEntityDBRecord {
     pub fn factory_type(&self) -> u8 {
         (self.table_id & 0xFF) as u8
     }
+
     pub fn instance_index(&self) -> u32 {
         self.table_id >> 8
     }
+
     pub fn has_script_wrapper(&self) -> bool {
         (self.flags & 0x20) != 0
     }
 }
 
 // =============================================================================
-//  Script Wrapper System
+//  Script Wrapper — Lua-handle на native entity
 // =============================================================================
 
-/// Script wrapper — Lua-accessible handle to native entity.
+/// Script wrapper — Lua-доступный handle на нативную entity.
 ///
-/// `wrapper+0x10` IS the native entity pointer (runtime confirmed).
-/// For Joe/Henry: reads entity_type=0x0E, health correctly.
+/// `wrapper+0x10` — это **нативный указатель** (runtime подтверждено).
+/// Для Joe/Henry: корректно читает entity_type=0x0E, health.
 ///
-/// Created by M2DE_EntityManager_CreateScriptWrapper:
-///   1. factory_type = db_record.table_id & 0xFF
-///   2. factory = M2DE_g_WrapperFactoryMap[factory_type]
-///   3. wrapper = factory->Create() via vtable[+0x10]
-///   4. wrapper+0x10 = native entity ptr
-///   5. wrapper+0x18 = observer (264 bytes from DB record)
+/// Создание через `M2DE_EntityManager_CreateScriptWrapper`:
+/// 1. `factory_type = db_record.table_id & 0xFF`
+/// 2. `factory = WrapperFactoryMap[factory_type]`
+/// 3. `wrapper = factory->Create()` через vtable[+0x10]
+/// 4. `wrapper+0x10 = native entity ptr`
+/// 5. `wrapper+0x18 = observer (264 байта из DB record)`
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CScriptWrapper {
     pub vtable: *const c_void, // +0x00
     pub refcount: i32,         // +0x08
-    pub _pad_0C: i32,          // +0x0C
-    /// Native entity pointer (C_Human*, C_Car*, etc.). Runtime confirmed.
+    pub _pad_0c: i32,          // +0x0C
+    /// Нативный указатель на entity (C_Human*, C_Car* и т.д.). Подтверждено runtime.
     pub native_entity: *mut c_void, // +0x10
-    /// Observer (8 bytes alloc, vtable off_141919A78, 264 bytes from DB).
+    /// Observer-объект (кеширует состояние entity).
     pub observer: *mut c_void, // +0x18
 }
 
-/// Script Wrapper Manager — dual sorted cache for O(log n) lookup.
+/// Менеджер script wrapper'ов — двойной сортированный кеш для O(log n) поиска.
 ///
-/// Global: M2DE_g_ScriptWrapperManager (0x1431360F8, double indirection).
-/// Binary search in both caches.
+/// Глобал: `M2DE_g_ScriptWrapperManager` (0x1431360F8).
 ///
-/// Hash cache entry (16 bytes): { u64 fnv1_hash, *mut CScriptWrapper }
-/// ID cache entry (16 bytes): { u32 table_id, u32 pad, *mut CScriptWrapper }
+/// Кеш по хешу (16 байт/запись): `{ u64 fnv1_hash, *mut CScriptWrapper }`
+/// Кеш по table_id (16 байт/запись): `{ u32 table_id, u32 pad, *mut CScriptWrapper }`
 #[repr(C)]
 pub struct CScriptWrapperManager {
     pub vtable: *const c_void,        // +0x00
     pub hash_cache_begin: *mut u8,    // +0x08
     pub hash_cache_end: *mut u8,      // +0x10
     pub hash_cache_sentinel: *mut u8, // +0x18
-    pub _unknown_0x20: *mut c_void,   // +0x20
+    pub _unk_20: *mut c_void,         // +0x20
     pub id_cache_begin: *mut u8,      // +0x28
     pub id_cache_end: *mut u8,        // +0x30
     pub id_cache_capacity: *mut u8,   // +0x38
 }
 
-/// Wrapper Factory — creates typed C_ScriptWrapper for entity.
+/// Фабрика wrapper'ов — создаёт типизированный CScriptWrapper.
 ///
-/// 36 factories registered in M2DE_g_WrapperFactoryMap (RB-tree).
-/// All share vtable off_141918858.
-///
-/// Create function allocates wrapper with type-specific vtable:
-/// ```c
-/// result = GlobalAlloc(32);  // or larger for some types
-/// result[0] = WRAPPER_VTABLE; // unique per entity type
-/// result[1] = 1;              // refcount
-/// result[2] = 0;              // native_entity (filled later)
-/// result[3] = 0;              // observer (filled later)
-/// ```
+/// 36 фабрик в `M2DE_g_WrapperFactoryMap` (RB-дерево).
+/// Все имеют общую vtable `off_141918858`.
 #[repr(C)]
 pub struct CWrapperFactory {
     pub vtable: *const c_void,    // +0x00
     pub type_id_ptr: *const u32,  // +0x08
     pub create_fn: *const c_void, // +0x10
 }
+
 // =============================================================================
-//  Service Identity
+//  Service Identity — регистрация модуля
 // =============================================================================
 
-/// Service Identity — module registration in Service Locator.
+/// Идентификатор сервиса в Service Locator.
 ///
-/// Used by 49 module types (E_ModuleId 0-48).
-/// Hash: FNV-1 32-bit (seed=0x811C9DC5, prime=0x01000193).
-///
-/// Confirmed from C_ServiceIdentity::Init (0x1404444F0):
-/// ```asm
-/// mov [rdi+8], ebx    ; FNV-1 hash
-/// mov [rdi+0Ch], esi   ; module_id
-/// ```
+/// Используется 49 типами модулей (E_ModuleId 0-48).
+/// Хеш: FNV-1 32-bit (seed=0x811C9DC5, prime=0x01000193).
 #[repr(C)]
 pub struct CServiceIdentity {
     pub vtable: *const c_void, // +0x00
-    pub name_hash: u32,        // +0x08  FNV-1 32-bit
-    pub module_id: u32,        // +0x0C  E_ModuleId
+    pub name_hash: u32,        // +0x08 (FNV-1 32-bit)
+    pub module_id: u32,        // +0x0C (E_ModuleId)
 }
 
 // =============================================================================
-//  Type Registry (native entity creation from SDS)
+//  TypeRegistry — создание нативных entity из SDS
 // =============================================================================
 
-/// Type Descriptor — registered in global linked list for entity creation.
+/// Дескриптор типа для создания entity из SDS-ресурсов.
 ///
-/// 49 types registered via M2DE_TypeRegistry_RegisterDescriptor.
-/// Global: M2DE_g_TypeRegistry (0x141CAE228).
+/// 48 типов зарегистрировано через `M2DE_TypeRegistry_RegisterDescriptor`.
+/// Глобал: `M2DE_g_TypeRegistry` (0x141CAE228).
 ///
-/// IMPORTANT: Name hash uses FNV-1 64-bit with **seed=0** (not standard seed!):
+/// **ВАЖНО**: хеш имени использует FNV-1 64-bit с **seed=0** (не стандартный):
 /// ```c
-/// for (i = 0; *name; ) {       // seed = 0!
-///     i = byte ^ (0x100000001B3 * i);
+/// for (i = 0LL; *name; ) {       // seed = 0 !
+///     i = byte ^ (0x100000001B3LL * i);
 /// }
 /// ```
-///
-/// Example (C_CleanEntity):
-///   typeId = computed from alignment, nameHash = fnv1_64_seed0("C_CleanEntity")
-///
-/// Confirmed from M2DE_Register_CleanEntity_TypeDescriptor (0x14006AE30).
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CTypeDescriptor {
     pub next: *mut CTypeDescriptor, // +0x00
     pub type_id: u32,               // +0x08
-    pub _pad_0C: u32,               // +0x0C
-    pub name_hash: u64,             // +0x10  FNV-1 64-bit seed=0
+    pub _pad_0c: u32,               // +0x0C
+    pub name_hash: u64,             // +0x10 (FNV-1 64-bit seed=0)
     pub create_fn: *const c_void,   // +0x18
     pub parse_fn: *const c_void,    // +0x20
     pub aligned_size: u32,          // +0x28
-    pub _pad_2C: u32,               // +0x2C
+    pub _pad_2c: u32,               // +0x2C
 }
 
 // =============================================================================
-//  Constructor Chain (documented, not struct)
+//  Документация цепочки конструкторов
 // =============================================================================
 
-/// Constructor chain for C_Human entities (confirmed from IDA):
+/// Цепочка конструкторов для C_Human entity (подтверждено из IDA):
 ///
 /// ```text
-/// 1. M2DE_BaseEntity_Construct
-///    - Sets initial vtable
-///    - Initializes C_Entity fields
+/// 1. M2DE_BaseEntity_Construct (0x14039B710)
+///    - vtable = M2DE_VT_CEntity
+///    - Обнуляет +0x08..+0x70
+///    - Аллоцирует два RB-tree sentinel (+0x40, +0x50)
+///    - Генерирует table_id из глобального счётчика
+///    - Регистрирует в WorldEntityManager
 ///
-/// 2. M2DE_ActorEntity_Construct (sub called from step 3)
-///    - Sets C_Actor vtable = off_14186D050
-///    - Zeros frame_node (+0x78), owner (+0x80), and nearby ptrs
-///    - Sets alive flags at +0x24: bits 0+2 (value 5)
+/// 2. M2DE_ActorEntity_Construct (0x14039A7E0)
+///    - vtable = M2DE_VT_CActor
+///    - Обнуляет frame_node (+0x78), owner (+0x80), и соседние ptr
+///    - Устанавливает alive-флаги в +0x24
 ///
 /// 3. M2DE_CHuman_BaseConstructor (0x140D730B0)
-///    - Sets vtable = M2DE_vtbl_CActor_Abstract (with _purecall entries)
-///    - Allocates 2648 bytes (0xA58) for ALL inline components
-///    - Assigns component pointers to entity offsets +0xA8..+0x120
-///    - Sets initial values:
-///        +0x148 = 210.0f (health, NOT 200.0!)
-///        +0x14C = 210.0f (npc_healthmax)
-///        +0x150 = 1.0f   (nonplayer_damage_mult)
-///        +0x154 = 5.0f   (nonplayer_damage_dist)
-///        +0x160 = 0       (invulnerability + is_dead)
-///        +0x162 = 0       (demigod)
+///    - vtable = M2DE_VT_CActor_Abstract (с _purecall)
+///    - Аллоцирует 2648 байт для ВСЕХ компонентов
+///    - Инициализирует:
+///        +0x148 = 210.0f (здоровье)
+///        +0x14C = 210.0f (макс. здоровье NPC)
+///        +0x150 = 1.0f   (множитель урона)
+///        +0x154 = 5.0f   (дистанция урона)
+///        +0x160 = 0      (неуязвимость + мёртв)
+///        +0x162 = 0      (полубог)
 ///
 /// 4. M2DE_CHumanNPC_Constructor (0x140D712E0)
-///    - Sets vtable = 0x1418E5188 (NPC vtable)
-///    - Sets type = 0x0E via M2DE_Entity_SetTypeID
-///    - Sets entity_flags |= 0x40 at +0x28
-///    - Initializes self_ref (+0x190) = this
-///    - Initializes 8 smart ptr slots (+0x1C0..+0x238, IDs 1-7 and -1)
-///    - Registers in global entity table
+///    - vtable = 0x1418E5188 (NPC)
+///    - Тип = 0x0E через SetTypeID
+///    - self_ref (+0x190) = this
+///    - 8 smart ptr слотов (+0x1C0..+0x238)
 ///
-/// 5. M2DE_CPlayerEntity_Constructor (0x1400B9160)  [Player only]
-///    - Overwrites vtable = 0x14184C060 (player vtable)
-///    - Sets type = 0x10 via M2DE_Entity_SetTypeID
-///    - Initializes player-specific fields from +0x338
-///    - Total player entity size: ~0x530+ bytes
-/// ```
-///
-/// Component allocation (2648 bytes, single block):
-/// ```text
-/// +0xA8  -> AI params block (78+ bytes with float arrays)
-/// +0xB8  -> unknown component
-/// +0xC0  -> AI navigation (vtable from sub_140D723E0)
-/// +0xC8  -> component (vtable off_1418E3330)
-/// +0xD0  -> TransformSync (vtable M2DE_vtbl_TransformSyncComponent)
-/// +0xD8  -> NULL (optional, filled on demand)
-/// +0xE0  -> component (vtable off_1418E3308)
-/// +0xE8  -> Inventory (vtable M2DE_vtbl_HumanInventory)
-/// +0xF0  -> PropertyAccessor (back-ref at comp+0x170 -> entity)
-/// +0xF8  -> Behavior (sub_140D71AD0 result)
-/// +0x100 -> component block
-/// +0x108 -> weapon state (sub_1400B8FD0 result)
-/// +0x110 -> component (sub_1400B8F90 result)
-/// +0x118 -> component (vtable off_1418E33D0)
-/// +0x120 -> component (vtable off_1418E3358)
+/// 5. M2DE_CPlayerEntity_Constructor (0x1400B9160) [только Player]
+///    - vtable = 0x14184C060 (Player)
+///    - Тип = 0x10 через SetTypeID
+///    - Player-специфичные поля от +0x338
 /// ```
 pub const _CONSTRUCTOR_CHAIN_DOC: () = ();

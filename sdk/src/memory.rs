@@ -134,6 +134,79 @@ pub unsafe fn read_ptr_unaligned(addr: usize) -> Option<usize> {
 }
 
 // =============================================================================
+//  Проверка доступности страниц памяти
+// =============================================================================
+
+/// Проверяет что диапазон памяти `addr..addr+size` реально доступен для чтения.
+///
+/// Использует `VirtualQuery` для проверки что страница committed и readable.
+/// Это **тяжелее** чем `is_valid_ptr`, но гарантирует отсутствие access violation.
+///
+/// Использовать для:
+/// - дампов неизвестных структур
+/// - итерации по hash table с произвольными указателями
+/// - любых операций где нет 100% уверенности в валидности указателя
+pub fn is_readable(addr: usize, size: usize) -> bool {
+    use windows::Win32::System::Memory::{
+        VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT,
+        PAGE_READONLY, PAGE_READWRITE, PAGE_EXECUTE_READ,
+        PAGE_EXECUTE_READWRITE, PAGE_WRITECOPY, PAGE_EXECUTE_WRITECOPY,
+    };
+
+    if addr == 0 || addr < MIN_VALID_ADDR || size == 0 {
+        return false;
+    }
+
+    let mut mbi = MEMORY_BASIC_INFORMATION::default();
+    let result = unsafe {
+        VirtualQuery(
+            Some(addr as *const std::ffi::c_void),
+            &mut mbi,
+            std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+        )
+    };
+
+    if result == 0 {
+        return false;
+    }
+
+    if mbi.State != MEM_COMMIT {
+        return false;
+    }
+
+    let readable = mbi.Protect == PAGE_READONLY
+        || mbi.Protect == PAGE_READWRITE
+        || mbi.Protect == PAGE_EXECUTE_READ
+        || mbi.Protect == PAGE_EXECUTE_READWRITE
+        || mbi.Protect == PAGE_WRITECOPY
+        || mbi.Protect == PAGE_EXECUTE_WRITECOPY;
+
+    if !readable {
+        return false;
+    }
+
+    // Проверяем что весь запрошенный диапазон укладывается в один регион
+    let region_end = mbi.BaseAddress as usize + mbi.RegionSize;
+    addr + size <= region_end
+}
+
+/// Безопасно читает значение типа `T` с проверкой доступности страницы.
+///
+/// Медленнее чем `read_value`, но гарантирует отсутствие краша.
+pub unsafe fn read_value_safe<T: Copy>(addr: usize) -> Option<T> {
+    if !is_readable(addr, std::mem::size_of::<T>()) {
+        return None;
+    }
+    Some(std::ptr::read(addr as *const T))
+}
+
+/// Безопасно читает указатель с проверкой доступности страницы.
+pub unsafe fn read_ptr_safe(addr: usize) -> Option<usize> {
+    let value = read_value_safe::<usize>(addr)?;
+    if is_valid_ptr(value) { Some(value) } else { None }
+}
+
+// =============================================================================
 //  Отладка
 // =============================================================================
 
