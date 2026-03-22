@@ -216,6 +216,41 @@ pub mod player {
 
     /// `+0x344` -> death type / death mode (`i32`) [provisional].
     pub const DEATH_TYPE: usize = 0x344;
+
+    /// `+0x3D8` -> byte mode/state field.
+    ///
+    /// Подтверждённый predicate:
+    /// `M2DE_CPlayer_IsMode3D8_Not3Or4` проверяет что значение НЕ равно 3 и НЕ равно 4.
+    pub const MODE_3D8: usize = 0x3D8;
+
+    /// `+0x430` -> state code dword.
+    ///
+    /// Подтверждённый getter:
+    /// `M2DE_CPlayer_IsStateCode430_Equal10` возвращает `*(u32*)(this+0x430) == 10`.
+    pub const STATE_CODE_430: usize = 0x430;
+
+    /// `+0x464` -> dword-like bool/state field.
+    ///
+    /// Подтверждённый getter:
+    /// `M2DE_CPlayer_IsField464_Equal1` возвращает `*(u32*)(this+0x464) == 1`.
+    pub const FIELD_464: usize = 0x464;
+
+    /// `+0x490` -> player state flags / bitfield.
+    ///
+    /// Подтверждено:
+    /// - bits [1..3]   -> mask set/clear
+    /// - bits [4..6]   -> 3-bit field
+    /// - bits [7..13]  -> 7-bit mask/field
+    /// - bit  [14]     -> bool
+    /// - bit  [15]     -> bool
+    ///
+    /// См.:
+    /// - `M2DE_CPlayer_StateFlags490_SetClearMaskedBits1_3`
+    /// - `M2DE_CPlayer_StateFlags490_SetFieldBits4_6`
+    /// - `M2DE_CPlayer_StateFlags490_SetClearMaskedBits7_13`
+    /// - `M2DE_CPlayer_StateFlags490_SetBit14`
+    /// - `M2DE_CPlayer_StateFlags490_SetBit15`
+    pub const STATE_FLAGS_490: usize = 0x490;
 }
 
 // =============================================================================

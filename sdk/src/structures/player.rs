@@ -1,182 +1,146 @@
-//! Структура игрока (C_Human / C_Player).
+//! Структуры игрока и NPC (CHuman / CHumanNPC / CPlayer).
 //!
 //! Все поля восстановлены из IDA Pro + runtime проверок.
-//! Процент уверенности указан в комментариях к каждому полю.
 
-use super::Inventory;
+use super::{CEntity, Inventory};
 use crate::macros::assert_field_offsets;
 use std::ffi::c_void;
 
-/// C_Human / C_Player.
+/// CHuman — базовый класс для всех гуманоидов (NPC и Player).
 ///
-/// Базовый head `C_Entity` до `+0x78` пока не восстановлен полностью,
-/// поэтому он представлен raw-блоком.
+/// Размер: до +0x260 (где заканчиваются общие поля).
+/// Конструктор: `M2DE_CHuman_BaseConstructor` (0x140D730B0).
+/// Vtable: abstract (с _purecall).
 ///
-/// Подтверждённые полезные поля:
-/// - `+0x78` frame node
-/// - `+0x80` owner
-/// - `+0xA8` ai params
-/// - `+0xC0` ai nav
-/// - `+0xD0` transform sync
-/// - `+0xE8` inventory
-/// - `+0xF0` property accessor
-/// - `+0xF8` behavior
-/// - `+0x108` weapon state
-/// - `+0x148` current health
-/// - `+0x160` invulnerability
-/// - `+0x161` is_dead
-/// - `+0x162` demigod
-/// - `+0x180` body damage multipliers
-/// - `+0x190` self_ref
-/// - `+0x258` physics provider
+/// Наследуется:
+/// - CHumanNPC (0x0E) — NPC, размер ~0x338
+/// - CPlayer (0x10) — Player, размер 0x520+
+///
+/// Подтверждённые поля:
+/// - Health/damage (+0x148-0x163)
+/// - Components (+0xA8-0x120)
+/// - Smart ptr slots (+0x1C0-0x23F)
+/// - Self-ref (+0x190)
+/// - Physics provider (+0x258)
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CHuman {
-    /// Primary vtable.
-    pub vtable: *const c_void, // +0x000
+    /// База C_Entity (+0x00..+0x77)
+    pub base: CEntity, // +0x000
 
-    /// Неполностью доревершенный entity head.
-    pub _entity_head_08: [u8; 0x70], // +0x008..+0x077
-
-    /// Frame / transform node.
+    /// C_Actor overlay
     pub frame_node: *mut c_void, // +0x078
-
-    /// Owner entity. NULL = on foot, vehicle ptr = in car.
     pub owner: *mut c_void, // +0x080
 
-    /// Unknown actor padding.
-    pub _actor_pad_088: [u8; 0x18], // +0x088..+0x09F
+    /// Для Human/Player обычно 0, но оставляем как raw actor extension.
+    pub actor_field_88: usize, // +0x088
+    pub actor_field_90: usize, // +0x090
+    pub actor_field_98: usize, // +0x098
 
-    /// Actor subtype.
     pub entity_subtype: u32, // +0x0A0
     pub _pad_0A4: u32, // +0x0A4
 
-    /// AI params / config block.
+    /// Human components
     pub ai_params: *mut c_void, // +0x0A8
-
-    /// Unknown region between ai_params and ai_nav.
-    pub _unk_0B0: [u8; 0x10], // +0x0B0..+0x0BF
-
-    /// AI navigation component.
+    pub external_component_b0: *mut c_void, // +0x0B0
+    pub component_b8: *mut c_void, // +0x0B8
     pub ai_nav: *mut c_void, // +0x0C0
-    pub component_c8: *mut c_void,       // +0x0C8
-    pub transform_sync: *mut c_void,     // +0x0D0
+    pub component_c8: *mut c_void, // +0x0C8
+    pub transform_sync: *mut c_void, // +0x0D0
     pub optional_component: *mut c_void, // +0x0D8
-    pub component_e0: *mut c_void,       // +0x0E0
-
-    /// Inventory pointer.
+    pub component_e0: *mut c_void, // +0x0E0
     pub inventory: *mut Inventory, // +0x0E8
-
-    /// Property accessor / control-like component.
     pub property_accessor: *mut c_void, // +0x0F0
-
-    /// Behavior component.
     pub behavior: *mut c_void, // +0x0F8
-
     pub component_100: *mut c_void, // +0x100
-
-    /// Weapon state component.
     pub weapon_state: *mut c_void, // +0x108
+    pub component_110: *mut c_void, // +0x110
+    pub component_118: *mut c_void, // +0x118
+    pub component_120: *mut c_void, // +0x120
+    pub _unk_128: [u8; 0x20], // +0x128..+0x147
 
-    /// Unknown region before health.
-    pub _unk_110: [u8; 0x38], // +0x110..+0x147
-
-    /// Current health.
+    /// Health / damage
     pub current_health: f32, // +0x148
-
-    /// Для NPC — обычно healthmax.
-    /// Для player часть семантики может отличаться.
-    pub npc_healthmax_or_type_mult: f32, // +0x14C
-
-    /// Damage multiplier from non-player sources.
+    pub field_14c: f32, // +0x14C
     pub nonplayer_damage_mult: f32, // +0x150
-
-    /// Distance threshold for damage falloff.
     pub nonplayer_damage_dist: f32, // +0x154
-
     pub _pad_158: [u8; 0x08], // +0x158..+0x15F
 
-    /// Invulnerability flag.
     pub invulnerability: u8, // +0x160
-
-    /// Is dead flag.
     pub is_dead: u8, // +0x161
-
-    /// Demigod flag.
     pub demigod: u8, // +0x162
+    pub unknown_flag_163: u8, // +0x163
+    pub _pad_164: [u8; 0x1C], // +0x164..+0x17F
 
-    pub _pad_163: [u8; 0x1D], // +0x163..+0x17F
-
-    /// Body damage multipliers pointer.
     pub body_damage_multipliers: *mut f32, // +0x180
+    pub body_zone_count: u32, // +0x188
+    pub _unk_18c: u32, // +0x18C
 
-    pub _pad_188: [u8; 0x08], // +0x188..+0x18F
-
-    /// Self pointer.
     pub self_ref: *mut CHuman, // +0x190
 
-    /// NPC-specific indices / table refs.
-    pub entity_table_index: i32, // +0x198
-    pub entity_table_slot: i32, // +0x19C
+    pub _unk_198: u32, // +0x198
+    pub _unk_19c: u32, // +0x19C
 
     pub _pad_1A0: [u8; 0x20], // +0x1A0..+0x1BF
 
-    /// 8 smart pointer slots.
+    /// 8 smart ptr slots по 16 байт — пока raw.
     pub smart_ptr_slots: [[u8; 16]; 8], // +0x1C0..+0x23F
 
     pub _pad_240: [u8; 0x18], // +0x240..+0x257
 
-    /// Physics provider.
     pub physics_provider: *mut c_void, // +0x258
 }
 
 assert_field_offsets!(CHuman {
-    vtable                     == 0x000,
+    base                       == 0x000,
     frame_node                 == 0x078,
     owner                      == 0x080,
+    actor_field_88             == 0x088,
     entity_subtype             == 0x0A0,
     ai_params                  == 0x0A8,
+    external_component_b0      == 0x0B0,
+    component_b8               == 0x0B8,
     ai_nav                     == 0x0C0,
+    component_c8               == 0x0C8,
     transform_sync             == 0x0D0,
+    optional_component         == 0x0D8,
+    component_e0               == 0x0E0,
     inventory                  == 0x0E8,
     property_accessor          == 0x0F0,
     behavior                   == 0x0F8,
+    component_100              == 0x100,
     weapon_state               == 0x108,
+    component_110              == 0x110,
+    component_118              == 0x118,
+    component_120              == 0x120,
     current_health             == 0x148,
-    npc_healthmax_or_type_mult == 0x14C,
+    field_14c                  == 0x14C,
     nonplayer_damage_mult      == 0x150,
     nonplayer_damage_dist      == 0x154,
     invulnerability            == 0x160,
     is_dead                    == 0x161,
     demigod                    == 0x162,
+    unknown_flag_163           == 0x163,
     body_damage_multipliers    == 0x180,
+    body_zone_count            == 0x188,
     self_ref                   == 0x190,
     physics_provider           == 0x258,
 });
 
 impl CHuman {
-    /// factory type byte из packed table_id по offset +0x24.
+    /// factory type byte из packed table_id.
     pub fn factory_type(&self) -> u8 {
-        unsafe {
-            let base = self as *const Self as *const u8;
-            *(base.add(0x24) as *const u8)
-        }
+        self.base.factory_type()
     }
 
-    /// packed table_id по offset +0x24.
+    /// packed table_id.
     pub fn table_id(&self) -> u32 {
-        unsafe {
-            let base = self as *const Self as *const u8;
-            *(base.add(0x24) as *const u32)
-        }
+        self.base.table_id
     }
 
-    /// entity flags по offset +0x28.
+    /// entity flags.
     pub fn entity_flags(&self) -> u32 {
-        unsafe {
-            let base = self as *const Self as *const u8;
-            *(base.add(0x28) as *const u32)
-        }
+        self.base.entity_flags
     }
 
     pub fn health(&self) -> f32 {
@@ -203,7 +167,7 @@ impl CHuman {
         self.factory_type() == 0x10
     }
 
-    pub fn is_valid_ptr(&self) -> bool {
+    pub fn has_valid_self_ref(&self) -> bool {
         let self_ptr = self as *const Self as *mut CHuman;
         self.self_ref == self_ptr
     }

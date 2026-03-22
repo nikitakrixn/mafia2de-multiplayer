@@ -1641,3 +1641,54 @@ pub mod entity_vtable {
     /// IDA: `0x14039BAF0`
     pub const BASE_ENTITY_DESTROY_CLEANUP: usize = 0x39_BAF0;
 }
+
+
+pub mod player_vtable {
+    /// vtable[96] — player+0x490: set/clear mask for bits [1..3].
+    pub const STATE_FLAGS_490_SETCLEAR_BITS_1_3: usize = 0x0C_9240;
+
+    /// vtable[97] — player+0x490: write 3-bit field into bits [4..6].
+    pub const STATE_FLAGS_490_SET_FIELD_4_6: usize = 0x0C_9280;
+
+    /// vtable[98] — player+0x490: set/clear mask for bits [7..13].
+    pub const STATE_FLAGS_490_SETCLEAR_BITS_7_13: usize = 0x0C_92C0;
+
+    /// vtable[99] — player+0x490: set bit 14.
+    pub const STATE_FLAGS_490_SET_BIT_14: usize = 0x0C_92A0;
+
+    /// vtable[100] — player+0x490: set bit 15.
+    pub const STATE_FLAGS_490_SET_BIT_15: usize = 0x0C_9300;
+
+    /// vtable[83] — checks `player+0x430 == 10`.
+    pub const IS_STATE_CODE_430_EQ_10: usize = 0x0B_D8C0;
+
+    /// vtable[94] — checks `player+0x3D8 != 3 && != 4`.
+    pub const IS_MODE_3D8_NOT_3_OR_4: usize = 0x0C_47F0;
+
+    /// vtable[102] — checks `player+0x464 == 1`.
+    pub const IS_FIELD_464_EQ_1: usize = 0x0C_4640;
+
+    /// vtable[103] — `IsField464_Equal1 || sub_1400C46F0`.
+    pub const CHECK_FIELD_464_OR_HELPER: usize = 0x0C_4650;
+
+    /// vtable[104] — special dispatch for codes 800..849.
+    pub const HANDLE_CODE_RANGE_800_849: usize = 0x0C_6F00;
+
+    /// vtable[106] — physics marker toggle handler for codes 850..855.
+    pub const HANDLE_PHYSICS_MARKER_CODES_850_855: usize = 0x0C_6F40;
+
+    /// vtable[107] — formats "PlayerFx%u" and dispatches it.
+    pub const TRIGGER_FX_BY_ID: usize = 0x0C_7040;
+
+    /// vtable[109] — thunk via physics provider at +0x258.
+    pub const PHYSICS_PROVIDER_THUNK_FILLOUT: usize = 0x0C_3680;
+
+    /// kill damage action cluster
+    pub const KILL_DAMAGE_ACTION_BASE_DTOR_A: usize = 0x0B_B170;
+    pub const KILL_DAMAGE_ACTION_BASE_DTOR_B: usize = 0x0B_ACB0;
+    pub const KILL_DAMAGE_ACTION_CREATE_FROM_TEMPLATE: usize = 0x0B_EBB0;
+
+    /// pooled 0x20 object cluster
+    pub const POOLED_OBJECT20_CLONE: usize = 0x1D_1E90;
+    pub const POOLED_OBJECT20_DTOR_OR_RECYCLE: usize = 0x0B_AAC0;
+}

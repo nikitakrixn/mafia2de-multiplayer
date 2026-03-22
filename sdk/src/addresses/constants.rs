@@ -831,3 +831,25 @@ pub mod module_ids {
     pub const LAST: u32 = 48;
 }
 
+
+
+/// Битовая разметка player+0x490.
+///
+/// Семантика битов пока не названа,
+/// но структура bitfield подтверждена decompile'ом.
+pub mod player_state_flags_490 {
+    /// Биты [1..3]
+    pub const MASK_BITS_1_3: u32 = 0x0000_000E;
+
+    /// Биты [4..6]
+    pub const MASK_BITS_4_6: u32 = 0x0000_0070;
+
+    /// Биты [7..13]
+    pub const MASK_BITS_7_13: u32 = 0x0000_3F80;
+
+    /// Бит 14
+    pub const BIT_14: u32 = 0x0000_4000;
+
+    /// Бит 15
+    pub const BIT_15: u32 = 0x0000_8000;
+}
