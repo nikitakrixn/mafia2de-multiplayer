@@ -10,8 +10,8 @@
 //! - M2DE_HumanEntity_ProcessDeath (0x140DD2460)
 //! - M2DE_Human_SendEnterVehicleMessage (0x140DA4C80)
 
-use std::ffi::c_void;
 use crate::macros::{assert_field_offsets, assert_layout};
+use std::ffi::c_void;
 
 /// Общий заголовок entity/human сообщения.
 ///
@@ -23,30 +23,30 @@ use crate::macros::{assert_field_offsets, assert_layout};
 pub struct EntityMessageHeader {
     /// VTable конкретного типа сообщения.
     /// Через vtable движок определяет тип и читает payload.
-    pub vtable: *const c_void,              // +0x00
+    pub vtable: *const c_void, // +0x00
 
     /// Пока не расшифровано полностью.
-    pub field_08: u32,                      // +0x08
+    pub field_08: u32, // +0x08
 
     /// ID сущности-широковещателя.
     /// Если 0 при отправке — движок заполнит из [entity + 0x24].
-    pub broadcaster_id: u32,                // +0x0C
+    pub broadcaster_id: u32, // +0x0C
 
     /// ID сущности, связанной с сообщением.
     /// Sender-path обычно пишет сюда [entity + 0x24].
-    pub entity_id: u32,                     // +0x10
+    pub entity_id: u32, // +0x10
 
     /// Основной ID сообщения.
     /// Примеры: 0xD0010 (DAMAGE), 0xD0014 (DEATH),
     /// 0xD001B (ENTER_VEHICLE), 0xD001C (LEAVE_VEHICLE).
-    pub message_id: u32,                    // +0x14
+    pub message_id: u32, // +0x14
 
     /// Почти всегда 0xFFFFFFFF.
-    pub sentinel: u32,                      // +0x18
+    pub sentinel: u32, // +0x18
 
     /// Флаг активности. Во всех sender-path ставится в 1.
-    pub active_flag: u8,                    // +0x1C
-    pub _pad_1d: [u8; 3],                   // +0x1D
+    pub active_flag: u8, // +0x1C
+    pub _pad_1d: [u8; 3], // +0x1D
 }
 
 impl EntityMessageHeader {
@@ -68,13 +68,13 @@ impl EntityMessageHeader {
 #[derive(Debug, Clone, Copy)]
 pub struct DamageMessagePayload {
     /// Зона попадания.
-    pub hit_area: u32,                      // +0x20
+    pub hit_area: u32, // +0x20
     /// Часть тела (0x10 = голова, 0x11..0x13 = другие зоны).
-    pub body_part: u32,                     // +0x24
+    pub body_part: u32, // +0x24
     /// Тип/ID оружия, нанёсшего урон.
-    pub weapon_type: u32,                   // +0x28
+    pub weapon_type: u32, // +0x28
     /// Количество урона.
-    pub damage_amount: f32,                 // +0x2C
+    pub damage_amount: f32, // +0x2C
 }
 
 /// Полное DAMAGE-сообщение = заголовок + payload.
@@ -92,19 +92,19 @@ pub struct DamageMessage {
 #[derive(Debug, Clone, Copy)]
 pub struct DeathMessagePayload {
     /// Позиция смерти X.
-    pub pos_x: f32,                         // +0x20
+    pub pos_x: f32, // +0x20
     /// Позиция смерти Y.
-    pub pos_y: f32,                         // +0x24
+    pub pos_y: f32, // +0x24
     /// Позиция Z (raw, без интерпретации).
-    pub pos_z_raw: u32,                     // +0x28
+    pub pos_z_raw: u32, // +0x28
     /// ID сущности-убийцы.
-    pub killer_entity_id: u32,              // +0x2C
+    pub killer_entity_id: u32, // +0x2C
     /// Тип летального урона.
-    pub damage_type: u32,                   // +0x30
+    pub damage_type: u32, // +0x30
     /// Часть тела, куда пришёл смертельный удар.
-    pub body_part: u32,                     // +0x34
+    pub body_part: u32, // +0x34
     /// ID оружия.
-    pub weapon_id: u32,                     // +0x38
+    pub weapon_id: u32, // +0x38
 }
 
 /// Полное DEATH-сообщение.
@@ -123,7 +123,7 @@ pub struct DeathMessage {
 #[derive(Debug, Clone, Copy)]
 pub struct WeaponMessagePayload {
     /// ID сущности оружия.
-    pub weapon_entity_id: u32,              // +0x20
+    pub weapon_entity_id: u32, // +0x20
 }
 
 /// Weapon message (для WEAPON_DRAW и WEAPON_HOLSTER).
@@ -139,7 +139,7 @@ pub struct WeaponMessage {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct StanceMessagePayload {
-    pub flag: u8,                           // +0x20
+    pub flag: u8, // +0x20
 }
 
 /// Полное stance message.
@@ -150,9 +150,9 @@ pub struct StanceMessage {
     pub payload: StanceMessagePayload,
 }
 
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 //  Compile-time проверки layout'ов
-// ═══════════════════════════════════════════════════════════════════
+// =============================================================================
 
 assert_layout!(EntityMessageHeader, size = 0x20, {
     vtable         == 0x00,

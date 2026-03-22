@@ -3,8 +3,8 @@
 //! Низкоуровневый объект движка: физика, рендер, столкновения.
 //! Не путать с Vehicle (Lua-обёртка для гаража/спавна).
 
-use std::ffi::c_void;
 use crate::macros::assert_field_offsets;
+use std::ffi::c_void;
 
 /// Engine-level сущность машины.
 ///
@@ -12,10 +12,10 @@ use crate::macros::assert_field_offsets;
 /// VTables: `vtables::car::{MAIN, BASE_2, BASE_3}`
 #[repr(C)]
 pub struct CCar {
-    pub vtable: *const c_void,              // +0x00
+    pub vtable: *const c_void, // +0x00
     _pad_008: [u8; 0x38 - 0x08],
     /// Указатель на основные данные машины (физика, bbox).
-    pub important_data: *mut CarData,       // +0x38
+    pub important_data: *mut CarData, // +0x38
 }
 
 /// Основные данные машины (по C_Car::important_data).
@@ -31,10 +31,10 @@ pub struct CCar {
 pub struct CarData {
     _pad_000: [u8; 0x270],
     /// Информация о размерах модели.
-    pub size_info: *mut c_void,             // +0x270
+    pub size_info: *mut c_void, // +0x270
     _pad_278: [u8; 0x2F8 - 0x278],
     /// Параметры инициализации (из SDS/ресурсов).
-    pub init_info: *mut c_void,             // +0x2F8
+    pub init_info: *mut c_void, // +0x2F8
     _pad_300: [u8; 0x328 - 0x300],
 
     /// Bounding box — сырые байты области +0x328..+0x340.
@@ -47,7 +47,7 @@ pub struct CarData {
     ///
     /// Из-за невыровненного f64 нельзя представить как поля repr(C).
     /// Используй аксессоры ниже для типизированного чтения.
-    pub bbox_raw: [u8; 0x340 - 0x328],     // +0x328, 24 байта
+    pub bbox_raw: [u8; 0x340 - 0x328], // +0x328, 24 байта
 }
 
 impl CarData {

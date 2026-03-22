@@ -3,51 +3,60 @@
 //! Все структуры восстановлены из IDA Pro и проверены
 //! compile-time ассертами на смещения полей.
 
-mod game_world;
-mod player;
-mod inventory;
-mod vehicle;
-mod car;
-mod garage;
-mod tables;
 mod callbacks;
+mod car;
+mod entity;
+mod game_world;
+mod garage;
+mod inventory;
 mod messages;
+mod player;
+mod police_script_owner;
 mod render;
+mod script_entity;
+mod tables;
+mod vehicle;
+
+// Entity system (DB records, wrappers, factories)
+pub use entity::{
+    CActorFields, CEntity, CEntityDBRecord, CEntityGuid, CScriptWrapper, CScriptWrapperManager,
+    CServiceIdentity, CTypeDescriptor, CWrapperFactory,
+};
 
 // Корневые типы
 pub use game_world::GameManager;
 pub use player::CHuman;
 
 // Инвентарь и деньги
-pub use inventory::{Inventory, InventorySlot, InventoryData, MoneyValue};
+pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};
 
 // Транспорт
-pub use vehicle::{Vehicle, VehicleWrapper};
 pub use car::{CCar, CarData};
+pub use vehicle::{Vehicle, VehicleWrapper};
 
 // Гараж
-pub use garage::{CGarageManager, CGarage};
+pub use garage::{CGarage, CGarageManager};
 
 // Таблицы данных
 pub use tables::TableManager;
 
-// Callback-система (много связанных типов)
+// Callback-система
 pub use callbacks::{
-    GameCallbackManager, CallbackEventDesc, CallbackFunctionEntry,
-    PendingFunctionOp, DispatchContext, DispatchTimer,
+    CallbackEventDesc, CallbackFunctionEntry, DispatchContext, DispatchTimer, GameCallbackManager,
+    PendingFunctionOp,
 };
 
 // Entity/human сообщения
 pub use messages::{
-    EntityMessageHeader,
-    DamageMessage, DamageMessagePayload,
-    DeathMessage, DeathMessagePayload,
-    WeaponMessage, WeaponMessagePayload,
-    StanceMessage, StanceMessagePayload,
+    DamageMessage, DamageMessagePayload, DeathMessage, DeathMessagePayload, EntityMessageHeader,
+    StanceMessage, StanceMessagePayload, WeaponMessage, WeaponMessagePayload,
 };
 
 // DX11 рендер
-pub use render::{
-    CRenderDeviceD3D11, RenderInitConfig,
-    SwapChainManager, SwapChainWrapper,
-};
+pub use render::{CRenderDeviceD3D11, RenderInitConfig, SwapChainManager, SwapChainWrapper};
+
+// ScriptEntity family
+pub use script_entity::{CPoliceScriptChild, CScriptEntity};
+
+// Police-script owner singleton
+pub use police_script_owner::{PoliceScriptOwner, PoliceScriptOwnerNode};
