@@ -297,6 +297,30 @@ pub mod player {
 }
 
 // =============================================================================
+//  Player Sub45C subobject
+// =============================================================================
+
+pub mod player_sub45c {
+    /// `+0x00` -> primary stored action/code.
+    pub const CODE_A: usize = 0x00;
+
+    /// `+0x04` -> auxiliary stored action/code.
+    pub const CODE_B: usize = 0x04;
+
+    /// `+0x08` -> sub-state.
+    ///
+    /// Observed:
+    /// - 0 = idle
+    /// - 1 = pending
+    /// - 2 = active A
+    /// - 3 = active B
+    /// - 4 = deferred
+    pub const STATE: usize = 0x08;
+
+    pub const SIZE: usize = 0x0C;
+}
+
+// =============================================================================
 //  Inventory / weapon / money
 // =============================================================================
 

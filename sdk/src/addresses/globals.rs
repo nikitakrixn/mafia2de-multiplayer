@@ -361,3 +361,23 @@ pub const POLICE_SCRIPT_OWNER: usize = 0x1C9_FBB8;
 ///
 /// IDA: `byte_141C9FBC0`
 pub const POLICE_SCRIPT_OWNER_SHUTDOWN_FLAG: usize = 0x1C9_FBC0;
+
+/// `M2DE_g_ActionCodeManager` — прямой глобальный объект action-code manager.
+///
+/// ВАЖНО:
+/// это НЕ указатель, а сам объект в памяти игры.
+///
+/// Getter:
+/// - `M2DE_GetActionCodeManager()` (`0x140FEE6D0`)
+///
+/// Наблюдаемые поля:
+/// - `+0x08`   -> service/context ptr
+/// - `+0x2075` -> enabled-like byte
+/// - `+0x207C` -> busy/blocked-like byte
+/// - `+0x2090` -> mode/state dword
+/// - `+0x2094` -> mode/state dword
+/// - `+0x2098` -> context/descriptor ptr
+/// - `+0x20A0` -> extra ptr/ctx
+///
+/// IDA: `0x14314_0E30`
+pub const ACTION_CODE_MANAGER: usize = 0x314_0E30;

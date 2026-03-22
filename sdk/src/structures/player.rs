@@ -231,32 +231,29 @@ impl CHumanNPC {
 //  CPlayerSub45C — special state subobject
 // =============================================================================
 
-/// Player subobject at +0x45C — подобъект специального состояния игрока.
+/// Player special-state subobject at `player + 0x45C`.
 ///
 /// Подтверждено:
-/// - +0x08 = state field (поле состояния)
-/// - state==1 проверяется через `M2DE_CPlayer_IsSub45CStateEqual1`
-/// - state in {2,3} проверяется через `M2DE_CPlayerSub45C_IsState2Or3`
-/// - state==4 проверяется через `M2DE_CPlayerSub45C_IsStateEqual4`
-///
-/// Этот подобъект является частью state machine игрока.
+/// - `+0x08` = state
+/// - state 1/2/3/4 используются helper-функциями
+/// - `code_a` / `code_b` участвуют в code resolve / flush logic
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct CPlayerSub45C {
-    /// Основное сохранённое значение/код.
-    pub field_00: u32, // +0x00
+    /// Stored code / current action code.
+    pub code_a: u32, // +0x00
 
-    /// Зеркальное/вспомогательное значение.
-    pub field_04: u32, // +0x04
+    /// Auxiliary / mirror code.
+    pub code_b: u32, // +0x04
 
-    /// Поле state machine.
+    /// Sub-state.
     ///
-    /// Наблюдаемые значения:
-    /// - 0 = idle (простой)
-    /// - 1 = pending (ожидание)
-    /// - 2 = special-active A (специальное активное состояние A)
-    /// - 3 = special-active B (специальное активное состояние B)
-    /// - 4 = deferred/threshold-triggered (отложенное/триггерное состояние)
+    /// Observed values:
+    /// - 0 = idle
+    /// - 1 = pending
+    /// - 2 = active A
+    /// - 3 = active B
+    /// - 4 = deferred/threshold
     pub state: u32, // +0x08
 }
 
