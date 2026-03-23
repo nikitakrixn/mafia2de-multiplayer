@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
 use common::logger;
+use protocol::NetPlayerEvent;
 use sdk::game::player::Vec3;
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,11 @@ pub enum PlayerEvent {
     EnterVehicleDone,
     LeaveVehicle,
     LeaveVehicleDone,
+
+    VehicleEntered {
+        vehicle_ptr: usize,
+    },
+    VehicleLeft,
 
     Damage,
     Death,
@@ -74,6 +80,34 @@ pub fn push(event: PlayerEvent) {
     }
 }
 
+/// Маппинг локального события в сетевое.
+///
+/// Возвращает `None` для событий, которые не нужно транслировать по сети
+/// (например, MoneyChanged — это только локальное состояние).
+pub fn to_net_event(ev: &PlayerEvent) -> Option<NetPlayerEvent> {
+    match ev {
+        PlayerEvent::EnterVehicle => Some(NetPlayerEvent::EnterVehicle),
+        PlayerEvent::EnterVehicleDone => Some(NetPlayerEvent::EnterVehicleDone),
+        PlayerEvent::LeaveVehicle => Some(NetPlayerEvent::LeaveVehicle),
+        PlayerEvent::LeaveVehicleDone => Some(NetPlayerEvent::LeaveVehicleDone),
+        PlayerEvent::VehicleEntered { .. } => Some(NetPlayerEvent::EnterVehicleDone),
+        PlayerEvent::VehicleLeft => Some(NetPlayerEvent::LeaveVehicleDone),
+        PlayerEvent::Damage => Some(NetPlayerEvent::Damage),
+        PlayerEvent::Death => Some(NetPlayerEvent::Death),
+        PlayerEvent::Shot => Some(NetPlayerEvent::Shot),
+        PlayerEvent::WeaponSelect => Some(NetPlayerEvent::WeaponSelect),
+        PlayerEvent::WeaponHide => Some(NetPlayerEvent::WeaponHide),
+        // Локальные события — не транслируем
+        PlayerEvent::MoneyChanged { .. }
+        | PlayerEvent::MovementStarted { .. }
+        | PlayerEvent::MovementStopped { .. }
+        | PlayerEvent::Teleported { .. }
+        | PlayerEvent::ControlsLockedChanged { .. }
+        | PlayerEvent::ControlStyleChanged { .. }
+        | PlayerEvent::AnimNotify => None,
+    }
+}
+
 pub fn process_pending() {
     let drained: Vec<_> = match queue().lock() {
         Ok(mut q) => q.drain(..).collect(),
@@ -85,6 +119,12 @@ pub fn process_pending() {
 
     for ev in &drained {
         log_event(ev);
+
+        // Только whitelist-события идут в сетевой слой.
+        // push_local_event сам проверяет is_connected.
+        if let Some(net_ev) = to_net_event(ev) {
+            crate::network::push_local_event(net_ev);
+        }
     }
 }
 
@@ -101,6 +141,16 @@ fn log_event(ev: &PlayerEvent) {
         }
         PlayerEvent::LeaveVehicleDone => {
             logger::info("[player-event] LeaveVehicleDone");
+        }
+
+        PlayerEvent::VehicleEntered { vehicle_ptr } => {
+            logger::info(&format!(
+                "[player-event] VehicleEntered (ptr=0x{:X})",
+                vehicle_ptr
+            ));
+        }
+        PlayerEvent::VehicleLeft => {
+            logger::info("[player-event] VehicleLeft");
         }
 
         PlayerEvent::Damage => {

@@ -7,6 +7,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use common::logger;
+use protocol::{NetPlayerSnapshot, NetVec3};
 use sdk::game::{Player, player::Vec3};
 
 use crate::{
@@ -82,6 +83,13 @@ pub fn update_main_thread() {
 
     let snapshot = capture_snapshot(&player);
     guard.process_snapshot(snapshot);
+
+    // Отправляем network snapshot если подключены
+    if crate::network::is_connected() {
+        if let Some(net_snap) = capture_network_snapshot(&player) {
+            crate::network::push_local_snapshot(net_snap);
+        }
+    }
 }
 
 fn reset() {
@@ -103,6 +111,52 @@ fn capture_snapshot(player: &Player) -> PlayerSnapshot {
         controls_locked: player.are_controls_locked(),
         control_style: player.get_control_style_str(),
     }
+}
+
+/// Собрать минимальный сетевой snapshot для отправки на сервер.
+///
+/// Использует только подтверждённые reverse'ом поля.
+/// Возвращает `None` если позиция недоступна (игрок не готов).
+fn capture_network_snapshot(player: &Player) -> Option<NetPlayerSnapshot> {
+    static TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    let position = player.get_position()?;
+    let forward = player.get_forward_vector().unwrap_or_default();
+
+    let health = player.get_health().unwrap_or(0.0);
+    let is_dead = player.is_alive().map(|a| !a).unwrap_or(false);
+    let in_vehicle = player.is_in_vehicle().unwrap_or(false);
+
+    let state_code_430 = player.get_state_code_430().unwrap_or(0);
+    let state_flags_3d8 = player.get_state_flags_3d8().unwrap_or(0);
+    let state_flags_490 = player.get_state_flags_490().unwrap_or(0);
+    let sub45c_state = player.get_sub45c_state().unwrap_or(0);
+
+    let tick = TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+    let player_id = crate::network::local_player_id().unwrap_or(0);
+
+    Some(NetPlayerSnapshot {
+        tick,
+        player_id,
+        position: NetVec3 {
+            x: position.x,
+            y: position.y,
+            z: position.z,
+        },
+        forward: NetVec3 {
+            x: forward.x,
+            y: forward.y,
+            z: forward.z,
+        },
+        health,
+        is_dead,
+        state_code_430,
+        state_flags_3d8,
+        state_flags_490,
+        sub45c_state,
+        in_vehicle,
+    })
 }
 
 fn distance(a: Vec3, b: Vec3) -> f32 {

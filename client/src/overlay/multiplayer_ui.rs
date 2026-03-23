@@ -19,6 +19,8 @@ use std::sync::{Mutex, OnceLock};
 use super::egui_input;
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 
+use crate::network;
+
 // =============================================================================
 //  Состояние UI
 // =============================================================================
@@ -90,6 +92,16 @@ fn state() -> &'static MultiplayerUIState {
 // =============================================================================
 //  Публичный API
 // =============================================================================
+
+/// Нужен ли захват мыши — когда открыто любое интерактивное окно.
+///
+/// Вызывается из render thread перед сборкой egui RawInput.
+pub fn wants_mouse() -> bool {
+    let s = state();
+    s.show_connect_menu.load(Ordering::Relaxed)
+        || s.show_player_list.load(Ordering::Relaxed)
+        || s.show_chat.load(Ordering::Relaxed)
+}
 
 /// Обработка горячих клавиш для мультиплеер UI.
 pub fn handle_hotkeys() {
@@ -331,24 +343,20 @@ fn draw_connect_menu(ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 if !data.is_connected {
                     if ui.button("Подключиться").clicked() {
-                        // TODO: вызвать функцию подключения к серверу
-                        common::logger::info(&format!(
-                            "[multiplayer] подключение к {}:{} как {}",
-                            data.server_ip, data.server_port, data.nickname
-                        ));
-                        add_system_message(format!(
-                            "Подключение к {}:{}...",
-                            data.server_ip, data.server_port
-                        ));
+                        let port: u16 = data.server_port.parse().unwrap_or(protocol::DEFAULT_PORT);
+                        let ip = data.server_ip.clone();
+                        let nick = data.nickname.clone();
+                        drop(data);
+                        network::connect(&ip, port, &nick);
+                        s.show_connect_menu.store(false, Ordering::Relaxed);
+                        return;
                     }
                 } else {
                     if ui.button("Отключиться").clicked() {
-                        // TODO: вызвать функцию отключения
-                        common::logger::info("[multiplayer] отключение от сервера");
-                        data.is_connected = false;
-                        data.connection_status = "Отключен".to_string();
-                        clear_players();
-                        add_system_message("Отключено от сервера".to_string());
+                        drop(data);
+                        network::disconnect();
+                        s.show_connect_menu.store(false, Ordering::Relaxed);
+                        return;
                     }
                 }
 
@@ -511,18 +519,15 @@ fn draw_chat(ctx: &egui::Context) {
                 response.request_focus();
             }
 
-            // Enter — отправить сообщение
             if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                 if !input.trim().is_empty() {
-                    // TODO: отправить сообщение на сервер
-                    common::logger::info(&format!("[chat] отправка: {}", input.trim()));
-
-                    // Временно добавляем локально
-                    if let Ok(data) = s.connection_data.lock() {
-                        add_chat_message(data.nickname.clone(), input.clone());
-                    }
-
+                    let text = input.trim().to_string();
                     input.clear();
+                    drop(input);
+                    network::send_chat_message(text);
+                    s.show_chat.store(false, Ordering::Relaxed);
+                    s.chat_input_focused.store(false, Ordering::Relaxed);
+                    return;
                 }
                 s.show_chat.store(false, Ordering::Relaxed);
                 s.chat_input_focused.store(false, Ordering::Relaxed);

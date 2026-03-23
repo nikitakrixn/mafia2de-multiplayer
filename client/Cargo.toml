@@ -20,9 +20,10 @@ windows = { workspace = true, features = [
     "Win32_Graphics_Dxgi_Common",
     "Win32_Graphics_Gdi",
 ]}
-common = { workspace = true }
-sdk    = { workspace = true }
-minhook = { workspace = true }
+common   = { workspace = true }
+sdk      = { workspace = true }
+protocol = { workspace = true }
+minhook  = { workspace = true }
 chrono = { workspace = true }
 
 egui = { version = "0.33.3", default-features = false }

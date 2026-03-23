@@ -11,6 +11,7 @@ use common::logger;
 /// Высокоуровневая обёртка над humanoid entity по имени.
 ///
 /// Подходит для Joe / Henry / других NPC, доступных через FindByName.
+#[derive(Debug)]
 pub struct Npc {
     entity: EntityRef,
     name: String,
@@ -146,9 +147,18 @@ impl Npc {
 
         unsafe {
             // Forward (Col1)
-            memory::write_value(frame + crate::addresses::fields::entity_frame::FORWARD_X, fx);
-            memory::write_value(frame + crate::addresses::fields::entity_frame::FORWARD_Y, fy);
-            memory::write_value(frame + crate::addresses::fields::entity_frame::FORWARD_Z, fz);
+            memory::write_value(
+                frame + crate::addresses::fields::entity_frame::FORWARD_X,
+                fx,
+            );
+            memory::write_value(
+                frame + crate::addresses::fields::entity_frame::FORWARD_Y,
+                fy,
+            );
+            memory::write_value(
+                frame + crate::addresses::fields::entity_frame::FORWARD_Z,
+                fz,
+            );
 
             // Right (Col0)
             memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_X, rx);

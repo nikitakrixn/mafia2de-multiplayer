@@ -6,11 +6,14 @@ mod human_messages;
 mod input;
 mod lua_queue;
 mod main_thread;
+mod network;
 mod overlay;
 mod player_events;
 mod player_tracker;
+mod remote_players;
 mod state;
 mod utils;
+mod vehicle_tracker;
 
 use common::logger;
 use std::ffi::c_void;
@@ -61,6 +64,9 @@ fn initialize() {
     lua_queue::init();
     player_tracker::init();
     player_events::init();
+    vehicle_tracker::init();
+    network::init();
+    remote_players::init();
     let _ = state::refresh_from_runtime();
     sdk::game::lua::log_chain();
 

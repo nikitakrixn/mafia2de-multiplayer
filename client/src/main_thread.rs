@@ -40,8 +40,17 @@ pub fn on_main_thread_tick() {
     drain_lua_queue(MAX_LUA_PER_TICK);
     refresh_state_if_needed();
     update_ping_if_needed();
+
+    // Gameplay tracking — всё это работает на game thread.
     crate::player_tracker::update_main_thread();
+    crate::vehicle_tracker::update_main_thread();
+
+    // Высокоуровневые локальные события -> лог + network queue
     crate::player_events::process_pending();
+
+    // Multiplayer network layer: дреним outbound, применяем inbound
+    crate::network::poll_main_thread();
+
     crate::hooks::try_deferred_present_hook();
     crate::overlay::state::sync_from_game();
 }
@@ -67,7 +76,7 @@ fn update_ping_if_needed() {
     }
 
     LAST_PING_UPDATE_MS.store(now, Ordering::Release);
-    
+
     // Симулируем обновление пинга в демо-режиме
     // TODO: заменить на реальное обновление пинга от сервера
     crate::overlay::multiplayer_demo::simulate_ping_updates();

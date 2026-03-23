@@ -187,11 +187,12 @@ pub fn render_frame() {
 
     // Собираем ввод
     let hwnd = sdk::game::render::get_hwnd();
+    let wants_mouse = multiplayer_ui::wants_mouse();
     let mut raw_input = egui_input::collect_raw_input(
         inner.screen_w as f32,
         inner.screen_h as f32,
         hwnd,
-        false, // пока не нужен захват мыши
+        wants_mouse,
     );
     raw_input.time = Some(inner.start_time.elapsed().as_secs_f64());
 
