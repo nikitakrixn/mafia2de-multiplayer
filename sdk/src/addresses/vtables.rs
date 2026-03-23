@@ -409,3 +409,37 @@ pub mod render_device {
     /// Финальная vtable state-tracker object.
     pub const STATE_TRACKER_FINAL: usize = 0x18A_2960;
 }
+
+pub mod locomotion {
+    /// C_HumanLocomotionController vtable.
+    ///
+    /// 68 слотов. Character animation/movement state machine.
+    /// Accessed via human+0x258 (physics_provider field).
+    /// Object layout:
+    /// - +0x00: vtable
+    /// - +0x08: CHuman* owner (back-reference)
+    /// - +0x10: i64 sentinel (-1)
+    /// - +0x18: u64 flags (1)
+    /// - +0x20: ptr context
+    ///
+    /// After vtable in rdata: animation parameter name strings:
+    /// LOOK, MODIF, MOVEDIR, FIGHT, PLAYANIM, LOOKAT, SPECIAL,
+    /// Root2, MoveWRSa, StandRoot, CoverRootFunc,
+    /// m_MoveDir, m_Velocity, m_StartDir, m_MoveWalkSM,
+    /// m_EndDist, m_EndDir, m_EndScale, m_EndPredDist,
+    /// m_StepDir, m_StepRot, m_StepLength, m_TurnScale,
+    /// m_ObstacleType, m_DeathStyle, m_InjuryStyle, m_AdditAction,
+    /// m_CoverInAngle, m_CoverAction, m_CoverSuperLow,
+    /// m_CoverLeanFWS, m_CoverActionDir,
+    /// m_CarSteering, m_CarReverseGear, m_CarType,
+    /// m_CarIsInFrontSeat, m_CarLeanDir, m_CarLeanPower,
+    /// m_AimEnable, m_AimYaw, m_AimPitch,
+    /// m_LookAtEnable, m_LookAtStyle, m_LookAtSpeed,
+    /// m_LookAtX, m_LookAtY, m_LookAtZ,
+    /// Action0-3, m_StartTime, m_BlendIn, m_BlendOut,
+    /// Action_Special0-1, m_FightDir, m_FightHitLine, etc.
+    ///
+    /// Then ragdoll config: RagdollSetups, RigidBodies, Joints,
+    /// Pinpoints, PassiveBones, Sensors, etc.
+    pub const HUMAN_LOCOMOTION_CONTROLLER: usize = 0x199_3998;
+}

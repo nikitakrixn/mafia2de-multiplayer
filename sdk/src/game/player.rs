@@ -1077,4 +1077,217 @@ impl Player {
     pub fn get_forward_vector(&self) -> Option<Vec3> {
         self.get_forward()
     }
+
+    // =============================================================================
+    //  Direction / Rotation (из vtable reverse)
+    // =============================================================================
+
+    /// Получить direction vector через locomotion controller.
+    ///
+    /// Более точный путь чем frame matrix — учитывает
+    /// анимационное состояние и физику.
+    /// Подтверждено: vtable[37], locomotion controller slot[22].
+    pub fn get_direction(&self) -> Option<Vec3> {
+        unsafe {
+            let provider = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
+            let vtable = memory::read_ptr(provider)?;
+            let func_ptr = memory::read_ptr(vtable + fields::locomotion_controller::VFUNC_GET_DIR)?;
+
+            type GetDirFn = unsafe extern "C" fn(usize, *mut Vec3) -> *mut Vec3;
+            let func: GetDirFn = std::mem::transmute(func_ptr);
+
+            let mut out = Vec3::default();
+            let ret = func(provider, &mut out);
+            if ret.is_null() {
+                return None;
+            }
+
+            if out.x.is_finite() && out.y.is_finite() && out.z.is_finite() {
+                Some(out)
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Получить позицию головы/глаз (GetPos + offset (0, 0, 2.0)).
+    ///
+    /// Подтверждено vtable[43]: `GetPos() + Vec3(0, 0, 2.0)`.
+    /// Полезно для прицеливания, raycast'ов, камеры от первого лица.
+    pub fn get_head_position(&self) -> Option<Vec3> {
+        let mut pos = self.get_position()?;
+        pos.z += 2.0;
+        Some(pos)
+    }
+
+    /// Получить velocity (скорость) через locomotion controller.
+    ///
+    /// Подтверждено: vtable[68], locomotion controller slot[25].
+    pub fn get_velocity(&self) -> Option<Vec3> {
+        unsafe {
+            let provider = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
+            let vtable = memory::read_ptr(provider)?;
+            let func_ptr =
+                memory::read_ptr(vtable + fields::locomotion_controller::VFUNC_GET_VELOCITY)?;
+
+            type GetVelFn = unsafe extern "C" fn(usize) -> *mut Vec3;
+            let func: GetVelFn = std::mem::transmute(func_ptr);
+
+            let ptr = func(provider);
+            if ptr.is_null() {
+                return None;
+            }
+
+            let v = std::ptr::read(ptr);
+            if v.x.is_finite() && v.y.is_finite() && v.z.is_finite() {
+                Some(v)
+            } else {
+                None
+            }
+        }
+    }
+
+    // =============================================================================
+    //  Movement Speed (из vtable[75/76/77])
+    // =============================================================================
+
+    /// Получить текущую скорость передвижения (интерполированную).
+    ///
+    /// Подтверждено vtable[76]: `return *(float*)(this + 0x298)`.
+    pub fn get_movement_speed(&self) -> Option<f32> {
+        unsafe {
+            memory::read_value::<f32>(self.ptr + fields::human::MOVEMENT_SPEED_CURRENT)
+        }
+    }
+
+    /// Получить целевую скорость передвижения.
+    ///
+    /// Подтверждено vtable[77]: пишет только +0x294 (target).
+    /// Текущая скорость (+0x298) плавно интерполирует к target.
+    pub fn get_movement_speed_target(&self) -> Option<f32> {
+        unsafe {
+            memory::read_value::<f32>(self.ptr + fields::human::MOVEMENT_SPEED_TARGET)
+        }
+    }
+
+    /// Установить скорость передвижения мгновенно (target + current).
+    ///
+    /// Подтверждено vtable[75]: пишет в оба поля (+0x294 и +0x298).
+    pub fn set_movement_speed(&self, speed: f32) -> bool {
+        unsafe {
+            let ok1 = memory::write_value(self.ptr + fields::human::MOVEMENT_SPEED_TARGET, speed);
+            let ok2 = memory::write_value(self.ptr + fields::human::MOVEMENT_SPEED_CURRENT, speed);
+            ok1 && ok2
+        }
+    }
+
+    /// Установить целевую скорость (плавный переход).
+    ///
+    /// Подтверждено vtable[77]: пишет только +0x294.
+    /// Текущая скорость будет плавно интерполировать к этому значению.
+    pub fn set_movement_speed_target(&self, speed: f32) -> bool {
+        unsafe {
+            memory::write_value(self.ptr + fields::human::MOVEMENT_SPEED_TARGET, speed)
+        }
+    }
+
+    // =============================================================================
+    //  Model / Appearance (из vtable[80/81])
+    // =============================================================================
+
+    /// Получить текущий ID внешнего вида (одежда/модель).
+    ///
+    /// Подтверждено vtable[81]: `return *(u32*)(*(this+0xB8))` if active, else -1.
+    /// Возвращает None если компонент не активен.
+    pub fn get_appearance_id(&self) -> Option<u32> {
+        unsafe {
+            // component_b8 -> ptr_data -> appearance_id
+            let comp = memory::read_ptr(self.ptr + fields::player::COMPONENT_B8)?;
+            let ptr_data = memory::read_ptr(comp)?;
+            if ptr_data == 0 {
+                return None;
+            }
+            let id = memory::read_value::<u32>(ptr_data)?;
+            if id == 0xFFFFFFFF { None } else { Some(id) }
+        }
+    }
+
+    /// Получить имя текущей модели (из model descriptor +0xA8).
+    ///
+    /// Подтверждено vtable[61]: `strcmp(table_entry, descriptor+168)`.
+    pub fn get_model_name(&self) -> Option<String> {
+        unsafe {
+            let desc = memory::read_ptr(self.ptr + fields::human::MODEL_DESCRIPTOR)?;
+            let name_addr = desc + fields::model_descriptor::MODEL_NAME;
+            if !memory::is_valid_ptr(name_addr) {
+                return None;
+            }
+            let cstr = std::ffi::CStr::from_ptr(name_addr as *const i8);
+            let s = cstr.to_string_lossy().into_owned();
+            if s.is_empty() { None } else { Some(s) }
+        }
+    }
+
+    // =============================================================================
+    //  Collision Body (из vtable[85])
+    // =============================================================================
+
+    /// Проверить, есть ли у персонажа активное collision body.
+    ///
+    /// Подтверждено vtable[85]: `return *(qword*)(this+0x310) != 0`.
+    pub fn has_collision_body(&self) -> Option<bool> {
+        unsafe {
+            let ptr = memory::read_ptr_raw(self.ptr + fields::human::COLLISION_BODY)?;
+            Some(ptr != 0)
+        }
+    }
+
+    // =============================================================================
+    //  Locomotion Controller
+    // =============================================================================
+
+    /// Указатель на locomotion controller (он же physics_provider).
+    ///
+    /// Это C_HumanLocomotionController — управляет анимациями,
+    /// передвижением, укрытиями, боем, рэгдоллом.
+    /// Vtable: 0x141993998 (68 слотов).
+    pub fn locomotion_controller_ptr(&self) -> Option<usize> {
+        unsafe { memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER) }
+    }
+
+    /// Получить locomotion state через controller.
+    ///
+    /// Подтверждено: locomotion controller slot[36] = GetState.
+    /// Вызывается из CHuman vtable[59].
+    pub fn get_locomotion_state(&self) -> Option<u32> {
+        unsafe {
+            let provider = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
+            let vtable = memory::read_ptr(provider)?;
+            let func_ptr =
+                memory::read_ptr(vtable + fields::locomotion_controller::VFUNC_GET_STATE)?;
+
+            type GetStateFn = unsafe extern "C" fn(usize) -> u32;
+            let func: GetStateFn = std::mem::transmute(func_ptr);
+            Some(func(provider))
+        }
+    }
+
+    // =============================================================================
+    //  Damage parameters (из vtable[74/78])
+    // =============================================================================
+
+    /// Получить damage scale factor.
+    ///
+    /// Подтверждено vtable[78]: пишет float в +0x15C.
+    pub fn get_damage_scale(&self) -> Option<f32> {
+        unsafe { memory::read_value::<f32>(self.ptr + fields::human::DAMAGE_SCALE_FACTOR) }
+    }
+
+    /// Установить damage scale factor.
+    ///
+    /// Подтверждено vtable[78] SetDamageScaleFactor.
+    /// Множитель входящего урона (1.0 = нормальный).
+    pub fn set_damage_scale(&self, scale: f32) -> bool {
+        unsafe { memory::write_value(self.ptr + fields::human::DAMAGE_SCALE_FACTOR, scale) }
+    }
 }
