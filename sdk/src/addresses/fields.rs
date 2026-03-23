@@ -1241,4 +1241,96 @@ pub mod locomotion_controller {
     pub const VFUNC_QUERY_ZONE_PARAM: usize = 45 * 8;
     /// Слот проверки зоны.
     pub const VFUNC_QUERY_ZONE_CHECK: usize = 46 * 8;
+
+    // Подтверждённые поля данных контроллера (прямое чтение памяти).
+
+    /// `+0x1E8` -> кватернион ориентации (f32 x4: x, y, z, w).
+    /// Используется в get_direction() для конвертации в forward vector.
+    pub const ORIENTATION_QUAT: usize = 0x1E8;
+
+    /// `+0x230` -> вектор скорости (Vec3, f32 x3).
+    /// Используется в get_velocity() для прямого чтения.
+    pub const VELOCITY: usize = 0x230;
+
+    /// `+0x298` -> объект трансформации.
+    pub const TRANSFORM_OBJ: usize = 0x298;
+}
+
+// =============================================================================
+//  C_Car — подтверждённые поля (из IDA decompile vtable)
+// =============================================================================
+
+/// Подтверждённые поля C_Car (из decompile vtable C_Car).
+pub mod car_confirmed {
+    /// `+0xB0` -> pending dispatch begin.
+    pub const PENDING_DISPATCH_BEGIN: usize = 0xB0;
+    /// `+0xB8` -> pending dispatch end.
+    pub const PENDING_DISPATCH_END: usize = 0xB8;
+
+    /// `+0xC8` -> records begin.
+    pub const RECORDS_BEGIN: usize = 0xC8;
+    /// `+0xD0` -> records end.
+    pub const RECORDS_END: usize = 0xD0;
+    /// `+0xD8` -> records capacity.
+    pub const RECORDS_CAP: usize = 0xD8;
+
+    /// `+0xE0` -> physics sub-vtable pointer.
+    pub const PHYSICS_SUBOBJECT: usize = 0xE0;
+
+    /// `+0x270` -> world matrix 4x4 (f32[16], row-major).
+    pub const WORLD_MATRIX: usize = 0x270;
+
+    /// `+0x2C0` -> позиция X (из world_matrix[12]).
+    pub const POS_X: usize = 0x2C0;
+    /// `+0x2D0` -> позиция Y (из world_matrix[13]).
+    pub const POS_Y: usize = 0x2D0;
+    /// `+0x2E0` -> позиция Z (из world_matrix[14]).
+    pub const POS_Z: usize = 0x2E0;
+
+    /// `+0xED8` -> physics body pointer.
+    pub const PHYSICS_BODY: usize = 0xED8;
+
+    /// `+0xF10` -> behavior component pointer.
+    pub const BEHAVIOR: usize = 0xF10;
+
+    /// `+0xF30` -> car flags (u64).
+    pub const CAR_FLAGS: usize = 0xF30;
+
+    /// `+0xF48` -> template resource pointer.
+    pub const TEMPLATE_RESOURCE: usize = 0xF48;
+
+    /// `+0xF88` -> variant index (u32).
+    pub const VARIANT_INDEX: usize = 0xF88;
+
+    /// `+0x11EC` -> pos committed flag (u8).
+    pub const POS_COMMITTED: usize = 0x11EC;
+
+    /// `+0x1210` -> collision body pointer.
+    pub const COLLISION_BODY: usize = 0x1210;
+
+    /// `+0x1218` -> collision body refcount (i32).
+    pub const COLLISION_BODY_REFCOUNT: usize = 0x1218;
+}
+
+// =============================================================================
+//  C_CarVehicle — подтверждённые поля
+// =============================================================================
+
+/// Подтверждённые поля C_CarVehicle.
+pub mod car_vehicle_confirmed {
+    /// `+0xD0` -> physics params (0x44 байта, inline).
+    pub const PHYSICS_PARAMS: usize = 0xD0;
+
+    /// `+0x118` -> SDS name 1 / cloth slot (32 байта: u8 flag + char[31]).
+    pub const SDS_NAME_1: usize = 0x118;
+    /// `+0x138` -> SDS name 2 / body slot (32 байта).
+    pub const SDS_NAME_2: usize = 0x138;
+    /// `+0x158` -> SDS name 3 / look slot (32 байта).
+    pub const SDS_NAME_3: usize = 0x158;
+
+    /// `+0x178` -> extended params (0x30 байт).
+    pub const EXTENDED_PARAMS: usize = 0x178;
+
+    /// `+0x1A8` -> global subsystem pointer.
+    pub const GLOBAL_SUBSYSTEM: usize = 0x1A8;
 }

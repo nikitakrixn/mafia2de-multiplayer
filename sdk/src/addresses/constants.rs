@@ -853,3 +853,40 @@ pub mod player_state_flags_490 {
     /// Бит 15
     pub const BIT_15: u32 = 0x0000_8000;
 }
+
+// =============================================================================
+//  C_Car message codes
+// =============================================================================
+
+/// Коды сообщений C_Car (из IDA decompile vtable C_Car).
+///
+/// Формат: event_type=4 (CAR), base=0x40000.
+/// Используются в entity message dispatch системе.
+pub mod car_messages {
+    /// Базовое entity event (0x40001).
+    pub const ENTITY_EVENT: u32 = 0x40001;
+
+    /// Перенаправить в behavior (0x40002).
+    pub const FORWARD_TO_BEHAVIOR: u32 = 0x40002;
+
+    /// Создать физику (0x40003).
+    pub const CREATE_PHYSICS: u32 = 0x40003;
+
+    /// Создать wrapper (0x40004).
+    pub const CREATE_WRAPPER: u32 = 0x40004;
+
+    /// Перенаправить из behavior (0x40005).
+    pub const BEHAVIOR_FORWARD: u32 = 0x40005;
+
+    /// Пустая операция (0x40006).
+    pub const NOOP: u32 = 0x40006;
+
+    /// Урон до смерти (0x40007).
+    pub const KILL_DAMAGE: u32 = 0x40007;
+
+    /// Маркер физики (0x40008).
+    pub const PHYSICS_MARKER: u32 = 0x40008;
+
+    /// Переключить флаг 41 (0x40009).
+    pub const TOGGLE_FLAG_41: u32 = 0x40009;
+}

@@ -1082,28 +1082,30 @@ impl Player {
     //  Direction / Rotation (из vtable reverse)
     // =============================================================================
 
-    /// Получить direction vector через locomotion controller.
+    /// Получить direction vector персонажа.
     ///
-    /// Более точный путь чем frame matrix — учитывает
-    /// анимационное состояние и физику.
+    /// Читает кватернион напрямую из `provider + 0x1E8` и конвертирует
+    /// в forward vector. Формула из sub_140DA2440 (IDA decompile).
+    ///
     /// Подтверждено: vtable[37], locomotion controller slot[22].
     pub fn get_direction(&self) -> Option<Vec3> {
         unsafe {
             let provider = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
-            let vtable = memory::read_ptr(provider)?;
-            let func_ptr = memory::read_ptr(vtable + fields::locomotion_controller::VFUNC_GET_DIR)?;
 
-            type GetDirFn = unsafe extern "C" fn(usize, *mut Vec3) -> *mut Vec3;
-            let func: GetDirFn = std::mem::transmute(func_ptr);
+            // Читаем кватернион из provider + ORIENTATION_QUAT
+            let qx = memory::read_value::<f32>(provider + fields::locomotion_controller::ORIENTATION_QUAT)?;
+            let qy = memory::read_value::<f32>(provider + fields::locomotion_controller::ORIENTATION_QUAT + 4)?;
+            let qz = memory::read_value::<f32>(provider + fields::locomotion_controller::ORIENTATION_QUAT + 8)?;
+            let qw = memory::read_value::<f32>(provider + fields::locomotion_controller::ORIENTATION_QUAT + 12)?;
 
-            let mut out = Vec3::default();
-            let ret = func(provider, &mut out);
-            if ret.is_null() {
-                return None;
-            }
+            // Конвертация кватерниона в forward vector (sub_140DA2440)
+            // forward = quat * (0, 1, 0) * quat^-1
+            let x = 2.0 * (qx * qy + qw * qz);
+            let y = 1.0 - 2.0 * (qx * qx + qz * qz);
+            let z = 2.0 * (qy * qz - qw * qx);
 
-            if out.x.is_finite() && out.y.is_finite() && out.z.is_finite() {
-                Some(out)
+            if x.is_finite() && y.is_finite() && z.is_finite() {
+                Some(Vec3 { x, y, z })
             } else {
                 None
             }
@@ -1122,25 +1124,18 @@ impl Player {
 
     /// Получить velocity (скорость) через locomotion controller.
     ///
+    /// Читает Vec3 напрямую из `provider + 0x230`.
     /// Подтверждено: vtable[68], locomotion controller slot[25].
     pub fn get_velocity(&self) -> Option<Vec3> {
         unsafe {
             let provider = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
-            let vtable = memory::read_ptr(provider)?;
-            let func_ptr =
-                memory::read_ptr(vtable + fields::locomotion_controller::VFUNC_GET_VELOCITY)?;
 
-            type GetVelFn = unsafe extern "C" fn(usize) -> *mut Vec3;
-            let func: GetVelFn = std::mem::transmute(func_ptr);
+            let x = memory::read_value::<f32>(provider + fields::locomotion_controller::VELOCITY)?;
+            let y = memory::read_value::<f32>(provider + fields::locomotion_controller::VELOCITY + 4)?;
+            let z = memory::read_value::<f32>(provider + fields::locomotion_controller::VELOCITY + 8)?;
 
-            let ptr = func(provider);
-            if ptr.is_null() {
-                return None;
-            }
-
-            let v = std::ptr::read(ptr);
-            if v.x.is_finite() && v.y.is_finite() && v.z.is_finite() {
-                Some(v)
+            if x.is_finite() && y.is_finite() && z.is_finite() {
+                Some(Vec3 { x, y, z })
             } else {
                 None
             }
@@ -1255,22 +1250,9 @@ impl Player {
         unsafe { memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER) }
     }
 
-    /// Получить locomotion state через controller.
-    ///
-    /// Подтверждено: locomotion controller slot[36] = GetState.
-    /// Вызывается из CHuman vtable[59].
-    pub fn get_locomotion_state(&self) -> Option<u32> {
-        unsafe {
-            let provider = memory::read_ptr(self.ptr + fields::player::PHYSICS_PROVIDER)?;
-            let vtable = memory::read_ptr(provider)?;
-            let func_ptr =
-                memory::read_ptr(vtable + fields::locomotion_controller::VFUNC_GET_STATE)?;
-
-            type GetStateFn = unsafe extern "C" fn(usize) -> u32;
-            let func: GetStateFn = std::mem::transmute(func_ptr);
-            Some(func(provider))
-        }
-    }
+    // ВНИМАНИЕ: get_locomotion_state() удалён.
+    // slot[36] — это тяжёлая update-функция, вызов сломает анимации.
+    // Для чтения состояния используй прямое чтение полей через locomotion_controller_ptr().
 
     // =============================================================================
     //  Damage parameters (из vtable[74/78])
