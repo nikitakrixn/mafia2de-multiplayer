@@ -7,6 +7,7 @@ mod input;
 mod lua_queue;
 mod main_thread;
 mod multiplayer_test;
+mod net_debug;
 mod network;
 mod overlay;
 mod player_events;

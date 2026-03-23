@@ -420,6 +420,8 @@ fn transport_thread_main(mut stream: TcpStream) {
         };
 
         for packet in outbound_packets {
+            crate::net_debug::on_outbound(&packet);
+
             if let Err(e) = write_packet_line(&mut stream, &packet) {
                 logger::error(&format!("[network] write packet failed: {e}"));
                 transport_fail_disconnect("Ошибка записи в сокет");
@@ -453,6 +455,8 @@ fn transport_thread_main(mut stream: TcpStream) {
 
                     match serde_json::from_str::<ServerPacket>(&line) {
                         Ok(packet) => {
+                            crate::net_debug::on_inbound(&packet);
+
                             if let Ok(mut guard) = state().lock() {
                                 guard.inbound.push_back(packet);
                             }
@@ -511,4 +515,21 @@ fn transport_fail_disconnect(reason: &str) {
     crate::overlay::multiplayer_ui::clear_players();
     crate::overlay::multiplayer_ui::set_connection_status(false, reason.to_string());
     crate::overlay::multiplayer_ui::add_system_message(reason.to_string());
+}
+
+/// Автоматически оборвать session, если игра ушла в меню/выгрузку.
+pub fn auto_disconnect_if_session_invalid() {
+    use crate::state::GameSessionState;
+
+    match crate::state::get() {
+        GameSessionState::Boot
+        | GameSessionState::FrontendMenu
+        | GameSessionState::ShuttingDown => {
+            if is_connected() || TRANSPORT_RUNNING.load(Ordering::Acquire) {
+                logger::info("[network] auto-disconnect: session no longer in game");
+                let _ = disconnect();
+            }
+        }
+        GameSessionState::Loading | GameSessionState::Paused | GameSessionState::InGame => {}
+    }
 }

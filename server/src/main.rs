@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -12,6 +12,12 @@ use protocol::{
 
 /// Следующий выдаваемый PlayerId.
 static NEXT_PLAYER_ID: AtomicU16 = AtomicU16::new(1);
+
+/// Сколько snapshot-ов всего сервер принял.
+static SNAPSHOT_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Сколько event-ов всего сервер принял.
+static EVENT_COUNT: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 struct ClientHandle {
@@ -301,6 +307,14 @@ fn reader_loop(
                 // Никогда не доверяем player_id клиента.
                 snapshot.player_id = player_id;
 
+                let n = SNAPSHOT_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+                if n % 20 == 0 {
+                    logger::debug(&format!(
+                        "[server] snapshot count={} from player {}",
+                        n, player_id
+                    ));
+                }
+
                 shared.broadcast_except(Some(player_id), ServerPacket::Snapshot(snapshot));
             }
 
@@ -308,6 +322,12 @@ fn reader_loop(
                 if !welcomed {
                     continue;
                 }
+
+                let n = EVENT_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+                logger::debug(&format!(
+                    "[server] event #{} from player {}: {:?}",
+                    n, player_id, event
+                ));
 
                 shared.broadcast_except(
                     Some(player_id),

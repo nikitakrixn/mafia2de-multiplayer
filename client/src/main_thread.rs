@@ -42,6 +42,7 @@ pub fn on_main_thread_tick() {
     update_ping_if_needed();
 
     // Gameplay tracking — всё это работает на game thread.
+    crate::network::auto_disconnect_if_session_invalid();
     crate::player_tracker::update_main_thread();
     crate::vehicle_tracker::update_main_thread();
 
