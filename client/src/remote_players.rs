@@ -167,7 +167,6 @@ fn apply_snapshot_to_binding(binding: &mut RemoteBinding, snapshot: &NetPlayerSn
 
     binding.npc.set_position(&pos);
 
-    // Направление обновляем только если вектор не нулевой.
     let dir_len_sq = dir.x * dir.x + dir.y * dir.y + dir.z * dir.z;
     if dir_len_sq > 0.0001 {
         let _ = binding.npc.set_forward(&dir);
@@ -175,9 +174,26 @@ fn apply_snapshot_to_binding(binding: &mut RemoteBinding, snapshot: &NetPlayerSn
 
     if snapshot.is_dead {
         binding.npc.set_health(0.0);
+        logger::debug(&format!(
+            "[remote] {} (NPC '{}') — dead",
+            binding.player_name, binding.npc_name
+        ));
     } else {
         binding.npc.set_health(snapshot.health.max(1.0));
     }
+
+    // Обновляем запись в UI (пинг пока 0 — нет RTT)
+    crate::overlay::multiplayer_ui::update_player_ping(binding.player_id as u32, 0);
+}
+
+/// Получить имя удалённого игрока по его ID.
+#[allow(dead_code)]
+pub fn get_player_name(player_id: PlayerId) -> Option<String> {
+    bindings()
+        .lock()
+        .ok()?
+        .get(&player_id)
+        .map(|b| b.player_name.clone())
 }
 
 /// Применить удалённое высокоуровневое событие.
@@ -202,15 +218,15 @@ pub fn apply_event(player_id: PlayerId, event: NetPlayerEvent) {
         NetPlayerEvent::Death => {
             binding.npc.set_health(0.0);
             logger::info(&format!(
-                "[remote] player {} death mirrored on '{}'",
-                player_id, binding.npc_name
+                "[remote] {} (NPC '{}') died",
+                binding.player_name, binding.npc_name
             ));
         }
 
         NetPlayerEvent::Shot => {
             logger::debug(&format!(
-                "[remote] player {} shot (NPC '{}')",
-                player_id, binding.npc_name
+                "[remote] {} (NPC '{}') shot",
+                binding.player_name, binding.npc_name
             ));
         }
 
@@ -223,8 +239,8 @@ pub fn apply_event(player_id: PlayerId, event: NetPlayerEvent) {
         | NetPlayerEvent::WeaponHide
         | NetPlayerEvent::Fx(_) => {
             logger::debug(&format!(
-                "[remote] event for player {} on NPC '{}': {:?}",
-                player_id, binding.npc_name, event
+                "[remote] {} (NPC '{}'): {:?}",
+                binding.player_name, binding.npc_name, event
             ));
         }
     }

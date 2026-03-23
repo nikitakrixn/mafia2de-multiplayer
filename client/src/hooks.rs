@@ -8,11 +8,15 @@
 
 use std::ffi::c_void;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use common::logger;
 use minhook::{MH_STATUS, MinHook};
 use sdk::{addresses, memory};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallWindowProcW, SetWindowLongPtrW, GWLP_WNDPROC, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
+};
 
 // =============================================================================
 //  Типы функций
@@ -22,6 +26,8 @@ type GameTickAlwaysCallback = unsafe extern "C" fn(usize, usize);
 type FireEventByIdFn = unsafe extern "C" fn(usize, i32, usize) -> usize;
 type EntityBroadcastFn = unsafe extern "C" fn(usize, usize) -> u8;
 type Present1Fn = unsafe extern "system" fn(*mut c_void, u32, u32, *const c_void) -> i32;
+#[allow(dead_code)]
+type WndProcFn = unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT;
 
 // =============================================================================
 //  Оригиналы функций
@@ -33,6 +39,9 @@ static ORIGINAL_GAME_TICK_ALWAYS: OnceLock<GameTickAlwaysCallback> = OnceLock::n
 static ORIGINAL_FIRE_EVENT_BY_ID: OnceLock<FireEventByIdFn> = OnceLock::new();
 static ORIGINAL_ENTITY_BROADCAST: OnceLock<EntityBroadcastFn> = OnceLock::new();
 static ORIGINAL_PRESENT1: OnceLock<Present1Fn> = OnceLock::new();
+
+/// Оригинальный WndProc игры (сохраняется при SetWindowLongPtrW).
+static ORIGINAL_WNDPROC: AtomicUsize = AtomicUsize::new(0);
 
 // =============================================================================
 //  Detour функции
@@ -81,6 +90,64 @@ unsafe extern "system" fn present1_detour(
         unsafe { original(swapchain, sync_interval, present_flags, present_params) }
     } else {
         0
+    }
+}
+
+/// WndProc хук — перехватывает WM_CHAR / WM_KEYDOWN / WM_KEYUP.
+///
+/// WM_CHAR содержит готовый Unicode символ с учётом текущей раскладки (кириллица, etc).
+/// Передаём в egui_input очередь, остальное — в оригинальный WndProc.
+unsafe extern "system" fn wndproc_detour(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    use crate::overlay::egui_input::{WndProcEvent, push_wndproc_event, vk_to_egui_key};
+
+    // Обрабатываем только когда overlay захватил ввод
+    if crate::overlay::multiplayer_ui::wants_mouse() {
+        match msg {
+            WM_CHAR | WM_KEYDOWN | WM_KEYUP => {
+                let vk = wparam.0 as u16;
+                match msg {
+                    WM_CHAR => {
+                        if let Some(ch) = char::from_u32(wparam.0 as u32) {
+                            push_wndproc_event(WndProcEvent::Char(ch));
+                        }
+                    }
+                    WM_KEYDOWN => {
+                        if let Some(key) = vk_to_egui_key(vk) {
+                            push_wndproc_event(WndProcEvent::KeyDown(key));
+                        }
+                    }
+                    WM_KEYUP => {
+                        if let Some(key) = vk_to_egui_key(vk) {
+                            push_wndproc_event(WndProcEvent::KeyUp(key));
+                        }
+                    }
+                    _ => {}
+                }
+                // Блокируем — не передаём в игру
+                return LRESULT(0);
+            }
+            _ => {}
+        }
+    }
+
+    let orig = ORIGINAL_WNDPROC.load(Ordering::Relaxed);
+    if orig != 0 {
+        unsafe {
+            CallWindowProcW(
+                Some(std::mem::transmute(orig)),
+                hwnd,
+                msg,
+                wparam,
+                lparam,
+            )
+        }
+    } else {
+        LRESULT(0)
     }
 }
 
@@ -192,7 +259,35 @@ fn install_present1_hook() -> Result<(), String> {
         )?;
     }
 
+    // Устанавливаем WndProc хук — HWND гарантированно доступен когда SwapChain готов
+    install_wndproc_hook();
+
     Ok(())
+}
+
+fn install_wndproc_hook() {
+    if ORIGINAL_WNDPROC.load(Ordering::Relaxed) != 0 {
+        return;
+    }
+
+    let Some(hwnd_usize) = sdk::game::render::get_hwnd() else {
+        logger::warn("[hooks] WndProc hook: HWND not available");
+        return;
+    };
+
+    let hwnd = HWND(hwnd_usize as *mut _);
+
+    let old = unsafe {
+        SetWindowLongPtrW(hwnd, GWLP_WNDPROC, wndproc_detour as *const () as isize)
+    };
+
+    if old == 0 {
+        logger::warn("[hooks] SetWindowLongPtrW returned 0 — WndProc hook may have failed");
+        return;
+    }
+
+    ORIGINAL_WNDPROC.store(old as usize, Ordering::Relaxed);
+    logger::info(&format!("[hooks] WndProc hook installed, original=0x{old:X}"));
 }
 
 pub fn try_deferred_present_hook() {

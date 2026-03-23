@@ -103,43 +103,53 @@ pub fn wants_mouse() -> bool {
         || s.show_chat.load(Ordering::Relaxed)
 }
 
+/// Заблокировать/разблокировать управление игроком в зависимости от состояния UI.
+pub fn sync_player_controls() {
+    use sdk::game::Player;
+    let should_lock = wants_mouse();
+    let Some(player) = Player::get_active() else { return; };
+    if !player.is_ready() { return; }
+    // lock_controls проверяет текущее состояние внутри — вызов идемпотентен
+    player.lock_controls(should_lock);
+}
+
 /// Обработка горячих клавиш для мультиплеер UI.
 pub fn handle_hotkeys() {
     let s = state();
 
-    // F2 — меню подключения
-    if egui_input::is_held(VK_F2) {
+    // F2 — меню подключения (edge detection через just_pressed)
+    if egui_input::just_pressed(VK_F2) {
         let current = s.show_connect_menu.load(Ordering::Relaxed);
         s.show_connect_menu.store(!current, Ordering::Relaxed);
-        std::thread::sleep(std::time::Duration::from_millis(200)); // debounce
     }
 
     // F3 — список игроков
-    if egui_input::is_held(VK_F3) {
+    if egui_input::just_pressed(VK_F3) {
         let current = s.show_player_list.load(Ordering::Relaxed);
         s.show_player_list.store(!current, Ordering::Relaxed);
-        std::thread::sleep(std::time::Duration::from_millis(200)); // debounce
     }
 
-    // T — открыть чат (только если не в другом окне)
-    if egui_input::is_held(VK_T)
+    // T — открыть чат (только если не в другом окне и чат не открыт)
+    if egui_input::just_pressed(VK_T)
         && !s.show_connect_menu.load(Ordering::Relaxed)
         && !s.chat_input_focused.load(Ordering::Relaxed)
     {
         s.show_chat.store(true, Ordering::Relaxed);
         s.chat_input_focused.store(true, Ordering::Relaxed);
-        std::thread::sleep(std::time::Duration::from_millis(200)); // debounce
+        // Сбрасываем очередь — чтобы 'T' не попала в поле ввода
+        egui_input::flush_wndproc_queue();
     }
 
     // ESC — закрыть активное окно
-    if egui_input::is_held(VK_ESCAPE) {
+    if egui_input::just_pressed(VK_ESCAPE) {
         if s.chat_input_focused.load(Ordering::Relaxed) {
             s.show_chat.store(false, Ordering::Relaxed);
             s.chat_input_focused.store(false, Ordering::Relaxed);
         } else if s.show_connect_menu.load(Ordering::Relaxed) {
             s.show_connect_menu.store(false, Ordering::Relaxed);
+        } else if s.show_player_list.load(Ordering::Relaxed) {
+            s.show_player_list.store(false, Ordering::Relaxed);
         }
-        std::thread::sleep(std::time::Duration::from_millis(200)); // debounce
     }
 }
 
@@ -521,11 +531,21 @@ fn draw_chat(ctx: &egui::Context) {
                 response.request_focus();
             }
 
-            if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            let enter_pressed = response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            let enter_lost = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+            if enter_pressed || enter_lost {
                 if !input.trim().is_empty() {
                     let text = input.trim().to_string();
                     input.clear();
                     drop(input);
+                    // Показываем локально сразу, не ждём эхо от сервера
+                    let nickname = state()
+                        .connection_data
+                        .lock()
+                        .map(|d| d.nickname.clone())
+                        .unwrap_or_else(|_| "Я".to_string());
+                    add_chat_message(nickname, text.clone());
                     network::send_chat_message(text);
                     s.show_chat.store(false, Ordering::Relaxed);
                     s.chat_input_focused.store(false, Ordering::Relaxed);
