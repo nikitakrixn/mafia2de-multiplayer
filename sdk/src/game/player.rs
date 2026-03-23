@@ -1031,4 +1031,50 @@ impl Player {
             }
         }
     }
+
+    // =============================================================================
+    //  Player state machine / multiplayer-relevant fields
+    // =============================================================================
+
+    /// Главный state code игрока (`player + 0x430`).
+    ///
+    /// Это основная state machine, которая крутится в `M2DE_CHuman_Update`.
+    pub fn get_state_code_430(&self) -> Option<u32> {
+        unsafe { memory::read_value(self.ptr + fields::player::STATE_CODE_430) }
+    }
+
+    /// Player state/flags dword (`player + 0x3D8`).
+    ///
+    /// ВАЖНО:
+    /// это не просто byte-mode.
+    pub fn get_state_flags_3d8(&self) -> Option<u32> {
+        unsafe { memory::read_value(self.ptr + fields::player::STATE_FLAGS_3D8) }
+    }
+
+    /// State mask / profile (`player + 0x438`).
+    ///
+    /// Загружается через `M2DE_CPlayer_LoadStateMask438_ByName`.
+    pub fn get_state_mask_438(&self) -> Option<u32> {
+        unsafe { memory::read_value(self.ptr + fields::player::STATE_MASK_438) }
+    }
+
+    /// Player bitfield (`player + 0x490`).
+    pub fn get_state_flags_490(&self) -> Option<u32> {
+        unsafe { memory::read_value(self.ptr + fields::player::STATE_FLAGS_490) }
+    }
+
+    /// `player.sub45c.state` (`player + 0x464`).
+    pub fn get_sub45c_state(&self) -> Option<u32> {
+        unsafe { memory::read_value(self.ptr + fields::player::SUBOBJECT_45C_STATE) }
+    }
+
+    /// Дополнительный player state/flags dword (`player + 0x510`).
+    pub fn get_state_flags_510(&self) -> Option<u32> {
+        unsafe { memory::read_value(self.ptr + fields::player::STATE_FLAGS_510) }
+    }
+
+    /// Удобный alias: forward vector игрока.
+    pub fn get_forward_vector(&self) -> Option<Vec3> {
+        self.get_forward()
+    }
 }

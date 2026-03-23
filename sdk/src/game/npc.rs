@@ -117,6 +117,53 @@ impl Npc {
         }
     }
 
+    /// Установить forward direction NPC через frame node.
+    ///
+    /// ВАЖНО:
+    /// это low-level запись в basis-векторы frame node.
+    /// Для ground humanoid proxy этого достаточно.
+    pub fn set_forward(&self, dir: &Vec3) -> bool {
+        let Some(frame) = (unsafe {
+            memory::read_ptr(self.entity.ptr() + crate::addresses::fields::entity::FRAME_NODE)
+        }) else {
+            return false;
+        };
+
+        // Нормализация — защита от мусора/нулевого вектора.
+        let len = (dir.x * dir.x + dir.y * dir.y + dir.z * dir.z).sqrt();
+        if !len.is_finite() || len < 0.0001 {
+            return false;
+        }
+
+        let fx = dir.x / len;
+        let fy = dir.y / len;
+        let fz = dir.z / len;
+
+        // Для humanoid нам обычно достаточно right = perpendicular in XY plane.
+        let rx = fy;
+        let ry = -fx;
+        let rz = 0.0f32;
+
+        unsafe {
+            // Forward (Col1)
+            memory::write_value(frame + crate::addresses::fields::entity_frame::FORWARD_X, fx);
+            memory::write_value(frame + crate::addresses::fields::entity_frame::FORWARD_Y, fy);
+            memory::write_value(frame + crate::addresses::fields::entity_frame::FORWARD_Z, fz);
+
+            // Right (Col0)
+            memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_X, rx);
+            memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_Y, ry);
+            memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_Z, rz);
+
+            // Up (Col2) — оставляем world-up.
+            memory::write_value(frame + crate::addresses::fields::entity_frame::UP_X, 0.0f32);
+            memory::write_value(frame + crate::addresses::fields::entity_frame::UP_Y, 0.0f32);
+            memory::write_value(frame + crate::addresses::fields::entity_frame::UP_Z, 1.0f32);
+        }
+
+        true
+    }
+
     /// Вывести инфо в лог.
     pub fn log_info(&self) {
         let pos = self.get_position().unwrap_or_default();
