@@ -21,6 +21,7 @@ static EVENT_COUNT: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 struct ClientHandle {
+    #[allow(dead_code)]
     player_id: PlayerId,
     sender: mpsc::Sender<ServerPacket>,
 }
@@ -70,6 +71,7 @@ impl SharedServer {
             .unwrap_or_default()
     }
 
+    #[allow(dead_code)]
     fn send_to(&self, player_id: PlayerId, packet: ServerPacket) {
         let sender = {
             let clients = match self.clients.lock() {
@@ -341,7 +343,7 @@ fn reader_loop(
                 }
 
                 shared.broadcast_except(
-                    None,
+                    Some(player_id),
                     ServerPacket::ChatMessage { player_id, text },
                 );
             }
