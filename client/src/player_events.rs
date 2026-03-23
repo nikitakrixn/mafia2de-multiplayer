@@ -135,16 +135,16 @@ pub fn process_pending() {
 fn log_event(ev: &PlayerEvent) {
     match ev {
         PlayerEvent::EnterVehicle => {
-            logger::info("[player-event] EnterVehicle");
+            logger::debug("[player-event] EnterVehicle");
         }
         PlayerEvent::EnterVehicleDone => {
-            logger::info("[player-event] EnterVehicleDone");
+            logger::debug("[player-event] EnterVehicleDone");
         }
         PlayerEvent::LeaveVehicle => {
-            logger::info("[player-event] LeaveVehicle");
+            logger::debug("[player-event] LeaveVehicle");
         }
         PlayerEvent::LeaveVehicleDone => {
-            logger::info("[player-event] LeaveVehicleDone");
+            logger::debug("[player-event] LeaveVehicleDone");
         }
 
         PlayerEvent::VehicleEntered { vehicle_ptr } => {

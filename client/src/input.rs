@@ -19,7 +19,7 @@ pub fn log_keybinds() {
     logger::info("    F3      — Список игроков онлайн");
     logger::info("    T       — Открыть чат");
     logger::info("    F5      — Spawn mock remote player");
-    logger::info("    F6      — Move mock remote player (по кругу)");
+    logger::info("    F6      — Toggle auto-move mock remote");
     logger::info("    F7      — Send mock remote event (Shot)");
     logger::info("    F8      — Despawn mock remote player");
     logger::info("    F11     — Загрузить демо-данные (тест UI)");
@@ -75,9 +75,9 @@ pub fn run() {
             crate::multiplayer_test::spawn_mock_remote();
         }
 
-        // F6 — сдвинуть mock remote player по кругу
+        // F6 — переключить авто-движение mock remote
         if just_pressed(VK_F6) {
-            crate::multiplayer_test::step_mock_remote();
+            crate::multiplayer_test::toggle_mock_auto_move();
         }
 
         // F7 — отправить mock remote event

@@ -49,6 +49,7 @@ pub fn on_main_thread_tick() {
     crate::player_events::process_pending();
 
     // Multiplayer network layer: дреним outbound, применяем inbound
+    crate::multiplayer_test::update_main_thread();
     crate::network::poll_main_thread();
 
     crate::hooks::try_deferred_present_hook();

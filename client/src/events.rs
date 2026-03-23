@@ -83,8 +83,6 @@ fn should_log_event(event_id: i32) -> bool {
             | ev::LOADING_FADE_FINISHED
             | ev::GAME_PAUSED
             | ev::GAME_UNPAUSED
-            | ev::APP_ACTIVATE
-            | ev::APP_DEACTIVATE
             | ev::GAME_INIT
             | ev::GAME_DONE
             | ev::NO_GAME_START

@@ -26,6 +26,7 @@ pub struct PlayerSnapshot {
     pub money_cents: Option<i64>,
     pub controls_locked: Option<bool>,
     pub control_style: Option<String>,
+    pub in_vehicle: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -37,6 +38,7 @@ struct PlayerTracker {
 }
 
 static TRACKER: OnceLock<Mutex<PlayerTracker>> = OnceLock::new();
+static NET_SNAPSHOT_TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn tracker() -> &'static Mutex<PlayerTracker> {
     TRACKER.get_or_init(|| {
@@ -119,31 +121,32 @@ fn capture_snapshot(player: &Player) -> PlayerSnapshot {
         money_cents: player.get_money_cents(),
         controls_locked: player.are_controls_locked(),
         control_style: player.get_control_style_str(),
+        in_vehicle: player.is_in_vehicle(),
     }
 }
 
-/// Собрать минимальный сетевой snapshot для отправки на сервер.
+/// Собрать сетевой snapshot локального игрока.
 ///
-/// Использует только подтверждённые reverse'ом поля.
-/// Возвращает `None` если позиция недоступна (игрок не готов).
+/// Это multiplayer-ready snapshot:
+/// - только подтверждённые reverse'ом поля
+/// - без сырых указателей
+/// - без внутренних движковых объектов
+///
+/// Возвращает `None` если любое обязательное поле недоступно.
 fn capture_network_snapshot(player: &Player) -> Option<NetPlayerSnapshot> {
-    static TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let player_id = crate::network::local_player_id()?;
 
     let position = player.get_position()?;
-    let forward = player.get_forward_vector().unwrap_or_default();
+    let forward = player.get_forward_vector()?;
+    let health = player.get_health()?;
+    let is_dead = !player.is_alive()?;
+    let state_code_430 = player.get_state_code_430()?;
+    let state_flags_3d8 = player.get_state_flags_3d8()?;
+    let state_flags_490 = player.get_state_flags_490()?;
+    let sub45c_state = player.get_sub45c_state()?;
+    let in_vehicle = player.is_in_vehicle()?;
 
-    let health = player.get_health().unwrap_or(0.0);
-    let is_dead = player.is_alive().map(|a| !a).unwrap_or(false);
-    let in_vehicle = player.is_in_vehicle().unwrap_or(false);
-
-    let state_code_430 = player.get_state_code_430().unwrap_or(0);
-    let state_flags_3d8 = player.get_state_flags_3d8().unwrap_or(0);
-    let state_flags_490 = player.get_state_flags_490().unwrap_or(0);
-    let sub45c_state = player.get_sub45c_state().unwrap_or(0);
-
-    let tick = TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
-    let player_id = crate::network::local_player_id().unwrap_or(0);
+    let tick = NET_SNAPSHOT_TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     Some(NetPlayerSnapshot {
         tick,
@@ -219,36 +222,45 @@ impl PlayerTracker {
             }
         }
 
-        match (previous.position, current.position) {
-            (Some(old_pos), Some(new_pos)) => {
-                let dist = distance(old_pos, new_pos);
+        let prev_in_vehicle = previous.in_vehicle.unwrap_or(false);
+        let curr_in_vehicle = current.in_vehicle.unwrap_or(false);
 
-                if dist >= TELEPORT_DISTANCE {
-                    player_events::push(PlayerEvent::Teleported {
-                        from: old_pos,
-                        to: new_pos,
-                        distance: dist,
-                    });
-                    self.moving = false;
-                    self.still_ticks = 0;
-                } else if dist >= MOVE_EPSILON {
-                    if !self.moving {
-                        player_events::push(PlayerEvent::MovementStarted { pos: new_pos });
-                    }
-                    self.moving = true;
-                    self.still_ticks = 0;
-                } else if self.moving {
-                    self.still_ticks += 1;
-                    if self.still_ticks >= STOP_TICKS_REQUIRED {
+        if prev_in_vehicle || curr_in_vehicle {
+            // Сбрасываем локальный пеший movement-state.
+            self.moving = false;
+            self.still_ticks = 0;
+        } else {
+            match (previous.position, current.position) {
+                (Some(old_pos), Some(new_pos)) => {
+                    let dist = distance(old_pos, new_pos);
+
+                    if dist >= TELEPORT_DISTANCE {
+                        player_events::push(PlayerEvent::Teleported {
+                            from: old_pos,
+                            to: new_pos,
+                            distance: dist,
+                        });
                         self.moving = false;
                         self.still_ticks = 0;
-                        player_events::push(PlayerEvent::MovementStopped { pos: new_pos });
+                    } else if dist >= MOVE_EPSILON {
+                        if !self.moving {
+                            player_events::push(PlayerEvent::MovementStarted { pos: new_pos });
+                        }
+                        self.moving = true;
+                        self.still_ticks = 0;
+                    } else if self.moving {
+                        self.still_ticks += 1;
+                        if self.still_ticks >= STOP_TICKS_REQUIRED {
+                            self.moving = false;
+                            self.still_ticks = 0;
+                            player_events::push(PlayerEvent::MovementStopped { pos: new_pos });
+                        }
                     }
                 }
-            }
-            _ => {
-                self.moving = false;
-                self.still_ticks = 0;
+                _ => {
+                    self.moving = false;
+                    self.still_ticks = 0;
+                }
             }
         }
 
