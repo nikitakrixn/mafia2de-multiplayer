@@ -226,13 +226,28 @@ pub mod player {
     /// Также higher bits читаются как flags, например `0x40000`.
     pub const STATE_FLAGS_3D8: usize = 0x3D8;
 
+    /// `+0x428` -> pointer returned by slot [101].
+    pub const FIELD_428: usize = 0x428;
+
     /// `+0x430` -> state code dword.
     ///
     /// Подтверждённый getter:
     /// `M2DE_CPlayer_IsStateCode430_Equal10` возвращает `*(u32*)(this+0x430) == 10`.
     pub const STATE_CODE_430: usize = 0x430;
 
-    /// `+0x464` -> dword-like bool/state field.
+    /// `+0x438` -> state mask/profile dword.
+    ///
+    /// Загружается из строки через `M2DE_CPlayer_LoadStateMask438_ByName`.
+    pub const STATE_MASK_438: usize = 0x438;
+
+    /// `+0x43C` -> auxiliary player state field.
+    pub const FIELD_43C: usize = 0x43C;
+
+    /// `+0x440` -> auxiliary state/config dword.
+    pub const FIELD_440: usize = 0x440;
+
+    /// `+0x448` -> auxiliary player state field.
+    pub const FIELD_448: usize = 0x448;
     ///
     /// Подтверждённый getter:
     /// `M2DE_CPlayer_IsField464_Equal1` возвращает `*(u32*)(this+0x464) == 1`.
@@ -255,27 +270,6 @@ pub mod player {
     /// - `M2DE_CPlayer_StateFlags490_SetBit15`
     pub const STATE_FLAGS_490: usize = 0x490;
 
-    /// `+0x438` -> player state flags dword used heavily by Character_Update.
-    ///
-    /// Наблюдаемые маски:
-    /// - 0x40
-    /// - 0x10
-    /// - 0x20000
-    /// - 0x8000
-    /// - 0x10000
-    ///
-    /// Семантика пока не закреплена.
-    pub const STATE_FLAGS_438: usize = 0x438;
-
-    /// `+0x43C` -> auxiliary player state field.
-    pub const FIELD_43C: usize = 0x43C;
-
-    /// `+0x440` -> auxiliary player state field.
-    pub const FIELD_440: usize = 0x440;
-
-    /// `+0x448` -> auxiliary player state field.
-    pub const FIELD_448: usize = 0x448;
-
     /// `+0x45C` -> player special-state subobject.
     /// HasSpecialState46F0 delegates into this object.
     pub const SUBOBJECT_45C: usize = 0x45C;
@@ -286,14 +280,32 @@ pub mod player {
     /// This is sub45c + 0x08.
     pub const SUBOBJECT_45C_STATE: usize = 0x464;
 
+    /// `+0x4E0` -> dword reset to -1 in player reset/init path.
+    pub const FIELD_4E0: usize = 0x4E0;
+
+    /// `+0x4E4` -> flags dword, low bits cleared in reset/init path.
+    pub const FLAGS_4E4: usize = 0x4E4;
+
+    /// `+0x4F8` -> qword reset to 0 in player reset/init path.
+    pub const FIELD_4F8: usize = 0x4F8;
+
     /// `+0x500` -> world/entity handle used by ClearSpecialState45C.
-    pub const FIELD_500: usize = 0x500;
+    pub const WORLD_HANDLE_500: usize = 0x500;
+
+    /// `+0x508` -> owned helper/resource ptr. Released in teardown path.
+    pub const OWNED_HELPER_508: usize = 0x508;
 
     /// `+0x510` -> player state flags dword.
     ///
     /// В Character_Update используется bit 4 / bit 3-like логика,
     /// зависящая от результата `sub_1400C46F0`.
     pub const STATE_FLAGS_510: usize = 0x510;
+
+    /// `+0x518` -> string-related pointer.
+    pub const STRING_PTR_518: usize = 0x518;
+
+    /// `+0x520` -> string object / buffer reset by M2DE_String_SetCStr.
+    pub const STRING_OBJ_520: usize = 0x520;
 }
 
 // =============================================================================

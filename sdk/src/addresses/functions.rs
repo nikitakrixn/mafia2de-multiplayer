@@ -1775,3 +1775,46 @@ pub mod action_code_backend {
     /// Mapping helper: returns third dword from 12-byte map entry.
     pub const MAP_FIND_CODE_B: usize = 0xDA_13E0;
 }
+
+// =============================================================================
+//  Player State Tail — additional vtable slots and state helpers
+// =============================================================================
+
+pub mod player_state_tail {
+    /// Uses frame_node (+0x78), walks linked nodes from frame+0x40,
+    /// finds first node passing predicate, then calls its vfunc+88.
+    pub const FRAME_MATCHING_NODE_INVOKE_VFUNC88: usize = 0xDA_F160;
+
+    /// Returns true if *(qword*)(this+0x310) != NULL.
+    pub const HAS_FIELD310_PTR: usize = 0xDA_A340;
+
+    /// Uses component pointer at this+0xB8 and dword-like source at this+0x168
+    /// together with this->vfunc16().
+    pub const COMPONENT_B8_PROCESS_WITH_FIELD168: usize = 0xDA_CD50;
+
+    /// Main player transition path. Clears/resets current state or assigns
+    /// state_code_430 based on resolved object type and updates sub45c/physics marker state.
+    pub const TRANSITION_STATE430_BY_RESOLVED_OBJECT: usize = 0x0C_52D0;
+
+    /// Returns whether resolved object type permits current player state transition;
+    /// special-case handling for type 9.
+    pub const CHECK_RESOLVED_OBJECT_ALLOWS_TRANSITION: usize = 0x0C_4560;
+
+    /// Hashes input string with FNV-1 64-bit, looks up state mask/profile,
+    /// writes result to player+0x438, resets string field at +0x520.
+    pub const LOAD_STATE_MASK_438_BY_NAME: usize = 0x0C_98C0;
+
+    /// If state_code_430 <= 1, gets current position and tests it via helper
+    /// sub_1400BD9E0(this, this+0x330, pos).
+    pub const CHECK_STATE0OR1_POSITION_PREDICATE: usize = 0x0B_D950;
+
+    /// Returns *(qword*)(player+0x428).
+    pub const GET_FIELD428_PTR: usize = 0x0C_33B0;
+
+    /// Uses provided code or, if -1, resolves current code from active descriptor/weapon path,
+    /// then calls sub45c.GenerateCodeThenNotifyProvider().
+    pub const SUB45C_USE_ARG_CODE_OR_CURRENT_CODE: usize = 0x0C_E850;
+
+    /// Returns constant 3.
+    pub const GET_CONSTANT3: usize = 0x0C_39E0;
+}
