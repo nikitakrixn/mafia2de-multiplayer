@@ -5,3 +5,4 @@ edition.workspace = true
 description = "Network protocol shared between client and server"
 
 [dependencies]
+serde = { workspace = true }

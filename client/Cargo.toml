@@ -25,6 +25,7 @@ sdk      = { workspace = true }
 protocol = { workspace = true }
 minhook  = { workspace = true }
 chrono = { workspace = true }
+serde_json = { workspace = true }
 
 egui = { version = "0.33.3", default-features = false }
 egui-directx11 = "0.12.1"

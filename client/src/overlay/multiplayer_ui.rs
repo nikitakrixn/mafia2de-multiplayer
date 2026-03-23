@@ -78,7 +78,7 @@ fn state() -> &'static MultiplayerUIState {
         chat_input_focused: AtomicBool::new(false),
         connection_data: Mutex::new(ConnectionData {
             server_ip: "127.0.0.1".to_string(),
-            server_port: "7777".to_string(),
+            server_port: "7788".to_string(),
             nickname: "Player".to_string(),
             is_connected: false,
             connection_status: "Не подключен".to_string(),
@@ -322,6 +322,8 @@ fn draw_connect_menu(ctx: &egui::Context) {
             // Статус
             let status_color = if data.is_connected {
                 Color32::from_rgb(100, 255, 100)
+            } else if data.connection_status.contains("Подключение") {
+                Color32::from_rgb(255, 220, 120)
             } else {
                 Color32::from_rgb(255, 100, 100)
             };

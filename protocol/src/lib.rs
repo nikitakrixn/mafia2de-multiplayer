@@ -1,13 +1,16 @@
 //! Сетевой протокол для Mafia II: DE Multiplayer.
 //!
+//! v1 transport:
+//! - JSON packets over TCP
+//! - line-delimited framing (`\n`)
+//!
 //! ВАЖНО:
-//! Это пока transport-agnostic уровень:
-//! - только типы пакетов
-//! - без сериализации
-//! - без сокетов
+//! protocol не зависит от sdk, поэтому используем собственные простые типы.
+
+use serde::{Deserialize, Serialize};
 
 /// Версия протокола.
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// Порт сервера по умолчанию.
 pub const DEFAULT_PORT: u16 = 7788;
@@ -19,27 +22,17 @@ pub const MAX_PLAYERS: usize = 32;
 pub type PlayerId = u16;
 
 /// Простой сетевой Vec3.
-///
-/// Не тянем сюда `sdk::game::player::Vec3`,
-/// потому что protocol должен оставаться независимым от SDK.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct NetVec3 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
 
-/// Снапшот игрока для синхронизации по сети.
+/// Snapshot игрока.
 ///
-/// Это минимальный набор подтверждённых reverse'ом полей,
-/// которые реально полезны для proxy remote-player.
-///
-/// Намеренно НЕ включаем сюда:
-/// - сырые указатели
-/// - неизвестные поля
-/// - внутренности ActionCodeManager
-/// - всё подряд из player state cluster
-#[derive(Debug, Clone)]
+/// Минимальный multiplayer-useful набор подтверждённых reverse'ом данных.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetPlayerSnapshot {
     /// Локальный tick/sequence number отправителя.
     pub tick: u64,
@@ -77,8 +70,8 @@ pub struct NetPlayerSnapshot {
     pub in_vehicle: bool,
 }
 
-/// Высокоуровневые сетевые события игрока.
-#[derive(Debug, Clone)]
+/// Высокоуровневые события игрока.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NetPlayerEvent {
     EnterVehicle,
     EnterVehicleDone,
@@ -97,15 +90,15 @@ pub enum NetPlayerEvent {
 }
 
 /// Пакет от клиента к серверу.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientPacket {
-    /// Запрос на подключение.
+    /// Первый пакет после подключения.
     Connect {
         name: String,
         version: u32,
     },
 
-    /// Отключение.
+    /// Явное отключение.
     Disconnect,
 
     /// Snapshot локального игрока.
@@ -114,20 +107,14 @@ pub enum ClientPacket {
     /// Event локального игрока.
     Event(NetPlayerEvent),
 
-    /// Чат.
+    /// Сообщение чата.
     ChatMessage {
         text: String,
-    },
-
-    /// Старый packet. TODO: Убрать
-    PlayerUpdate {
-        position: [f32; 3],
-        rotation: f32,
     },
 }
 
 /// Пакет от сервера к клиенту.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerPacket {
     /// Подключение принято.
     ConnectAccepted {
@@ -139,13 +126,13 @@ pub enum ServerPacket {
         reason: String,
     },
 
-    /// Информация о появлении нового игрока.
+    /// Спавн удалённого игрока.
     PlayerSpawn {
         player_id: PlayerId,
         name: String,
     },
 
-    /// Игрок отключился.
+    /// Удалённый игрок отключился.
     PlayerDespawn {
         player_id: PlayerId,
     },
@@ -153,22 +140,15 @@ pub enum ServerPacket {
     /// Snapshot удалённого игрока.
     Snapshot(NetPlayerSnapshot),
 
-    /// Event удалённого игрока.
+    /// Событие удалённого игрока.
     Event {
         player_id: PlayerId,
         event: NetPlayerEvent,
     },
 
-    /// Чат.
+    /// Чат-сообщение.
     ChatMessage {
         player_id: PlayerId,
         text: String,
-    },
-
-    /// Старый packet. TODO: Убрать
-    PlayerUpdate {
-        player_id: PlayerId,
-        position: [f32; 3],
-        rotation: f32,
     },
 }
