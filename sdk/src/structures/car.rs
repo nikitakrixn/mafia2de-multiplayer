@@ -147,6 +147,14 @@ impl CCar {
         let ref_addr = self.self_ref as usize;
         ref_addr != 0 && ref_addr == self_addr
     }
+
+    /// Получить указатель на damage subobject (overlay car+0xE0).
+    ///
+    /// Возвращает raw pointer — вызывающий код отвечает за валидность.
+    pub fn damage_sub1_ptr(&self) -> *const CCarDamageSub1 {
+        // physics_sub_vtable находится по +0xE0 — это и есть начало subobject
+        &self.physics_sub_vtable as *const *const c_void as *const CCarDamageSub1
+    }
 }
 
 assert_field_offsets!(CCar {
@@ -257,4 +265,164 @@ assert_field_offsets!(CCarVehicle {
     sds_name_3       == 0x158,
     extended_params  == 0x178,
     global_subsystem == 0x1A8,
+});
+
+// =============================================================================
+//  CCarDamageSub1 — overlay для car+0xE0 (damage subobject)
+// =============================================================================
+
+/// Damage subobject машины (overlay на car+0xE0).
+///
+/// Не является отдельной аллокацией — это inline-часть CCar начиная с +0xE0.
+/// Все смещения относительно начала этого subobject (т.е. car+0xE0 = base).
+///
+/// Восстановлено из IDA Pro decompile CCarDamageSub1 vtable.
+#[repr(C)]
+pub struct CCarDamageSub1 {
+    /// Vtable pointer (+0x00 от subobject base = car+0xE0).
+    pub vtable: *const c_void,                  // +0x00
+
+    _pad_008: [u8; 0x30 - 0x08],
+
+    /// Parts table begin (вектор crash-part записей).
+    pub parts_table_begin: *mut c_void,         // +0x30
+    /// Parts table end.
+    pub parts_table_end: *mut c_void,           // +0x38
+
+    _pad_040: [u8; 0x60 - 0x40],
+
+    /// Active refs begin.
+    pub active_refs_begin: *mut c_void,         // +0x60
+    /// Active refs end.
+    pub active_refs_end: *mut c_void,           // +0x68
+
+    _pad_070: [u8; 0x6B0 - 0x70],
+
+    /// Group A begin.
+    pub group_a_begin: *mut c_void,             // +0x6B0
+    /// Group A end.
+    pub group_a_end: *mut c_void,               // +0x6B8
+
+    _pad_6c0: [u8; 0x6C8 - 0x6C0],
+
+    /// Links begin.
+    pub links_begin: *mut c_void,               // +0x6C8
+    /// Links end.
+    pub links_end: *mut c_void,                 // +0x6D0
+
+    _pad_6d8: [u8; 0x6E0 - 0x6D8],
+
+    /// Group B begin.
+    pub group_b_begin: *mut c_void,             // +0x6E0
+    /// Group B end.
+    pub group_b_end: *mut c_void,               // +0x6E8
+
+    _pad_6f0: [u8; 0x710 - 0x6F0],
+
+    /// Group C begin.
+    pub group_c_begin: *mut c_void,             // +0x710
+    /// Group C end.
+    pub group_c_end: *mut c_void,               // +0x718
+
+    _pad_720: [u8; 0x740 - 0x720],
+
+    /// Group D begin.
+    pub group_d_begin: *mut c_void,             // +0x740
+    /// Group D end.
+    pub group_d_end: *mut c_void,               // +0x748
+
+    _pad_750: [u8; 0x758 - 0x750],
+
+    /// FX group begin.
+    pub fx_group_begin: *mut c_void,            // +0x758
+    /// FX group end.
+    pub fx_group_end: *mut c_void,              // +0x760
+
+    _pad_768: [u8; 0x8A0 - 0x768],
+
+    /// Event buckets begin.
+    pub event_buckets_begin: *mut c_void,       // +0x8A0
+    /// Event buckets end.
+    pub event_buckets_end: *mut c_void,         // +0x8A8
+
+    _pad_8b0: [u8; 0xAA8 - 0x8B0],
+
+    /// Flags AA8 (u32).
+    pub flags_aa8: u32,                         // +0xAA8
+
+    _pad_aac: [u8; 0xAB0 - 0xAAC],
+
+    /// Flags AB0 (u32).
+    pub flags_ab0: u32,                         // +0xAB0
+
+    _pad_ab4: [u8; 0xAB8 - 0xAB4],
+
+    /// Flags AB8 (u32).
+    pub flags_ab8: u32,                         // +0xAB8
+
+    _pad_abc: [u8; 0xAC8 - 0xABC],
+
+    /// FX manager pointer (+0xAC8).
+    pub fx_manager_ac8: *mut c_void,            // +0xAC8
+}
+
+impl CCarDamageSub1 {
+    /// Количество crash-parts в parts_table.
+    pub fn parts_count(&self) -> usize {
+        let begin = self.parts_table_begin as usize;
+        let end = self.parts_table_end as usize;
+        if end > begin {
+            (end - begin) / std::mem::size_of::<*mut c_void>()
+        } else {
+            0
+        }
+    }
+
+    /// Количество элементов в group_a.
+    pub fn group_a_count(&self) -> usize {
+        let begin = self.group_a_begin as usize;
+        let end = self.group_a_end as usize;
+        if end > begin {
+            (end - begin) / std::mem::size_of::<*mut c_void>()
+        } else {
+            0
+        }
+    }
+
+    /// Количество элементов в group_b.
+    pub fn group_b_count(&self) -> usize {
+        let begin = self.group_b_begin as usize;
+        let end = self.group_b_end as usize;
+        if end > begin {
+            (end - begin) / std::mem::size_of::<*mut c_void>()
+        } else {
+            0
+        }
+    }
+}
+
+assert_field_offsets!(CCarDamageSub1 {
+    vtable              == 0x00,
+    parts_table_begin   == 0x30,
+    parts_table_end     == 0x38,
+    active_refs_begin   == 0x60,
+    active_refs_end     == 0x68,
+    group_a_begin       == 0x6B0,
+    group_a_end         == 0x6B8,
+    links_begin         == 0x6C8,
+    links_end           == 0x6D0,
+    group_b_begin       == 0x6E0,
+    group_b_end         == 0x6E8,
+    group_c_begin       == 0x710,
+    group_c_end         == 0x718,
+    group_d_begin       == 0x740,
+    group_d_end         == 0x748,
+    fx_group_begin      == 0x758,
+    fx_group_end        == 0x760,
+    event_buckets_begin == 0x8A0,
+    event_buckets_end   == 0x8A8,
+    flags_aa8           == 0xAA8,
+    flags_ab0           == 0xAB0,
+    flags_ab8           == 0xAB8,
+    fx_manager_ac8      == 0xAC8,
 });

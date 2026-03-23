@@ -1334,3 +1334,65 @@ pub mod car_vehicle_confirmed {
     /// `+0x1A8` -> global subsystem pointer.
     pub const GLOBAL_SUBSYSTEM: usize = 0x1A8;
 }
+
+/// Crash part object (базовый layout, общий для всех типов).
+/// Создаётся CCar::CreateCrashPart (vtable[89]).
+pub mod crash_part {
+    /// +0x00: vtable crash part.
+    pub const VTABLE: usize = 0x00;
+    /// +0x08: тип детали (u32, коды 0-16).
+    pub const PART_TYPE: usize = 0x08;
+    /// +0x10: флаги (u32, 0x80000000=detachable, 0x08=physical, etc).
+    pub const FLAGS: usize = 0x10;
+    /// +0x18: указатель на parent entity context.
+    pub const PARENT_CONTEXT: usize = 0x18;
+    /// +0x34: float, параметр (обычно прочность?).
+    pub const STRENGTH_PARAM: usize = 0x34;
+    /// +0x38: float, параметр.
+    pub const PARAM_38: usize = 0x38;
+    /// +0x148: указатель на sub-context (для сложных деталей).
+    pub const SUB_CONTEXT: usize = 0x148;
+}
+
+pub mod car_damage {
+    /// Индексы основной damage group A (u32 array).
+    pub const GROUP_A_BEGIN: usize = 0x6B0;
+    pub const GROUP_A_END: usize   = 0x6B8;
+
+    /// Связки parent/child между деталями.
+    pub const LINK_GROUP_BEGIN: usize = 0x6C8;
+    pub const LINK_GROUP_END: usize   = 0x6D0;
+
+    /// Damage group B.
+    pub const GROUP_B_BEGIN: usize = 0x6E0;
+    pub const GROUP_B_END: usize   = 0x6E8;
+
+    /// Damage group C.
+    pub const GROUP_C_BEGIN: usize = 0x710;
+    pub const GROUP_C_END: usize   = 0x718;
+
+    /// Damage group D.
+    pub const GROUP_D_BEGIN: usize = 0x740;
+    pub const GROUP_D_END: usize   = 0x748;
+
+    /// Active FX/detachable-part index list.
+    pub const FX_GROUP_BEGIN: usize = 0x758;
+    pub const FX_GROUP_END: usize   = 0x760;
+
+    /// Crash-event bucket groups, stride 0x260.
+    pub const EVENT_BUCKETS_BEGIN: usize = 0x8A0;
+    pub const EVENT_BUCKETS_END: usize   = 0x8A8;
+    pub const EVENT_BUCKET_STRIDE: usize = 0x260;
+
+    /// Damage/crash flags dword.
+    pub const FLAGS_AA8: usize = 0xAA8;
+
+    /// Runtime crash flags qword.
+    pub const FLAGS_AB0: usize = 0xAB0;
+
+    /// Secondary crash-state flags qword.
+    pub const FLAGS_AB8: usize = 0xAB8;
+
+    /// Crash FX / manager ptr.
+    pub const FX_MANAGER_AC8: usize = 0xAC8;
+}

@@ -6,6 +6,7 @@
 
 pub mod callbacks;
 pub mod camera;
+pub mod car;
 pub mod entity;
 pub mod entity_ref;
 pub mod entity_types;

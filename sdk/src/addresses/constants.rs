@@ -890,3 +890,49 @@ pub mod car_messages {
     /// Переключить флаг 41 (0x40009).
     pub const TOGGLE_FLAG_41: u32 = 0x40009;
 }
+
+/// Типы деталей повреждений C_Car (crash part codes).
+/// Используются в CCar::CreateCrashPart (vtable[89]).
+pub mod car_crash_parts {
+    pub const BODY: u32 = 0;
+    pub const BODY_ARMORED: u32 = 1;
+    pub const WHEEL: u32 = 2;
+    pub const LID: u32 = 3;        // капот/багажник
+    pub const DOOR: u32 = 4;
+    pub const WINDOW: u32 = 5;
+    pub const COVER: u32 = 6;
+    pub const BUMPER: u32 = 7;
+    // 8-10 = gap
+    pub const DOOR_PART: u32 = 11;  // 0xB, фрагмент двери
+    pub const EXHAUST: u32 = 12;    // 0xC
+    pub const MOTOR: u32 = 13;      // 0xD
+    pub const TYRE: u32 = 14;       // 0xE
+    pub const SNOW: u32 = 15;       // 0xF, снежное покрытие
+    pub const PLOW: u32 = 16;       // 0x10, снегоуборщик
+
+    /// Размеры аллокации по типу.
+    pub const fn alloc_size(part_type: u32) -> usize {
+        match part_type {
+            0 | 1 | 11 | 15 | 16 => 336,
+            2 | 3 | 14 => 360,
+            4 => 504,
+            5 | 12 => 424,
+            6 => 480,
+            7 => 368,
+            13 => 352,
+            _ => 0,
+        }
+    }
+}
+
+/// Флаги crash part (+0x10).
+pub mod car_crash_flags {
+    /// Деталь может полностью отделиться от кузова.
+    pub const DETACHABLE: u32 = 0x80000000;
+    /// Физическая деталь (требует физический контакт для повреждения).
+    pub const PHYSICAL: u32 = 0x08;
+    /// Специальная деталь (снегоуборщик и т.д.).
+    pub const SPECIAL: u32 = 0x20000000;
+    /// Разбиваемое стекло (окно может разбиться, но не отделиться).
+    pub const BREAKABLE: u32 = 0x10;
+}

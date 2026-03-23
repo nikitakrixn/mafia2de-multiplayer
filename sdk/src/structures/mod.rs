@@ -31,7 +31,7 @@ pub use player::{CHuman, CHumanNPC, CPlayer, CPlayerSub45C};
 pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};
 
 // Транспорт
-pub use car::{CCar, CCarVehicle};
+pub use car::{CCar, CCarDamageSub1, CCarVehicle};
 pub use vehicle::{Vehicle, VehicleWrapper};
 
 // Гараж
