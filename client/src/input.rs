@@ -18,6 +18,10 @@ pub fn log_keybinds() {
     logger::info("    F2      — Меню подключения к серверу");
     logger::info("    F3      — Список игроков онлайн");
     logger::info("    T       — Открыть чат");
+    logger::info("    F5      — Spawn mock remote player");
+    logger::info("    F6      — Move mock remote player (по кругу)");
+    logger::info("    F7      — Send mock remote event (Shot)");
+    logger::info("    F8      — Despawn mock remote player");
     logger::info("    F11     — Загрузить демо-данные (тест UI)");
     logger::info("    F12     — Очистить демо-данные");
 }
@@ -64,6 +68,26 @@ pub fn run() {
         if just_pressed(VK_F12) {
             logger::info("[input] очистка демо-данных мультиплеера");
             crate::overlay::multiplayer_demo::clear_demo_data();
+        }
+
+        // F5 — заспавнить mock remote player
+        if just_pressed(VK_F5) {
+            crate::multiplayer_test::spawn_mock_remote();
+        }
+
+        // F6 — сдвинуть mock remote player по кругу
+        if just_pressed(VK_F6) {
+            crate::multiplayer_test::step_mock_remote();
+        }
+
+        // F7 — отправить mock remote event
+        if just_pressed(VK_F7) {
+            crate::multiplayer_test::send_mock_remote_event();
+        }
+
+        // F8 — удалить mock remote player
+        if just_pressed(VK_F8) {
+            crate::multiplayer_test::despawn_mock_remote();
         }
     }
 }

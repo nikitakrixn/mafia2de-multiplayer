@@ -54,9 +54,18 @@ pub fn init() {
 }
 
 pub fn update_main_thread() {
-    if !matches!(state::get(), GameSessionState::InGame) {
-        reset();
-        return;
+    match state::get() {
+        GameSessionState::InGame => {}
+        GameSessionState::Paused => {
+            // На паузе не обновляем, но и не сбрасываем —
+            // чтобы после unpause не было ложного "initial snapshot captured"
+            // и ложных teleport/movement start.
+            return;
+        }
+        _ => {
+            reset();
+            return;
+        }
     }
 
     let Some(player) = Player::get_active() else {

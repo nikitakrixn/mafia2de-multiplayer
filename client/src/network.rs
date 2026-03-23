@@ -263,23 +263,8 @@ pub fn poll_main_thread() {
         return;
     }
 
-    // -------------------------------------------------------------------------
-    // OUTBOUND
-    // -------------------------------------------------------------------------
-    //
-    // Пока transport не реализован, просто дреним очередь.
-    // Это важно, чтобы верхние слои уже работали как multiplayer-ready,
-    // но очередь не росла бесконечно.
-    if !outbound.is_empty() {
-        logger::debug(&format!(
-            "[network] drained {} outbound packet(s) (transport v0 stub)",
-            outbound.len()
-        ));
-    }
+    let _ = outbound;
 
-    // -------------------------------------------------------------------------
-    // INBOUND
-    // -------------------------------------------------------------------------
     for packet in inbound {
         match packet {
             ServerPacket::PlayerSpawn { player_id, name } => {

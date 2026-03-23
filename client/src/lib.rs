@@ -6,6 +6,7 @@ mod human_messages;
 mod input;
 mod lua_queue;
 mod main_thread;
+mod multiplayer_test;
 mod network;
 mod overlay;
 mod player_events;

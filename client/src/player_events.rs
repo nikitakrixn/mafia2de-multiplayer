@@ -86,25 +86,29 @@ pub fn push(event: PlayerEvent) {
 /// (например, MoneyChanged — это только локальное состояние).
 pub fn to_net_event(ev: &PlayerEvent) -> Option<NetPlayerEvent> {
     match ev {
-        PlayerEvent::EnterVehicle => Some(NetPlayerEvent::EnterVehicle),
-        PlayerEvent::EnterVehicleDone => Some(NetPlayerEvent::EnterVehicleDone),
-        PlayerEvent::LeaveVehicle => Some(NetPlayerEvent::LeaveVehicle),
-        PlayerEvent::LeaveVehicleDone => Some(NetPlayerEvent::LeaveVehicleDone),
+        // Только authoritative polling events идут по сети.
+        // Raw HUMAN message transitions (EnterVehicle/LeaveVehicle) — только локальный лог.
         PlayerEvent::VehicleEntered { .. } => Some(NetPlayerEvent::EnterVehicleDone),
         PlayerEvent::VehicleLeft => Some(NetPlayerEvent::LeaveVehicleDone),
+
         PlayerEvent::Damage => Some(NetPlayerEvent::Damage),
         PlayerEvent::Death => Some(NetPlayerEvent::Death),
         PlayerEvent::Shot => Some(NetPlayerEvent::Shot),
         PlayerEvent::WeaponSelect => Some(NetPlayerEvent::WeaponSelect),
         PlayerEvent::WeaponHide => Some(NetPlayerEvent::WeaponHide),
-        // Локальные события — не транслируем
-        PlayerEvent::MoneyChanged { .. }
+
+        // Всё остальное — не транслируем
+        PlayerEvent::EnterVehicle
+        | PlayerEvent::EnterVehicleDone
+        | PlayerEvent::LeaveVehicle
+        | PlayerEvent::LeaveVehicleDone
+        | PlayerEvent::AnimNotify
+        | PlayerEvent::MoneyChanged { .. }
         | PlayerEvent::MovementStarted { .. }
         | PlayerEvent::MovementStopped { .. }
         | PlayerEvent::Teleported { .. }
         | PlayerEvent::ControlsLockedChanged { .. }
-        | PlayerEvent::ControlStyleChanged { .. }
-        | PlayerEvent::AnimNotify => None,
+        | PlayerEvent::ControlStyleChanged { .. } => None,
     }
 }
 

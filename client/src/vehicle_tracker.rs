@@ -49,9 +49,17 @@ fn reset() {
 
 /// Вызывается на game thread каждый tick.
 pub fn update_main_thread() {
-    if !matches!(state::get(), GameSessionState::InGame) {
-        reset();
-        return;
+    match state::get() {
+        GameSessionState::InGame => {}
+        GameSessionState::Paused => {
+            // На паузе не обновляем, но сохраняем last_state —
+            // чтобы после unpause не было ложного VehicleEntered/VehicleLeft.
+            return;
+        }
+        _ => {
+            reset();
+            return;
+        }
     }
 
     let Some(player) = Player::get_active() else {
