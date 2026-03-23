@@ -41,17 +41,8 @@ pub fn on_main_thread_tick() {
     refresh_state_if_needed();
     update_ping_if_needed();
 
-    // Gameplay tracking — всё это работает на game thread.
-    crate::network::auto_disconnect_if_session_invalid();
-    crate::player_tracker::update_main_thread();
-    crate::vehicle_tracker::update_main_thread();
-
-    // Высокоуровневые локальные события -> лог + network queue
-    crate::player_events::process_pending();
-
-    // Multiplayer network layer: дреним outbound, применяем inbound
-    crate::multiplayer_test::update_main_thread();
-    crate::network::poll_main_thread();
+    // Multiplayer orchestration: tracking → events → network
+    crate::multiplayer::on_main_thread_tick();
 
     crate::hooks::try_deferred_present_hook();
     crate::overlay::state::sync_from_game();

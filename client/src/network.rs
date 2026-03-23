@@ -255,33 +255,6 @@ pub fn send_chat_message(text: String) {
         .push_back(ClientPacket::ChatMessage { text: text.clone() });
 }
 
-pub fn inject_player_spawn(player_id: PlayerId, name: String) {
-    if let Ok(mut s) = state().lock() {
-        s.inbound.push_back(ServerPacket::PlayerSpawn { player_id, name });
-    }
-}
-
-/// Инъекция remote snapshot.
-pub fn inject_remote_snapshot(snapshot: NetPlayerSnapshot) {
-    if let Ok(mut s) = state().lock() {
-        s.inbound.push_back(ServerPacket::Snapshot(snapshot));
-    }
-}
-
-/// Инъекция remote event.
-pub fn inject_remote_event(player_id: PlayerId, event: NetPlayerEvent) {
-    if let Ok(mut s) = state().lock() {
-        s.inbound.push_back(ServerPacket::Event { player_id, event });
-    }
-}
-
-/// Инъекция despawn.
-pub fn inject_player_despawn(player_id: PlayerId) {
-    if let Ok(mut s) = state().lock() {
-        s.inbound.push_back(ServerPacket::PlayerDespawn { player_id });
-    }
-}
-
 /// Вызывается на game thread — применяет inbound packets к runtime.
 pub fn poll_main_thread() {
     let inbound = {

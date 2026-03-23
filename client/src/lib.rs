@@ -6,7 +6,7 @@ mod human_messages;
 mod input;
 mod lua_queue;
 mod main_thread;
-mod multiplayer_test;
+mod multiplayer;
 mod net_debug;
 mod network;
 mod overlay;
@@ -69,6 +69,7 @@ fn initialize() {
     vehicle_tracker::init();
     network::init();
     remote_players::init();
+    multiplayer::init();
     let _ = state::refresh_from_runtime();
     sdk::game::lua::log_chain();
 
