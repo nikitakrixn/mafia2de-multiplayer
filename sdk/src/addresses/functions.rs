@@ -1792,6 +1792,15 @@ pub mod player_state_tail {
     /// together with this->vfunc16().
     pub const COMPONENT_B8_PROCESS_WITH_FIELD168: usize = 0xDA_CD50;
 
+    /// Calls helper on *(qword*)(this+0xB8) and returns second argument.
+    pub const COMPONENT_B8_INVOKE_AND_RETURN_ARG: usize = 0xDA_2D50;
+
+    /// Shared human thunk via physics_provider (+0x258).
+    pub const PHYSICS_PROVIDER_THUNK_88: usize = 0xDA_FB90;
+
+    /// Shared human thunk: physics_provider (+0x258) -> vtable+0x110.
+    pub const PHYSICS_PROVIDER_INVOKE_VFUNC110: usize = 0xDD_7740;
+
     /// Main player transition path. Clears/resets current state or assigns
     /// state_code_430 based on resolved object type and updates sub45c/physics marker state.
     pub const TRANSITION_STATE430_BY_RESOLVED_OBJECT: usize = 0x0C_52D0;
@@ -1803,6 +1812,12 @@ pub mod player_state_tail {
     /// Hashes input string with FNV-1 64-bit, looks up state mask/profile,
     /// writes result to player+0x438, resets string field at +0x520.
     pub const LOAD_STATE_MASK_438_BY_NAME: usize = 0x0C_98C0;
+
+    /// Returns *(qword*)(player+0x520).
+    pub const GET_FIELD520_QWORD: usize = 0x0C_3590;
+
+    /// Returns low byte of *(u32*)(player+0x3D8) != 3 && != 4.
+    pub const IS_STATE_3D8_LOWBYTE_NOT_3_OR_4: usize = 0x0C_47F0;
 
     /// If state_code_430 <= 1, gets current position and tests it via helper
     /// sub_1400BD9E0(this, this+0x330, pos).
@@ -1817,4 +1832,28 @@ pub mod player_state_tail {
 
     /// Returns constant 3.
     pub const GET_CONSTANT3: usize = 0x0C_39E0;
+
+    /// Handles codes 800..849 via action-code path, otherwise jumps to CHuman fallback handler.
+    pub const HANDLE_CODE_RANGE_800_849_OR_FALLBACK: usize = 0x0C_6F00;
+
+    /// Special player handler for codes 850..855. Uses PhysicsWorld marker 1 and mask values 1/2/4.
+    pub const HANDLE_PHYSICS_MARKER_CODES_850_855: usize = 0x0C_6F40;
+
+    /// Formats string 'PlayerFx%u' and dispatches it through object at player+0x110.
+    pub const TRIGGER_FX_BY_ID: usize = 0x0C_7040;
+
+    /// Returns constant true/1.
+    pub const RETURN_TRUE: usize = 0x0B_EF00;
+
+    /// Uses player.physics_provider (+0x258). If present, calls provider path; otherwise uses fallback helper.
+    pub const PHYSICS_PROVIDER_INVOKE_VFUNC320_OR_FALLBACK: usize = 0x0C_3680;
+
+    /// Returns true if player.sub45c.state == 1 or state in {2,3}.
+    pub const IS_SUB45C_STATE_1_OR_2_OR_3: usize = 0x0C_4650;
+
+    /// Returns constant 0/null.
+    pub const RETURN_NULL: usize = 0x0C_3380;
+
+    /// Returns constant false/0.
+    pub const RETURN_FALSE: usize = 0x0C_3D50;
 }

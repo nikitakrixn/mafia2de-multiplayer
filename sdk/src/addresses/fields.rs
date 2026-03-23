@@ -274,6 +274,12 @@ pub mod player {
     /// HasSpecialState46F0 delegates into this object.
     pub const SUBOBJECT_45C: usize = 0x45C;
 
+    /// `+0x45C` -> sub45c.code_a (primary stored action/code).
+    pub const SUBOBJECT_45C_CODE_A: usize = 0x45C;
+
+    /// `+0x460` -> sub45c.code_b (auxiliary stored action/code).
+    pub const SUBOBJECT_45C_CODE_B: usize = 0x460;
+
     /// `+0x464` -> sub45c.state.
     /// NOT an independent field — part of the subobject at +0x45C.
     ///
@@ -306,6 +312,9 @@ pub mod player {
 
     /// `+0x520` -> string object / buffer reset by M2DE_String_SetCStr.
     pub const STRING_OBJ_520: usize = 0x520;
+
+    /// `+0x520` -> qword field (alias for STRING_OBJ_520).
+    pub const FIELD_520_QWORD: usize = 0x520;
 }
 
 // =============================================================================
