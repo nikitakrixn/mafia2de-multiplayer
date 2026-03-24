@@ -10,7 +10,7 @@ pub struct Car {
 
 impl Car {
     pub fn from_ptr(ptr: usize) -> Option<Self> {
-        if ptr == 0 || !unsafe { memory::is_valid_ptr(ptr) } {
+        if ptr == 0 || !memory::is_valid_ptr(ptr) {
             return None;
         }
 

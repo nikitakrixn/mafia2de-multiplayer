@@ -1866,122 +1866,85 @@ pub mod player_state_tail {
 }
 
 // =============================================================================
-//  C_Car embedded damage/crash subobject (sub-vtable1 at car+0xE0)
+//  C_Car embedded damage/crash subobject (car + 0xE0)
 // =============================================================================
 
-/// Методы embedded damage/crash subobject C_Car.
-///
-/// ВАЖНО:
-/// это НЕ primary `C_Car` vtable.
-/// Primary `C_Car` vtable заканчивается на slot [76].
-/// Эти методы принадлежат `M2DE_VT_CCar_DamageSub1` (0x141850298),
-/// которая живёт по `C_Car + 0xE0`.
-/// Методы получают `this = car + 0xE0`, а не top-level `C_Car*`.
 pub mod car_damage {
-    /// Embedded damage/crash subobject update.
+    /// Main update for embedded crash/damage subsystem.
     ///
-    /// Исторически в flat dump фигурировало как "slot[83]",
-    /// но это misleading — primary `C_Car` vtable заканчивается раньше.
+    /// ВАЖНО:
+    /// это НЕ primary `C_Car` vtable slot.
+    /// Это метод embedded sub-vtable (`M2DE_VT_CCar_DamageSub1`),
+    /// которая начинается по `car + 0xE0`.
     ///
-    /// Функция:
-    /// - обрабатывает damage groups
-    /// - синхронизирует linked crash parts
-    /// - переключает frame/bone visibility
-    /// - применяет runtime crash flags
+    /// Обрабатывает:
+    /// - active refs
+    /// - doors
+    /// - windows/links
+    /// - covers (hood/trunk)
+    /// - exhaust
+    /// - bumpers
+    /// - fx/debris
+    /// - runtime flags
     ///
     /// IDA: `0x1404AE220`
     pub const UPDATE_CRASH_DAMAGE_STATE: usize = 0x4A_E220;
 
-    /// Crash-part factory.
+    /// Crash part factory.
     ///
-    /// Исторически в flat dump фигурировало как "slot[89]".
-    /// На деле это метод `CCarDamageSub1`.
-    ///
-    /// Создаёт crash part object:
-    /// - по integer type code
-    /// - либо по имени frame node
-    ///
-    /// Типы: Body, Wheel, Lid, Door, Window, Cover, Bumper,
-    /// DoorPart, Exhaust, Motor, Tyre, Snow, Plow.
+    /// Создаёт damage/crash parts:
+    /// Body, Door, Window, Cover, Bumper, Exhaust и т.д.
     ///
     /// IDA: `0x140482B70`
     pub const CREATE_CRASH_PART: usize = 0x48_2B70;
 
-    /// Включить/выключить damage group A.
+    /// Activate/deactivate 4-door group.
     /// IDA: `0x1404BAA90`
-    pub const SET_GROUP_A_ACTIVE: usize = 0x4B_AA90;
+    pub const SET_DOOR_GROUP_ACTIVE: usize = 0x4B_AA90;
 
-    /// Обновить угол/поворот damage group A.
+    /// Update door open/damage angle.
     /// IDA: `0x1404BA500`
-    pub const UPDATE_GROUP_A_ANGLE: usize = 0x4B_A500;
+    pub const UPDATE_DOOR_GROUP_OPEN_ANGLE: usize = 0x4B_A500;
 
-    /// Включить/выключить damage group B.
+    /// Activate/deactivate cover group (hood/trunk-like).
     /// IDA: `0x1404BA050`
-    pub const SET_GROUP_B_ACTIVE: usize = 0x4B_A050;
+    pub const SET_COVER_GROUP_ACTIVE: usize = 0x4B_A050;
 
-    /// Обновить угол/поворот damage group B.
+    /// Update cover open angle.
     /// IDA: `0x1404B9CA0`
-    pub const UPDATE_GROUP_B_ANGLE: usize = 0x4B_9CA0;
+    pub const UPDATE_COVER_GROUP_OPEN_ANGLE: usize = 0x4B_9CA0;
 
-    /// Включить/выключить damage group C.
+    /// Activate/deactivate exhaust part.
     /// IDA: `0x1404BB880`
-    pub const SET_GROUP_C_ACTIVE: usize = 0x4B_B880;
+    pub const SET_EXHAUST_PART_ACTIVE: usize = 0x4B_B880;
 
-    /// Включить/выключить damage group D.
+    /// Activate/deactivate bumper group.
     /// IDA: `0x1404B97C0`
-    pub const SET_GROUP_D_ACTIVE: usize = 0x4B_97C0;
+    pub const SET_BUMPER_GROUP_ACTIVE: usize = 0x4B_97C0;
 
-    /// Переключить глобальный режим активации crash parts.
+    /// Toggle global crash-part activation mode.
     /// IDA: `0x1404C4170`
     pub const SET_CRASH_PART_ACTIVATION_MODE: usize = 0x4C_4170;
 
-    /// Включить/выключить damage rig.
+    /// Enable/disable full damage rig.
     /// IDA: `0x1404B2430`
     pub const SET_DAMAGE_RIG_ENABLED: usize = 0x4B_2430;
 
-    /// Применить runtime damage/crash flags.
+    /// Apply runtime crash/damage flags.
     /// IDA: `0x1404C1E10`
     pub const APPLY_RUNTIME_FLAGS: usize = 0x4C_1E10;
 
-    // ── crash-part constructors / helpers ────────────────────────────────
+    // ── Crash-part constructors ─────────────────────────────────────────
 
-    /// Аллокация crash-part object из pool.
-    /// IDA: `0x14047B390`
     pub const CRASH_PART_POOL_ALLOC: usize = 0x47_B390;
-
-    /// 336-byte body-like part constructor (Body, BodyArmored, DoorPart, Snow, Plow).
-    /// IDA: `0x140473060`
     pub const CRASH_PART_BODY_CTOR: usize = 0x47_3060;
-
-    /// 360-byte detachable part constructor (Wheel, Lid, Tyre).
-    /// IDA: `0x140473A60`
     pub const CRASH_PART_DETACHABLE_CTOR: usize = 0x47_3A60;
-
-    /// 504-byte door-like part constructor.
-    /// IDA: `0x1404738A0`
     pub const CRASH_PART_DOOR_CTOR: usize = 0x47_38A0;
-
-    /// 424-byte window-like part constructor.
-    /// IDA: `0x1404760D0`
     pub const CRASH_PART_WINDOW_CTOR: usize = 0x47_60D0;
-
-    /// 480-byte cover-like part constructor.
-    /// IDA: `0x140472FB0`
     pub const CRASH_PART_COVER_CTOR: usize = 0x47_2FB0;
-
-    /// 368-byte bumper-like part constructor.
-    /// IDA: `0x140472F60`
     pub const CRASH_PART_BUMPER_CTOR: usize = 0x47_2F60;
-
-    /// 424-byte exhaust-like part constructor.
-    /// IDA: `0x1404731F0`
     pub const CRASH_PART_EXHAUST_CTOR: usize = 0x47_31F0;
-
-    /// 352-byte motor-like part constructor.
-    /// IDA: `0x140473860`
     pub const CRASH_PART_MOTOR_CTOR: usize = 0x47_3860;
 
-    /// Присоединить crash part к damage context машины.
-    /// IDA: `0x1402E9350`
     pub const CRASH_PART_ATTACH_TO_CONTEXT: usize = 0x2E_9350;
 }

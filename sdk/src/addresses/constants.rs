@@ -893,6 +893,15 @@ pub mod car_messages {
 
 /// Типы деталей повреждений C_Car (crash part codes).
 /// Используются в CCar::CreateCrashPart (vtable[89]).
+///
+/// Подтверждено runtime dump'ами и decompile `CreateCrashPart`.
+/// Семантика групп в `CCarDamageSub1`:
+/// - group_a (двери)   = тип 4
+/// - links  (стёкла)   = тип 5
+/// - group_b (крышки)  = тип 6
+/// - group_d (бамперы) = тип 7
+/// - fx_group (эффекты)= тип 10
+/// - group_c (выхлоп)  = тип 12
 pub mod car_crash_parts {
     pub const BODY: u32 = 0;
     pub const BODY_ARMORED: u32 = 1;
@@ -902,7 +911,10 @@ pub mod car_crash_parts {
     pub const WINDOW: u32 = 5;
     pub const COVER: u32 = 6;
     pub const BUMPER: u32 = 7;
-    // 8-10 = gap
+    // 8-9 = gap
+    /// Crash FX / debris / вспомогательная визуальная деталь.
+    /// Runtime confirmed: fx_group в CCarDamageSub1.
+    pub const FX: u32 = 10;
     pub const DOOR_PART: u32 = 11;  // 0xB, фрагмент двери
     pub const EXHAUST: u32 = 12;    // 0xC
     pub const MOTOR: u32 = 13;      // 0xD
@@ -935,4 +947,66 @@ pub mod car_crash_flags {
     pub const SPECIAL: u32 = 0x20000000;
     /// Разбиваемое стекло (окно может разбиться, но не отделиться).
     pub const BREAKABLE: u32 = 0x10;
+}
+
+// =============================================================================
+//  C_Car body-style subtypes
+// =============================================================================
+
+/// Подтверждённые body-style subtype'ы `C_Car` (`car + 0xA0`).
+///
+/// Это НЕ factory type — factory type у `C_Car` всегда `0x12`.
+/// subtype отражает кузов / damage-layout / body-style.
+///
+/// Подтверждено runtime dump'ами active cars и damage groups.
+pub mod car_entity_subtypes {
+    /// 4-дверный кузов (вариант A).
+    pub const BODY_4DOOR_A: u32 = 0x38;
+
+    /// subtype 0x39 — пока не классифицирован окончательно.
+    pub const BODY_UNKNOWN_39: u32 = 0x39;
+
+    /// 4-дверный кузов (вариант B).
+    pub const BODY_4DOOR_B: u32 = 0x3A;
+
+    /// 4-дверный кузов (вариант C).
+    pub const BODY_4DOOR_C: u32 = 0x3B;
+
+    /// 2-дверный кузов.
+    ///
+    /// Runtime confirmed:
+    /// - group_a (двери) count = 2
+    /// - links (стёкла) count = 1
+    /// - group_d (бамперы) count = 1
+    pub const BODY_2DOOR: u32 = 0x3D;
+
+    /// 4-дверный кузов (вариант D).
+    pub const BODY_4DOOR_D: u32 = 0x40;
+}
+
+// =============================================================================
+//  C_Car damage group semantic indices
+// =============================================================================
+
+/// Семантические индексы damage-групп внутри `CCarDamageSub1`.
+///
+/// Это reverse semantic names, подтверждённые runtime dump'ами.
+pub mod car_damage_groups {
+    /// group_a = двери (тип 4).
+    pub const DOORS: usize = 0;
+
+    /// links = стёкла / linked window parts (тип 5).
+    pub const GLASS_LINKS: usize = 1;
+
+    /// group_b = крышки (капот / багажник, тип 6).
+    pub const COVERS: usize = 2;
+
+    /// group_c = выхлоп (тип 12).
+    pub const EXHAUST: usize = 3;
+
+    /// group_d = бамперы (тип 7).
+    pub const BUMPERS: usize = 4;
+
+    /// fx_group = crash fx / debris (тип 10).
+    pub const FX: usize = 5;
 }

@@ -109,14 +109,20 @@ pub struct CCar {
 }
 
 impl CCar {
-    /// Получить позицию из world_matrix (translation: [12], [13], [14]).
+    /// Получить позицию из встроенной world matrix.
     ///
-    /// Подтверждено: IDA decompile, world_matrix[12..14] = translation.
+    /// Подтверждено decompile `CCar_GetPos`:
+    /// - +0x27C = X
+    /// - +0x28C = Y
+    /// - +0x29C = Z
+    ///
+    /// Если `world_matrix` начинается с +0x270, то это элементы:
+    /// - [3], [7], [11]
     pub fn get_pos(&self) -> (f32, f32, f32) {
         (
-            self.world_matrix[12],
-            self.world_matrix[13],
-            self.world_matrix[14],
+            self.world_matrix[3],
+            self.world_matrix[7],
+            self.world_matrix[11],
         )
     }
 
@@ -125,17 +131,24 @@ impl CCar {
         !self.physics_body.is_null()
     }
 
-    /// Установлен ли флаг "dirty" (bit 0 car_flags).
+    /// Установлен ли dirty-флаг.
+    ///
+    /// Подтверждено `CCar_SetPos` / `CCar_SetRotation`:
+    /// `car_flags |= 0x1000`.
     pub fn is_dirty(&self) -> bool {
-        self.car_flags & 1 != 0
+        (self.car_flags & 0x1000) != 0
     }
 
-    /// Количество записей в records вектора.
+    /// Количество записей в records-векторе.
+    ///
+    /// Подтверждено:
+    /// - slot[67] = `(end - begin) / 24`
+    /// - slot[68] = `begin + 24 * index`
     pub fn record_count(&self) -> usize {
         let begin = self.records_begin as usize;
         let end = self.records_end as usize;
         if end > begin {
-            (end - begin) / std::mem::size_of::<*mut c_void>()
+            (end - begin) / 24
         } else {
             0
         }
@@ -148,12 +161,25 @@ impl CCar {
         ref_addr != 0 && ref_addr == self_addr
     }
 
-    /// Получить указатель на damage subobject (overlay car+0xE0).
+    /// Получить указатель на embedded damage subobject (`car + 0xE0`).
     ///
-    /// Возвращает raw pointer — вызывающий код отвечает за валидность.
+    /// ВАЖНО:
+    /// это overlay на inline-подобъект внутри `C_Car`,
+    /// а НЕ отдельная аллокация.
     pub fn damage_sub1_ptr(&self) -> *const CCarDamageSub1 {
-        // physics_sub_vtable находится по +0xE0 — это и есть начало subobject
-        &self.physics_sub_vtable as *const *const c_void as *const CCarDamageSub1
+        (&self.physics_sub_vtable as *const *const c_void) as *const CCarDamageSub1
+    }
+
+    /// Это двухдверный кузов?
+    ///
+    /// Runtime confirmed: subtype `0x3D` имеет 2 двери в `group_a`.
+    pub fn is_two_door_body(&self) -> bool {
+        self.entity_subtype == 0x3D
+    }
+
+    /// Это один из подтверждённых четырёхдверных кузовов?
+    pub fn is_four_door_body(&self) -> bool {
+        matches!(self.entity_subtype, 0x38 | 0x3A | 0x3B | 0x40)
     }
 }
 
@@ -233,23 +259,24 @@ pub struct CCarVehicle {
 }
 
 impl CCarVehicle {
-    /// Получить SDS name 1 (cloth) как строку.
+    /// Получить SDS name 1 как строку.
+    ///
+    /// Подтверждено decompile `InitFromTemplate`:
+    /// `strncpy(this+0x118, template+72, 0x1F); this[0x137]=0`
+    ///
+    /// То есть это обычный `char[32]`, а НЕ `{flag + char[31]}`.
     pub fn get_sds_name_1(&self) -> Option<&str> {
-        // Формат: { u8 flag, char[31] name }
-        let name_bytes = &self.sds_name_1[1..];
-        CStr::from_bytes_until_nul(name_bytes).ok()?.to_str().ok()
+        CStr::from_bytes_until_nul(&self.sds_name_1).ok()?.to_str().ok()
     }
 
-    /// Получить SDS name 2 (body) как строку.
+    /// Получить SDS name 2 как строку.
     pub fn get_sds_name_2(&self) -> Option<&str> {
-        let name_bytes = &self.sds_name_2[1..];
-        CStr::from_bytes_until_nul(name_bytes).ok()?.to_str().ok()
+        CStr::from_bytes_until_nul(&self.sds_name_2).ok()?.to_str().ok()
     }
 
-    /// Получить SDS name 3 (look) как строку.
+    /// Получить SDS name 3 как строку.
     pub fn get_sds_name_3(&self) -> Option<&str> {
-        let name_bytes = &self.sds_name_3[1..];
-        CStr::from_bytes_until_nul(name_bytes).ok()?.to_str().ok()
+        CStr::from_bytes_until_nul(&self.sds_name_3).ok()?.to_str().ok()
     }
 }
 
@@ -350,17 +377,15 @@ pub struct CCarDamageSub1 {
     /// Flags AA8 (u32).
     pub flags_aa8: u32,                         // +0xAA8
 
-    _pad_aac: [u8; 0xAB0 - 0xAAC],
+    _pad_aac: [u8; 0xAB0 - 0xAAC],             // +0xAAC..+0xAAF
 
-    /// Flags AB0 (u32).
-    pub flags_ab0: u32,                         // +0xAB0
+    /// Flags AB0 (u64).
+    pub flags_ab0: u64,                         // +0xAB0
 
-    _pad_ab4: [u8; 0xAB8 - 0xAB4],
+    /// Flags AB8 (u64).
+    pub flags_ab8: u64,                         // +0xAB8
 
-    /// Flags AB8 (u32).
-    pub flags_ab8: u32,                         // +0xAB8
-
-    _pad_abc: [u8; 0xAC8 - 0xABC],
+    _pad_ac0: [u8; 0xAC8 - 0xAC0],             // +0xAC0..+0xAC7
 
     /// FX manager pointer (+0xAC8).
     pub fx_manager_ac8: *mut c_void,            // +0xAC8
@@ -368,36 +393,82 @@ pub struct CCarDamageSub1 {
 
 impl CCarDamageSub1 {
     /// Количество crash-parts в parts_table.
+    ///
+    /// Это таблица указателей, stride = 8.
     pub fn parts_count(&self) -> usize {
         let begin = self.parts_table_begin as usize;
         let end = self.parts_table_end as usize;
         if end > begin {
-            (end - begin) / std::mem::size_of::<*mut c_void>()
+            (end - begin) / 8
         } else {
             0
         }
     }
 
-    /// Количество элементов в group_a.
+    /// Количество элементов в active_refs.
+    ///
+    /// Это вектор указателей, stride = 8.
+    pub fn active_refs_count(&self) -> usize {
+        let begin = self.active_refs_begin as usize;
+        let end = self.active_refs_end as usize;
+        if end > begin {
+            (end - begin) / 8
+        } else {
+            0
+        }
+    }
+
+    /// Количество индексов в group A.
+    ///
+    /// Подтверждено: это массив `u32`, stride = 4.
     pub fn group_a_count(&self) -> usize {
         let begin = self.group_a_begin as usize;
         let end = self.group_a_end as usize;
-        if end > begin {
-            (end - begin) / std::mem::size_of::<*mut c_void>()
-        } else {
-            0
-        }
+        if end > begin { (end - begin) / 4 } else { 0 }
     }
 
-    /// Количество элементов в group_b.
+    /// Количество индексов в links.
+    pub fn links_count(&self) -> usize {
+        let begin = self.links_begin as usize;
+        let end = self.links_end as usize;
+        if end > begin { (end - begin) / 4 } else { 0 }
+    }
+
+    /// Количество индексов в group B.
     pub fn group_b_count(&self) -> usize {
         let begin = self.group_b_begin as usize;
         let end = self.group_b_end as usize;
-        if end > begin {
-            (end - begin) / std::mem::size_of::<*mut c_void>()
-        } else {
-            0
-        }
+        if end > begin { (end - begin) / 4 } else { 0 }
+    }
+
+    /// Количество индексов в group C.
+    pub fn group_c_count(&self) -> usize {
+        let begin = self.group_c_begin as usize;
+        let end = self.group_c_end as usize;
+        if end > begin { (end - begin) / 4 } else { 0 }
+    }
+
+    /// Количество индексов в group D.
+    pub fn group_d_count(&self) -> usize {
+        let begin = self.group_d_begin as usize;
+        let end = self.group_d_end as usize;
+        if end > begin { (end - begin) / 4 } else { 0 }
+    }
+
+    /// Количество индексов в fx_group.
+    pub fn fx_group_count(&self) -> usize {
+        let begin = self.fx_group_begin as usize;
+        let end = self.fx_group_end as usize;
+        if end > begin { (end - begin) / 4 } else { 0 }
+    }
+
+    /// Количество event buckets.
+    ///
+    /// Подтверждено runtime/decompile: stride = 0x260.
+    pub fn event_bucket_count(&self) -> usize {
+        let begin = self.event_buckets_begin as usize;
+        let end = self.event_buckets_end as usize;
+        if end > begin { (end - begin) / 0x260 } else { 0 }
     }
 }
 
