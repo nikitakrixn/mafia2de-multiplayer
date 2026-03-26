@@ -48,7 +48,7 @@ pub fn flush_wndproc_queue() {
     }
 }
 
-/// Маппинг VK → egui::Key для служебных клавиш.
+/// Маппинг VK -> egui::Key для служебных клавиш.
 pub fn vk_to_egui_key(vk: u16) -> Option<egui::Key> {
     match VIRTUAL_KEY(vk) {
         VK_BACK => Some(egui::Key::Backspace),
@@ -217,7 +217,7 @@ fn key_states() -> &'static Mutex<HashMap<u16, bool>> {
     KEY_STATES.get_or_init(|| Mutex::new(HashMap::with_capacity(64)))
 }
 
-/// Edge detection: true только в момент перехода was_up → is_down.
+/// Edge detection: true только в момент перехода was_up -> is_down.
 pub fn just_pressed(vk: VIRTUAL_KEY) -> bool {
     let currently_down = is_key_down(vk);
     let Ok(mut states) = key_states().lock() else {

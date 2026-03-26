@@ -41,7 +41,7 @@ pub fn on_main_thread_tick() {
     refresh_state_if_needed();
     update_ping_if_needed();
 
-    // Multiplayer orchestration: tracking → events → network
+    // Multiplayer orchestration: tracking -> events -> network
     crate::multiplayer::on_main_thread_tick();
 
     crate::hooks::try_deferred_present_hook();

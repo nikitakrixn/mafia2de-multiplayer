@@ -17,7 +17,7 @@ use std::sync::{Mutex, OnceLock};
 use common::logger;
 use protocol::{NetPlayerEvent, NetPlayerSnapshot, PlayerId};
 use sdk::game::npc::Npc;
-use sdk::game::player::Vec3;
+use sdk::types::Vec3;
 
 #[derive(Debug)]
 struct RemoteBinding {
@@ -199,7 +199,7 @@ pub fn get_player_name(player_id: PlayerId) -> Option<String> {
 /// Применить удалённое высокоуровневое событие.
 ///
 /// Пока v0 делает только безопасные вещи:
-/// - Death → hp=0
+/// - Death -> hp=0
 /// - остальное логируется
 pub fn apply_event(player_id: PlayerId, event: NetPlayerEvent) {
     let map = match bindings().lock() {

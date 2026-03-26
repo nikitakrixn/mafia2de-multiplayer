@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 
 use common::logger;
 use protocol::{NetPlayerSnapshot, NetVec3};
-use sdk::game::{Player, player::Vec3};
+use sdk::game::Player;
+use sdk::types::Vec3;
 
 use crate::{
     player_events::{self, PlayerEvent},

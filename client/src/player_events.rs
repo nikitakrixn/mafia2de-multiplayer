@@ -12,7 +12,7 @@ use std::sync::{Mutex, OnceLock};
 
 use common::logger;
 use protocol::NetPlayerEvent;
-use sdk::game::player::Vec3;
+use sdk::types::Vec3;
 
 #[derive(Debug, Clone)]
 pub enum PlayerEvent {

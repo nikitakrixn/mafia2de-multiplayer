@@ -1,5 +1,27 @@
 [build]
 target = "x86_64-pc-windows-msvc"
 
-[target.x86_64-pc-windows-msvc]
-linker = "rust-lld"
+[alias]
+# Собрать клиент (DLL)
+build-client = "build -p client --release"
+
+# Собрать devtools (DLL)  
+build-dev = "build -p devtools --release"
+
+# Собрать сервер
+build-server = "build -p server --release"
+
+# Собрать всё
+build-all = "build --release"
+
+# Запустить сервер
+run-server = "run -p server --release"
+
+# Запустить launcher
+run-launcher = "run -p launcher --release"
+
+# Быстрая проверка без сборки
+chk = "check --workspace"
+
+# Clippy по всему workspace
+lint = "clippy --workspace --all-targets"
