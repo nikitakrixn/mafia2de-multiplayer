@@ -105,12 +105,14 @@ pub struct LuaChainInfo {
 /// -> array[index] -> ScriptMachine -> lua_State (sm+0x70)
 pub fn discover(index: usize) -> Option<LuaChainInfo> {
     unsafe {
-        let manager = memory::read_ptr(base() + addresses::globals::SCRIPT_MACHINE_MANAGER)?;
+        let manager =
+            memory::read_validated_ptr(base() + addresses::globals::SCRIPT_MACHINE_MANAGER)?;
 
-        let vector = memory::read_ptr(manager + fields::script_machine_manager::VECTOR)?;
+        let vector =
+            memory::read_validated_ptr(manager + fields::script_machine_manager::VECTOR)?;
 
-        let begin = memory::read_ptr_raw(vector + fields::std_vector::BEGIN)?;
-        let end = memory::read_ptr_raw(vector + fields::std_vector::END)?;
+        let begin = memory::read::<usize>(vector + fields::std_vector::BEGIN)?;
+        let end = memory::read::<usize>(vector + fields::std_vector::END)?;
 
         if begin == 0 || end < begin {
             return None;
@@ -121,8 +123,9 @@ pub fn discover(index: usize) -> Option<LuaChainInfo> {
             return None;
         }
 
-        let machine = memory::read_ptr(begin + index * 8)?;
-        let lua_state = memory::read_ptr(machine + fields::script_machine::LUA_STATE)?;
+        let machine = memory::read_validated_ptr(begin + index * 8)?;
+        let lua_state =
+            memory::read_validated_ptr(machine + fields::script_machine::LUA_STATE)?;
 
         Some(LuaChainInfo {
             manager,
@@ -214,7 +217,7 @@ pub fn exec_named(code: &str, chunk_name: &str) -> Result<(), String> {
     // Вызвать загруженный chunk
     let call_status = unsafe { lua_pcall()(l, 0, 0, 0) };
     if call_status != 0 {
-        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l),));
+        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l)));
     }
 
     Ok(())
@@ -258,7 +261,7 @@ pub fn eval_chunk_named(code: &str, chunk_name: &str) -> Result<Option<String>, 
     // nresults=1 — просим один результат
     let call_status = unsafe { lua_pcall()(l, 0, 1, 0) };
     if call_status != 0 {
-        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l),));
+        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l)));
     }
 
     // Читаем результат с вершины стека
@@ -286,10 +289,10 @@ pub fn eval_expression(expr: &str) -> Result<String, String> {
     }
 }
 
-/// Fallback через luaL_loadstring (только для отладки).
+/// Fallback через `luaL_loadstring` (только для отладки).
 ///
-/// Основной путь — exec/exec_named через loadbuffer.
-/// Этот метод нужен если по какой-то причине loadbuffer
+/// Основной путь — `exec`/`exec_named` через `loadbuffer`.
+/// Этот метод нужен если по какой-то причине `loadbuffer`
 /// ведёт себя странно.
 pub fn exec_via_loadstring(code: &str) -> Result<(), String> {
     let info = discover_main().ok_or_else(|| "Lua VM не готова".to_string())?;
@@ -310,7 +313,7 @@ pub fn exec_via_loadstring(code: &str) -> Result<(), String> {
 
     let call_status = unsafe { lua_pcall()(l, 0, 0, 0) };
     if call_status != 0 {
-        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l),));
+        return Err(format!("lua_pcall({call_status}): {}", last_lua_error(l)));
     }
 
     Ok(())
@@ -323,7 +326,7 @@ pub fn exec_via_loadstring(code: &str) -> Result<(), String> {
 /// Прочитать сообщение об ошибке с вершины Lua стека.
 ///
 /// Lua кладёт ошибку на стек как строку при неудаче
-/// loadbuffer/pcall. Если там не строка — вернём заглушку.
+/// `loadbuffer`/`pcall`. Если там не строка — вернём заглушку.
 fn last_lua_error(l: usize) -> String {
     unsafe {
         let ptr = lua_tolstring()(l, -1, std::ptr::null_mut());

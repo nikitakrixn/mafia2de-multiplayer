@@ -19,6 +19,8 @@ use common::logger;
 
 use crate::game::{base, entity_ref::EntityRef, entity_types::FactoryType};
 use crate::{addresses, memory};
+use crate::memory::Ptr;
+use crate::structures::CScriptEntity;
 
 /// Дружественная обёртка над native script-entity-like объектом.
 ///
@@ -33,7 +35,7 @@ use crate::{addresses, memory};
 /// - `new_unchecked()` — если указатель уже получен из подтверждённого reverse-path
 #[derive(Debug, Clone, Copy)]
 pub struct ScriptEntity {
-    ptr: usize,
+    ptr: Ptr<CScriptEntity>,
 }
 
 /// Человеко-читаемая классификация script-entity family по vtable.
@@ -84,7 +86,9 @@ impl ScriptEntity {
             return None;
         }
 
-        Some(Self { ptr })
+        Some(Self {
+            ptr: Ptr::new(ptr),
+        })
     }
 
     /// Создать `ScriptEntity` без проверки factory type.
@@ -92,7 +96,9 @@ impl ScriptEntity {
     /// Использовать только если pointer уже получен из подтверждённого
     /// child-path reverse'а.
     pub fn new_unchecked(ptr: usize) -> Self {
-        Self { ptr }
+        Self {
+            ptr: Ptr::new(ptr),
+        }
     }
 
     /// Создать из `EntityRef`, если это top-level script entity.
@@ -101,31 +107,40 @@ impl ScriptEntity {
         if ft != FactoryType::ScriptEntity {
             return None;
         }
-        Some(Self { ptr: ent.ptr() })
+        Some(Self {
+            ptr: Ptr::new(ent.ptr()),
+        })
     }
 
     // =============================================================================
     //  Базовые аксессоры
     // =============================================================================
 
+    unsafe fn native(&self) -> Option<&CScriptEntity> {
+        unsafe { self.ptr.as_ref() }
+    }
+
     /// Сырой указатель на native объект.
     pub fn as_ptr(self) -> usize {
-        self.ptr
+        self.ptr.addr()
     }
 
     /// Vtable pointer.
     pub fn vtable(self) -> Option<usize> {
-        unsafe { memory::read_ptr(self.ptr) }
+        let se = unsafe { self.native()? };
+        Some(se.base.vtable as usize)
     }
 
     /// Packed table_id.
     pub fn table_id(self) -> Option<u32> {
-        unsafe { memory::read_value::<u32>(self.ptr + addresses::fields::entity::TABLE_ID) }
+        let se = unsafe { self.native()? };
+        Some(se.base.table_id)
     }
 
     /// Factory type byte.
     pub fn factory_type_byte(self) -> Option<u8> {
-        self.table_id().map(|tid| (tid & 0xFF) as u8)
+        let se = unsafe { self.native()? };
+        Some(se.base.factory_type())
     }
 
     /// FactoryType enum.
@@ -135,12 +150,14 @@ impl ScriptEntity {
 
     /// Entity flags.
     pub fn entity_flags(self) -> Option<u32> {
-        unsafe { memory::read_value::<u32>(self.ptr + addresses::fields::entity::ENTITY_FLAGS) }
+        let se = unsafe { self.native()? };
+        Some(se.base.entity_flags)
     }
 
     /// Name hash.
     pub fn name_hash(self) -> Option<u64> {
-        unsafe { memory::read_value::<u64>(self.ptr + addresses::fields::entity::NAME_HASH) }
+        let se = unsafe { self.native()? };
+        Some(se.base.name_hash)
     }
 
     // =============================================================================
@@ -151,9 +168,8 @@ impl ScriptEntity {
     ///
     /// В direct police child path участвует как индекс в `scripts[...]`.
     pub fn script_entry_id(self) -> Option<u32> {
-        unsafe {
-            memory::read_value::<u32>(self.ptr + addresses::fields::script_entity::SCRIPT_ENTRY_ID)
-        }
+        let se = unsafe { self.native()? };
+        Some(se.script_entry_id)
     }
 
     /// `+0x7C` -> script context index / selector.
@@ -161,27 +177,21 @@ impl ScriptEntity {
     /// В police child path низкий байт читается как:
     /// `movzx ecx, byte ptr [this+7Ch]`.
     pub fn script_context_index(self) -> Option<u32> {
-        unsafe {
-            memory::read_value::<u32>(
-                self.ptr + addresses::fields::script_entity::SCRIPT_CONTEXT_INDEX,
-            )
-        }
+        let se = unsafe { self.native()? };
+        Some(se.script_context_index)
     }
 
     /// `+0x80` -> дополнительное code/state-like поле.
     pub fn aux_code_or_state(self) -> Option<i32> {
-        unsafe {
-            memory::read_value::<i32>(
-                self.ptr + addresses::fields::script_entity::AUX_CODE_OR_STATE,
-            )
-        }
+        let se = unsafe { self.native()? };
+        Some(se.aux_code_or_state)
     }
 
     /// `+0x88` -> provider/list-like pointer.
     pub fn script_provider_or_list(self) -> Option<usize> {
-        unsafe {
-            memory::read_ptr(self.ptr + addresses::fields::script_entity::SCRIPT_PROVIDER_OR_LIST)
-        }
+        let se = unsafe { self.native()? };
+        let ptr = se.script_provider_or_list as usize;
+        memory::is_valid_ptr(ptr).then_some(ptr)
     }
 
     // =============================================================================

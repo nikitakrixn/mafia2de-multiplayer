@@ -1,8 +1,11 @@
 //! Высокоуровневый API для работы с игрой.
 //!
-//! Этот модуль — основной интерфейс SDK для клиента.
-//! Скрывает за собой цепочки указателей, вызовы движка
-//! и прочую низкоуровневую механику.
+//! ## Порядок инициализации движка
+//!
+//! 1. Модуль загружен → `base()` работает
+//! 2. GameManager создан → `is_game_initialized()` = true
+//! 3. Player создан → `Player::get()` возвращает Some
+//! 4. Lua VM готова → `lua::is_ready()` = true
 
 pub mod callbacks;
 pub mod camera;
@@ -25,38 +28,37 @@ pub use player::Player;
 
 use crate::{addresses, memory};
 use common::logger;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 /// Кэш базового адреса модуля игры.
-/// Инициализируется один раз при первом обращении.
-static GAME_BASE: OnceLock<usize> = OnceLock::new();
-
-/// Базовый адрес модуля игры (кэшируется).
 ///
-/// Все RVA из addresses прибавляются к этому адресу.
+/// `LazyLock` (Rust 1.80+) — инициализируется при первом обращении,
+/// потокобезопасно, без boilerplate.
+static GAME_BASE: LazyLock<usize> = LazyLock::new(|| {
+    memory::get_module_base(addresses::GAME_MODULE)
+        .expect("Модуль игры не найден — DLL не инжектирована в процесс игры")
+});
+
+/// Базовый адрес модуля игры.
+///
+/// Все RVA из [`addresses`] прибавляются к этому значению.
 ///
 /// # Паника
 ///
-/// Паникует если DLL загружена не в процесс игры.
-/// Это ожидаемое поведение — без модуля игры SDK бесполезен.
+/// Паникует если модуль не найден — без него SDK бесполезен.
+#[inline]
 pub fn base() -> usize {
-    *GAME_BASE.get_or_init(|| {
-        memory::get_module_base(addresses::GAME_MODULE)
-            .expect("Модуль игры не найден — DLL не инжектирована?")
-    })
+    *GAME_BASE
 }
 
 /// Проверяет что GameManager проинициализирован.
 ///
-/// GameManager появляется не сразу — движку нужно время
-/// на загрузку core-систем. До этого момента обращаться
-/// к Player, Lua и прочим подсистемам бессмысленно.
+/// Пока `false` — Player, Lua, Entity system ещё не готовы.
 pub fn is_game_initialized() -> bool {
-    unsafe { memory::read_ptr(base() + addresses::globals::GAME_MANAGER).is_some() }
+    unsafe { memory::read_validated_ptr(base() + addresses::globals::GAME_MANAGER).is_some() }
 }
 
 /// Логирует базовый адрес и размер модуля игры.
-/// Полезно при старте клиента — сразу видно что инжект сработал.
 pub fn log_module_info() {
     match memory::get_module_info(addresses::GAME_MODULE) {
         Some(info) => logger::info(&format!(

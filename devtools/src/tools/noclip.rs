@@ -11,7 +11,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use common::logger;
-use sdk::game::{player::Vec3, Player};
+use sdk::game::Player;
+use sdk::types::Vec3;
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 
 use crate::state::GameSessionState;
@@ -70,6 +71,11 @@ fn read_pos_snapshot() -> Vec3 {
 
 pub fn is_active() -> bool {
     NOCLIP_ACTIVE.load(Ordering::Acquire)
+}
+
+/// Публичная функция для переключения noclip (можно вызывать из input).
+pub fn toggle() {
+    request_toggle();
 }
 
 /// Можно вызывать из input thread / debug command / console.

@@ -218,7 +218,7 @@ pub fn get_default_param(view_offset: usize, param_index: usize) -> Option<f32> 
 fn set_view_fov(view_offset: usize, fov: f32) -> bool {
     // DefaultFOV
     unsafe {
-        if !memory::write_value(default_fov_addr(view_offset), fov) {
+        if !memory::write(default_fov_addr(view_offset), fov) {
             return false;
         }
     }
@@ -226,8 +226,8 @@ fn set_view_fov(view_offset: usize, fov: f32) -> bool {
     // Все 15 state-слотов + их флаги
     for n in 0..cv::NUM_STATES {
         unsafe {
-            memory::write_value(state_fov_addr(view_offset, n), fov);
-            memory::write_value::<u8>(state_fov_flag_addr(view_offset, n), 0);
+            memory::write(state_fov_addr(view_offset, n), fov);
+            memory::write::<u8>(state_fov_flag_addr(view_offset, n), 0);
         }
     }
 
@@ -299,7 +299,7 @@ pub fn set_all_fov(fov: f32) -> bool {
     // Базовый Fov всех car/misc камер
     for &offset in ALL_FOV_OFFSETS {
         unsafe {
-            if !memory::write_value(mgr + offset, fov) {
+            if !memory::write(mgr + offset, fov) {
                 ok_car = false;
             }
         }
@@ -309,7 +309,7 @@ pub fn set_all_fov(fov: f32) -> bool {
     // добавит дельту к нашему FOV и угол обзора «поплывёт»
     for &offset in FOV_MAX_OFFSETS {
         unsafe {
-            memory::write_value(mgr + offset, 0.0f32);
+            memory::write(mgr + offset, 0.0f32);
         }
     }
 
@@ -342,7 +342,7 @@ pub fn set_default_param(view_offset: usize, param_index: usize, value: f32) -> 
     // DefaultParams
     let default_addr = mgr + view_offset + cv::DEFAULT_PARAMS + param_index * 4;
     unsafe {
-        memory::write_value(default_addr, value);
+        memory::write(default_addr, value);
     }
 
     // Все states + flags
@@ -351,8 +351,8 @@ pub fn set_default_param(view_offset: usize, param_index: usize, value: f32) -> 
         let param_addr = state_base + cv::STATE_PARAMS_OFFSET + param_index * 4;
         let flag_addr = state_base + cv::STATE_PARAM_FLAGS_OFFSET + param_index;
         unsafe {
-            memory::write_value(param_addr, value);
-            memory::write_value::<u8>(flag_addr, 0);
+            memory::write(param_addr, value);
+            memory::write::<u8>(flag_addr, 0);
         }
     }
 
@@ -365,7 +365,7 @@ pub fn set_default_param(view_offset: usize, param_index: usize, value: f32) -> 
 /// `param_index` — индекс в массиве.
 pub fn set_car_camera_param(params_offset: usize, param_index: usize, value: f32) -> bool {
     let addr = camera_mgr() + params_offset + param_index * 4;
-    unsafe { memory::write_value(addr, value) }
+    unsafe { memory::write(addr, value) }
 }
 
 // =============================================================================

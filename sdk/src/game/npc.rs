@@ -1,26 +1,40 @@
-use crate::addresses::functions;
+//! High-level обёртка над humanoid entity по имени.
+//!
+//! Подходит для Joe / Henry / других NPC, доступных через FindByName.
+//!
+//! Для подтверждённых полей `CHuman` используем `repr(C)` структуру:
+//! - health
+//! - invulnerability
+//! - demigod
+//! - owner / in-vehicle
+//!
+//! Для системных действий движка (например SetPos) используем
+//! native функции по RVA через `memory::fn_at()`.
+
 use crate::game::{
     entity,
     entity_ref::EntityRef,
     entity_types::{EntityType, FactoryType},
-    player::Vec3,
 };
-use crate::memory;
+use crate::structures::CHuman;
+use crate::types::Vec3;
 use common::logger;
+use crate::memory::Ptr;
 
 /// Высокоуровневая обёртка над humanoid entity по имени.
-///
-/// Подходит для Joe / Henry / других NPC, доступных через FindByName.
 #[derive(Debug)]
 pub struct Npc {
     entity: EntityRef,
+    ptr: Ptr<CHuman>,
     name: String,
 }
 
 impl Npc {
     /// Найти NPC по имени.
     ///
-    /// Пропускает только human/player factory types.
+    /// Пропускает только humanoid factory types:
+    /// - `HumanNpc`
+    /// - `Player`
     pub fn find(name: &str) -> Option<Self> {
         let entity = entity::find_entity_ref_by_name(name)?;
 
@@ -39,6 +53,7 @@ impl Npc {
         }
 
         Some(Self {
+            ptr: Ptr::<CHuman>::new(entity.ptr()),
             entity,
             name: name.to_string(),
         })
@@ -46,7 +61,7 @@ impl Npc {
 
     /// Сырой native pointer.
     pub fn ptr(&self) -> usize {
-        self.entity.ptr()
+        self.ptr.addr()
     }
 
     /// Typed low-level entity reference.
@@ -54,53 +69,60 @@ impl Npc {
         self.entity
     }
 
-    /// FactoryType enum.
+    /// Typed reference на `CHuman`.
+    ///
+    /// # Safety
+    ///
+    /// Указатель должен указывать на живой humanoid object.
+    unsafe fn human(&self) -> Option<&CHuman> {
+        unsafe { self.ptr.as_ref() }
+    }
+
+    /// Typed mutable reference на `CHuman`.
+    ///
+    /// # Safety
+    ///
+    /// Использовать только из game thread.
+    unsafe fn human_mut(&self) -> Option<&mut CHuman> {
+        unsafe { self.ptr.as_mut() }
+    }
+
     pub fn factory_type(&self) -> Option<FactoryType> {
         self.entity.factory_type()
     }
 
-    /// Lua-facing entity type.
     pub fn entity_type(&self) -> Option<EntityType> {
         self.entity.lua_entity_type()
     }
 
     /// Жив ли NPC.
     pub fn is_alive(&self) -> bool {
-        self.entity.is_alive().unwrap_or(false)
+        unsafe { self.human().map(|h| h.is_alive()).unwrap_or(false) }
     }
 
     /// Текущее здоровье.
     pub fn health(&self) -> f32 {
-        self.entity.health().unwrap_or(0.0)
+        unsafe { self.human().map(|h| h.health()).unwrap_or(0.0) }
     }
 
-    /// Установить здоровье.
+    /// Установить здоровье напрямую в `CHuman.current_health`.
     pub fn set_health(&self, hp: f32) {
-        unsafe {
-            memory::write_value(
-                self.entity.ptr() + crate::addresses::fields::player::CURRENT_HEALTH,
-                hp,
-            );
+        if let Some(h) = unsafe { self.human_mut() } {
+            h.current_health = hp;
         }
     }
 
     /// Сделать неуязвимым.
     pub fn set_invulnerable(&self, enabled: bool) {
-        unsafe {
-            memory::write_value(
-                self.entity.ptr() + crate::addresses::fields::player::INVULNERABILITY,
-                enabled as u8,
-            );
+        if let Some(h) = unsafe { self.human_mut() } {
+            h.invulnerability = enabled as u8;
         }
     }
 
     /// Установить полубога.
     pub fn set_demigod(&self, enabled: bool) {
-        unsafe {
-            memory::write_value(
-                self.entity.ptr() + crate::addresses::fields::player::DEMIGOD,
-                enabled as u8,
-            );
+        if let Some(h) = unsafe { self.human_mut() } {
+            h.demigod = enabled as u8;
         }
     }
 
@@ -110,27 +132,35 @@ impl Npc {
     }
 
     /// Телепортировать NPC через native SetPos.
-    pub fn set_position(&self, pos: &Vec3) {
+    ///
+    /// Не пишем напрямую в frame node — игра обновляет не только transform,
+    /// но и внутренние кеши/dirty flags.
+     pub fn set_position(&self, pos: &Vec3) {
         unsafe {
+            let entity_ptr = self.entity.ptr();
             type SetPosFn = unsafe extern "C" fn(usize, *const Vec3);
-            let func: SetPosFn = memory::fn_at(crate::game::base() + functions::entity::SET_POS);
-            func(self.entity.ptr(), pos);
+            let func: SetPosFn =
+                crate::memory::fn_at(crate::game::base() + crate::addresses::functions::entity::SET_POS);
+            func(entity_ptr, pos);
         }
     }
 
-    /// Установить forward direction NPC через frame node.
+    /// Выставить basis-векторы frame node вручную.
     ///
-    /// ВАЖНО:
-    /// это low-level запись в basis-векторы frame node.
-    /// Для ground humanoid proxy этого достаточно.
+    /// Это низкоуровневый helper для debug/экспериментов.
+    /// Для обычной телепортации/поворота предпочтительнее engine-функции.
     pub fn set_forward(&self, dir: &Vec3) -> bool {
-        let Some(frame) = (unsafe {
-            memory::read_ptr(self.entity.ptr() + crate::addresses::fields::entity::FRAME_NODE)
-        }) else {
-            return false;
+        let frame = unsafe {
+            match self.human() {
+                Some(h) => h.actor.frame_node as usize,
+                None => return false,
+            }
         };
 
-        // Нормализация — защита от мусора/нулевого вектора.
+        if !crate::memory::is_valid_ptr(frame) {
+            return false;
+        }
+
         let len = (dir.x * dir.x + dir.y * dir.y + dir.z * dir.z).sqrt();
         if !len.is_finite() || len < 0.0001 {
             return false;
@@ -140,35 +170,49 @@ impl Npc {
         let fy = dir.y / len;
         let fz = dir.z / len;
 
-        // Для humanoid нам обычно достаточно right = perpendicular in XY plane.
         let rx = fy;
         let ry = -fx;
         let rz = 0.0f32;
 
         unsafe {
-            // Forward (Col1)
-            memory::write_value(
+            crate::memory::write(
                 frame + crate::addresses::fields::entity_frame::FORWARD_X,
                 fx,
             );
-            memory::write_value(
+            crate::memory::write(
                 frame + crate::addresses::fields::entity_frame::FORWARD_Y,
                 fy,
             );
-            memory::write_value(
+            crate::memory::write(
                 frame + crate::addresses::fields::entity_frame::FORWARD_Z,
                 fz,
             );
 
-            // Right (Col0)
-            memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_X, rx);
-            memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_Y, ry);
-            memory::write_value(frame + crate::addresses::fields::entity_frame::RIGHT_Z, rz);
+            crate::memory::write(
+                frame + crate::addresses::fields::entity_frame::RIGHT_X,
+                rx,
+            );
+            crate::memory::write(
+                frame + crate::addresses::fields::entity_frame::RIGHT_Y,
+                ry,
+            );
+            crate::memory::write(
+                frame + crate::addresses::fields::entity_frame::RIGHT_Z,
+                rz,
+            );
 
-            // Up (Col2) — оставляем world-up.
-            memory::write_value(frame + crate::addresses::fields::entity_frame::UP_X, 0.0f32);
-            memory::write_value(frame + crate::addresses::fields::entity_frame::UP_Y, 0.0f32);
-            memory::write_value(frame + crate::addresses::fields::entity_frame::UP_Z, 1.0f32);
+            crate::memory::write(
+                frame + crate::addresses::fields::entity_frame::UP_X,
+                0.0f32,
+            );
+            crate::memory::write(
+                frame + crate::addresses::fields::entity_frame::UP_Y,
+                0.0f32,
+            );
+            crate::memory::write(
+                frame + crate::addresses::fields::entity_frame::UP_Z,
+                1.0f32,
+            );
         }
 
         true

@@ -1,18 +1,9 @@
 //! Сканирование мировых сущностей.
-//!
-//! Два режима:
-//! 1. cached entities — через ScriptWrapperManager (стабильно, немного сущностей)
-//! 2. all world entities — через WorldEntityManager / EntityDatabase (полный мир)
-//!
-//! Подтверждено runtime:
-//! - WorldEntityManager == EntityDatabase (один объект)
-//! - object + 0x18 = logical entity count
-//! - object + 0x38 .. +0x38+4096*8 = open-addressing array of entity pointers
-//! - нужно сканировать именно 4096 слотов, а не только count
 
 use std::collections::{HashMap, HashSet};
 
 use super::{base, entity, entity_ref::EntityRef, entity_types::EntityType};
+use crate::types::Vec3;
 use crate::{addresses, memory};
 
 /// Количество слотов в EntityDatabase open-addressing массиве.
@@ -38,7 +29,7 @@ pub struct WorldEntityInfo {
     /// Name hash from entity+0x30.
     pub name_hash: u64,
     /// Позиция в мире.
-    pub pos: Option<[f32; 3]>,
+    pub pos: Option<Vec3>,
     /// Расстояние до игрока.
     pub distance: f32,
     /// Runtime alias name, если был замечен в lookup.
@@ -57,7 +48,7 @@ pub struct WorldEntityInfo {
 
 /// Сканирует nearby cached entities через ScriptWrapperManager.
 pub fn scan_nearby_entities(
-    player_pos: [f32; 3],
+    player_pos: Vec3,
     radius: f32,
     max_count: usize,
 ) -> Vec<WorldEntityInfo> {
@@ -75,7 +66,8 @@ pub fn scan_nearby_entities(
             .unwrap_or(0)
     };
     let cache_end = unsafe {
-        memory::read_ptr_raw(mgr + addresses::fields::entity_cache::TABLE_ID_CACHE_END).unwrap_or(0)
+        memory::read_ptr_raw(mgr + addresses::fields::entity_cache::TABLE_ID_CACHE_END)
+            .unwrap_or(0)
     };
 
     if cache_begin == 0 || cache_end <= cache_begin || !memory::is_valid_ptr(cache_begin) {
@@ -104,21 +96,16 @@ pub fn scan_nearby_entities(
             continue;
         };
 
-        let pos = ent.position().map(|p| [p.x, p.y, p.z]);
-        let Some([x, y, z]) = pos else {
+        let Some(pos) = ent.position() else {
             continue;
         };
 
-        let dx = x - player_pos[0];
-        let dy = y - player_pos[1];
-        let dz = z - player_pos[2];
-        let dist_sq = dx * dx + dy * dy + dz * dz;
+        let dist_sq = pos.distance_sq(&player_pos);
         if dist_sq > radius_sq {
             continue;
         }
 
-        let distance = dist_sq.sqrt();
-        results.push(build_info(ent, distance));
+        results.push(build_info(ent, dist_sq.sqrt()));
     }
 
     results.sort_by(|a, b| {
@@ -228,7 +215,7 @@ fn build_info(ent: EntityRef, distance: f32) -> WorldEntityInfo {
     let factory_type = ent.factory_type_byte().unwrap_or(0);
     let vtable = ent.vtable().unwrap_or(0);
     let name_hash = ent.name_hash().unwrap_or(0);
-    let pos = ent.position().map(|p| [p.x, p.y, p.z]);
+    let pos = ent.position();
 
     WorldEntityInfo {
         ptr: ent.ptr(),

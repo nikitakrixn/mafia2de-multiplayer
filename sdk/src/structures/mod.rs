@@ -1,7 +1,7 @@
 //! repr(C) структуры движка Mafia II: Definitive Edition.
-//!
-//! Все структуры восстановлены из IDA Pro и проверены
-//! compile-time ассертами на смещения полей.
+
+pub mod std_vector;
+pub mod vtables;
 
 mod callbacks;
 mod car;
@@ -17,46 +17,33 @@ mod script_entity;
 mod tables;
 mod vehicle;
 
-// Entity system (DB records, wrappers, factories)
+pub use std_vector::StdVector;
+pub use vtables::CPlayerVTable;
+
 pub use entity::{
-    CActorFields, CEntity, CEntityDBRecord, CEntityGuid, CScriptWrapper, CScriptWrapperManager,
-    CServiceIdentity, CTypeDescriptor, CWrapperFactory,
+    CActor, CEntity, CEntityDBRecord, CEntityGuid, CScriptWrapper,
+    CScriptWrapperManager, CServiceIdentity, CTypeDescriptor, CWrapperFactory,
 };
 
-// Корневые типы
 pub use game_world::GameManager;
 pub use player::{CHuman, CHumanNPC, CPlayer, CPlayerSub45C};
-
-// Инвентарь и деньги
 pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};
-
-// Транспорт
 pub use car::{CCar, CCarDamageSub1, CCarVehicle};
 pub use vehicle::{Vehicle, VehicleWrapper};
-
-// Гараж
 pub use garage::{CGarage, CGarageManager};
-
-// Таблицы данных
 pub use tables::TableManager;
 
-// Callback-система
 pub use callbacks::{
-    CallbackEventDesc, CallbackFunctionEntry, DispatchContext, DispatchTimer, GameCallbackManager,
-    PendingFunctionOp,
+    CallbackEventDesc, CallbackFunctionEntry, DispatchContext, DispatchTimer,
+    GameCallbackManager, PendingFunctionOp,
 };
 
-// Entity/human сообщения
 pub use messages::{
-    DamageMessage, DamageMessagePayload, DeathMessage, DeathMessagePayload, EntityMessageHeader,
-    StanceMessage, StanceMessagePayload, WeaponMessage, WeaponMessagePayload,
+    DamageMessage, DamageMessagePayload, DeathMessage, DeathMessagePayload,
+    EntityMessageHeader, StanceMessage, StanceMessagePayload, WeaponMessage,
+    WeaponMessagePayload,
 };
 
-// DX11 рендер
 pub use render::{CRenderDeviceD3D11, RenderInitConfig, SwapChainManager, SwapChainWrapper};
-
-// ScriptEntity family
-pub use script_entity::{CPoliceScriptChild, CScriptEntity};
-
-// Police-script owner singleton
+pub use script_entity::{CScriptEntity, CScriptEntityChildEx};
 pub use police_script_owner::{PoliceScriptOwner, PoliceScriptOwnerNode};

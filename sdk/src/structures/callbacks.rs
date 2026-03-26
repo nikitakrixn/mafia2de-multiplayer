@@ -19,28 +19,26 @@
 use crate::macros::{assert_field_offsets, assert_layout};
 use std::ffi::c_void;
 
+use super::std_vector::StdVector;
+
 /// Глобальный менеджер callback/event системы.
 ///
 /// Глобал: `addresses::globals::GAME_CALLBACK_MANAGER`
 ///
 /// Внутри:
-/// - std::vector<CallbackEventDesc> — зарегистрированные события
-/// - std::vector<PendingFunctionOp> — отложенные операции
+/// - `std::vector<CallbackEventDesc>` — зарегистрированные события
+/// - `std::vector<PendingFunctionOp>` — отложенные операции
 /// - указатель на текущий DispatchContext
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct GameCallbackManager {
     pub vtable: *const c_void, // +0x00
 
-    // std::vector<CallbackEventDesc>
-    pub entries_begin: *mut CallbackEventDesc,    // +0x08
-    pub entries_end: *mut CallbackEventDesc,      // +0x10
-    pub entries_capacity: *mut CallbackEventDesc, // +0x18
+    /// Зарегистрированные события (`std::vector<CallbackEventDesc>`).
+    pub entries: StdVector<CallbackEventDesc>, // +0x08
 
-    // std::vector<PendingFunctionOp> — отложенные add/remove
-    pub pending_begin: *mut PendingFunctionOp,    // +0x20
-    pub pending_end: *mut PendingFunctionOp,      // +0x28
-    pub pending_capacity: *mut PendingFunctionOp, // +0x30
+    /// Отложенные add/remove операции (`std::vector<PendingFunctionOp>`).
+    pub pending: StdVector<PendingFunctionOp>, // +0x20
 
     /// Активный контекст во время dispatch (NULL в покое).
     pub current_dispatch_ctx: *mut DispatchContext, // +0x38
@@ -63,10 +61,8 @@ pub struct CallbackEventDesc {
     /// Сбрасывается в 0 после завершения dispatch.
     pub in_dispatch: i32, // +0x24
 
-    // std::vector<CallbackFunctionEntry> — подписанные callback'и
-    pub funcs_begin: *mut CallbackFunctionEntry, // +0x28
-    pub funcs_end: *mut CallbackFunctionEntry,   // +0x30
-    pub funcs_capacity: *mut CallbackFunctionEntry, // +0x38
+    /// Подписанные callback'и (`std::vector<CallbackFunctionEntry>`).
+    pub funcs: StdVector<CallbackFunctionEntry>, // +0x28
 }
 
 impl CallbackEventDesc {
@@ -78,6 +74,28 @@ impl CallbackEventDesc {
             .position(|&b| b == 0)
             .unwrap_or(self.name.len());
         String::from_utf8_lossy(&self.name[..end]).into_owned()
+    }
+
+    /// Количество подписанных callback'ов.
+    #[inline]
+    pub fn callback_count(&self) -> usize {
+        self.funcs.len()
+    }
+
+    /// Слайс callback'ов.
+    ///
+    /// # Safety
+    ///
+    /// Game thread only.
+    #[inline]
+    pub unsafe fn callbacks(&self) -> &[CallbackFunctionEntry] {
+        unsafe { self.funcs.as_slice() }
+    }
+
+    /// Событие сейчас dispatch'ится.
+    #[inline]
+    pub fn is_dispatching(&self) -> bool {
+        self.in_dispatch != 0
     }
 }
 
@@ -115,6 +133,14 @@ pub struct CallbackFunctionEntry {
 
     /// Не расшифровано.
     pub reserved: i32, // +0x24
+}
+
+impl CallbackFunctionEntry {
+    /// Callback активен (bit 0).
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        (self.flags & 0x01) != 0
+    }
 }
 
 /// Отложенная операция над callback-системой.
@@ -223,15 +249,15 @@ pub struct DispatchTimer {
 // =============================================================================
 
 assert_layout!(GameCallbackManager, size = 0x40, {
-    entries_begin        == 0x08,
-    pending_begin        == 0x20,
+    entries              == 0x08,
+    pending              == 0x20,
     current_dispatch_ctx == 0x38,
 });
 
 assert_layout!(CallbackEventDesc, size = 0x40, {
     event_id    == 0x20,
     in_dispatch == 0x24,
-    funcs_begin == 0x28,
+    funcs       == 0x28,
 });
 
 assert_layout!(CallbackFunctionEntry, size = 0x28, {
@@ -276,3 +302,29 @@ assert_field_offsets!(DispatchTimer {
     prev_cap0   == 0x58,
     prev_cap4   == 0x68,
 });
+
+impl GameCallbackManager {
+    /// Количество зарегистрированных типов событий.
+    ///
+    /// В стандартной сессии FreeRide — 39 типов.
+    #[inline]
+    pub fn event_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Слайс зарегистрированных событий.
+    ///
+    /// # Safety
+    ///
+    /// Вызывать из game thread. Массив может быть изменён движком.
+    #[inline]
+    pub unsafe fn events(&self) -> &[CallbackEventDesc] {
+        unsafe { self.entries.as_slice() }
+    }
+
+    /// Сейчас идёт dispatch.
+    #[inline]
+    pub fn is_dispatching(&self) -> bool {
+        !self.current_dispatch_ctx.is_null()
+    }
+}

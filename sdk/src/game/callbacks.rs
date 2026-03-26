@@ -1,16 +1,10 @@
 //! Чтение callback/event реестра движка.
-//!
-//! Этот модуль НЕ вмешивается в callback-систему игры.
-//! Он только читает уже зарегистрированные event descriptor'ы
-//! и callback entry. Полезно для:
-//! - диагностики (какие события зарегистрированы, сколько callback'ов)
-//! - проверки гипотез реверса (правильные ли ID событий)
-//! - поиска хороших точек для hook'ов
 
 use common::logger;
 
 use crate::{
     addresses, memory,
+    memory::Ptr,
     structures::{CallbackEventDesc, CallbackFunctionEntry, GameCallbackManager},
 };
 
@@ -21,113 +15,80 @@ use super::base;
 // =============================================================================
 
 /// Информация об одном зарегистрированном событии.
-///
-/// Это "дружественная" копия данных — можно хранить,
-/// передавать между потоками, логировать.
 #[derive(Debug, Clone)]
 pub struct CallbackEventInfo {
-    /// Адрес descriptor'а в памяти игры.
     pub desc_addr: usize,
-    /// Имя события ("Game Tick", "Game Render" и т.д.).
     pub name: String,
-    /// Уникальный ID события.
     pub event_id: i32,
-    /// 1 = событие сейчас dispatch'ится.
     pub in_dispatch: i32,
-    /// Количество подписанных callback'ов.
     pub func_count: usize,
-    /// Начало массива callback'ов.
     pub funcs_begin: usize,
-    /// Конец массива callback'ов.
     pub funcs_end: usize,
-    /// Ёмкость массива callback'ов.
     pub funcs_capacity: usize,
 }
 
 /// Информация об одном callback внутри события.
 #[derive(Debug, Clone)]
 pub struct CallbackFunctionInfo {
-    /// Адрес entry в памяти игры.
     pub entry_addr: usize,
-    /// Объект-получатель (RCX при вызове).
     pub callback_object: usize,
-    /// Адрес функции callback'а.
     pub callback_function: usize,
-    /// Приоритет (чем меньше — тем раньше).
     pub priority: i32,
-    /// Runtime-флаги (bit0 = active).
     pub flags: u8,
-    /// Конфигурационная маска.
     pub config_mask: i32,
-    /// Float-параметр callback'а.
     pub float_param: f32,
-    /// Integer-параметр callback'а.
     pub int_param: i32,
-    /// Зарезервировано.
     pub reserved: i32,
+}
+
+// =============================================================================
+//  Внутренний typed helper
+// =============================================================================
+
+/// Typed reference на `GameCallbackManager`.
+///
+/// # Safety
+///
+/// Менеджер должен быть уже создан движком.
+/// Использовать только из game thread.
+unsafe fn manager_ref() -> Option<&'static GameCallbackManager> {
+    let ptr = get_manager_ptr()?;
+    let typed = Ptr::<GameCallbackManager>::new(ptr);
+    debug_assert!(
+        typed.raw().is_aligned(),
+        "unaligned GameCallbackManager pointer"
+    );
+    Some(unsafe { &*typed.raw() })
 }
 
 // =============================================================================
 //  Чтение реестра
 // =============================================================================
 
-/// Указатель на глобальный GameCallbackManager.
+/// Указатель на глобальный `GameCallbackManager`.
 pub fn get_manager_ptr() -> Option<usize> {
     unsafe { memory::read_ptr(base() + addresses::globals::GAME_CALLBACK_MANAGER) }
 }
 
 /// Прочитать список всех зарегистрированных событий.
-///
-/// Возвращает пустой вектор если менеджер не инициализирован.
-/// Обычно в игре 39 событий.
 pub fn list_events() -> Vec<CallbackEventInfo> {
-    let Some(manager_ptr) = get_manager_ptr() else {
+    let Some(manager) = (unsafe { manager_ref() }) else {
         return Vec::new();
     };
 
-    let Some(manager) = (unsafe { memory::read_value::<GameCallbackManager>(manager_ptr) }) else {
-        return Vec::new();
-    };
+    let events = unsafe { manager.events() };
+    let mut result = Vec::with_capacity(events.len());
 
-    let begin = manager.entries_begin as usize;
-    let end = manager.entries_end as usize;
-    let cap = manager.entries_capacity as usize;
-
-    // Базовая проверка валидности вектора
-    if begin == 0 || end < begin || cap < end {
-        return Vec::new();
-    }
-
-    let entry_size = std::mem::size_of::<CallbackEventDesc>();
-    let event_count = (end - begin) / entry_size;
-    let mut result = Vec::with_capacity(event_count);
-
-    for i in 0..event_count {
-        let entry_addr = begin + i * entry_size;
-
-        let Some(entry) = (unsafe { memory::read_value::<CallbackEventDesc>(entry_addr) }) else {
-            continue;
-        };
-
-        let funcs_begin = entry.funcs_begin as usize;
-        let funcs_end = entry.funcs_end as usize;
-        let funcs_capacity = entry.funcs_capacity as usize;
-
-        let func_count = if funcs_begin != 0 && funcs_end >= funcs_begin {
-            (funcs_end - funcs_begin) / std::mem::size_of::<CallbackFunctionEntry>()
-        } else {
-            0
-        };
-
+    for event in events {
         result.push(CallbackEventInfo {
-            desc_addr: entry_addr,
-            name: fixed_c_string(&entry.name),
-            event_id: entry.event_id,
-            in_dispatch: entry.in_dispatch,
-            func_count,
-            funcs_begin,
-            funcs_end,
-            funcs_capacity,
+            desc_addr: event as *const CallbackEventDesc as usize,
+            name: event.name_string(),
+            event_id: event.event_id,
+            in_dispatch: event.in_dispatch,
+            func_count: event.callback_count(),
+            funcs_begin: event.funcs.begin_addr(),
+            funcs_end: event.funcs.end_addr(),
+            funcs_capacity: event.funcs.capacity as usize,
         });
     }
 
@@ -148,28 +109,21 @@ pub fn find_event_by_name(name: &str) -> Option<CallbackEventInfo> {
 
 /// Прочитать все callback'и конкретного события.
 pub fn get_functions_for_event(event_id: i32) -> Vec<CallbackFunctionInfo> {
-    let Some(event) = find_event_by_id(event_id) else {
+    let Some(manager) = (unsafe { manager_ref() }) else {
         return Vec::new();
     };
 
-    if event.funcs_begin == 0 || event.funcs_end < event.funcs_begin {
+    let events = unsafe { manager.events() };
+    let Some(event) = events.iter().find(|e| e.event_id == event_id) else {
         return Vec::new();
-    }
+    };
 
-    let entry_size = std::mem::size_of::<CallbackFunctionEntry>();
-    let func_count = (event.funcs_end - event.funcs_begin) / entry_size;
-    let mut result = Vec::with_capacity(func_count);
+    let funcs = unsafe { event.callbacks() };
+    let mut result = Vec::with_capacity(funcs.len());
 
-    for i in 0..func_count {
-        let entry_addr = event.funcs_begin + i * entry_size;
-
-        let Some(entry) = (unsafe { memory::read_value::<CallbackFunctionEntry>(entry_addr) })
-        else {
-            continue;
-        };
-
+    for entry in funcs {
         result.push(CallbackFunctionInfo {
-            entry_addr,
+            entry_addr: entry as *const CallbackFunctionEntry as usize,
             callback_object: entry.callback_object as usize,
             callback_function: entry.callback_function as usize,
             priority: entry.priority,
@@ -189,9 +143,6 @@ pub fn get_functions_for_event(event_id: i32) -> Vec<CallbackFunctionInfo> {
 // =============================================================================
 
 /// Вывести в лог ключевые lifecycle-события.
-///
-/// Полезно при старте — сразу видно что callback-система работает
-/// и сколько подписчиков у каждого события.
 pub fn dump_interesting_events() {
     use crate::addresses::constants::game_events as ev;
 
@@ -229,64 +180,56 @@ pub fn dump_interesting_events() {
 }
 
 /// Полный дамп реестра — все события + все callback'и.
-///
-/// Выводит МНОГО текста. Использовать для глубокой отладки.
 pub fn dump_registry() {
     let Some(manager_ptr) = get_manager_ptr() else {
         logger::warn("[callbacks] GameCallbackManager = NULL");
         return;
     };
 
-    let events = list_events();
+    let Some(manager) = (unsafe { manager_ref() }) else {
+        logger::error("[callbacks] не удалось прочитать GameCallbackManager");
+        return;
+    };
+
+    let events = unsafe { manager.events() };
     if events.is_empty() {
         logger::warn("[callbacks] реестр событий пуст или невалиден");
         return;
     }
 
-    let Some(manager) = (unsafe { memory::read_value::<GameCallbackManager>(manager_ptr) }) else {
-        logger::error("[callbacks] не удалось прочитать GameCallbackManager");
-        return;
-    };
-
     logger::info(&format!(
-        "[callbacks] manager=0x{:X} begin=0x{:X} end=0x{:X} cap=0x{:X} событий={}",
+        "[callbacks] manager=0x{:X} events={} pending={} {:?}",
         manager_ptr,
-        manager.entries_begin as usize,
-        manager.entries_end as usize,
-        manager.entries_capacity as usize,
-        events.len(),
+        manager.entries.len(),
+        manager.pending.len(),
+        manager.entries,
     ));
 
     for (i, event) in events.iter().enumerate() {
+        let funcs = unsafe { event.callbacks() };
+
         logger::info(&format!(
             "[callbacks][{i:02}] id={} dispatch={} funcs={} \"{}\" addr=0x{:X}",
-            event.event_id, event.in_dispatch, event.func_count, event.name, event.desc_addr,
+            event.event_id,
+            event.in_dispatch,
+            funcs.len(),
+            event.name_string(),
+            event as *const CallbackEventDesc as usize,
         ));
 
-        // Для каждого события — его callback'и (debug-уровень, чтобы не засорять)
-        for (j, func) in get_functions_for_event(event.event_id).iter().enumerate() {
+        for (j, func) in funcs.iter().enumerate() {
             logger::debug(&format!(
                 "  [{j:02}] obj=0x{:X} fn=0x{:X} prio={} flags=0x{:02X} mask=0x{:X} \
                  float={} int={} addr=0x{:X}",
-                func.callback_object,
-                func.callback_function,
+                func.callback_object as usize,
+                func.callback_function as usize,
                 func.priority,
                 func.flags,
                 func.config_mask,
                 func.float_param,
                 func.int_param,
-                func.entry_addr,
+                func as *const CallbackFunctionEntry as usize,
             ));
         }
     }
-}
-
-// =============================================================================
-//  Вспомогательные функции
-// =============================================================================
-
-/// Прочитать null-terminated строку из фиксированного буфера.
-fn fixed_c_string(bytes: &[u8]) -> String {
-    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-    String::from_utf8_lossy(&bytes[..end]).into_owned()
 }

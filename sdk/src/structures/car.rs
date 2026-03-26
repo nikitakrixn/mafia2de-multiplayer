@@ -6,6 +6,7 @@
 //! Структуры восстановлены из IDA Pro decompile vtable C_Car.
 //! Подтверждены compile-time ассертами на смещения полей.
 
+use super::entity::CEntity;
 use crate::macros::assert_field_offsets;
 use std::ffi::{CStr, c_void};
 
@@ -497,3 +498,27 @@ assert_field_offsets!(CCarDamageSub1 {
     flags_ab8           == 0xAB8,
     fx_manager_ac8      == 0xAC8,
 });
+
+// =============================================================================
+//  Helpers для доступа к базовым классам
+// =============================================================================
+
+impl CCar {
+    /// Доступ к CEntity (первые 0x78 байт).
+    ///
+    /// Безопасно: CEntity layout находится в начале CCar
+    /// (CCar наследует CEntity → CActor в движке).
+    pub fn as_entity(&self) -> &CEntity {
+        unsafe { &*(self as *const CCar as *const CEntity) }
+    }
+
+    /// Packed table_id через CEntity.
+    pub fn table_id(&self) -> u32 {
+        self.as_entity().table_id
+    }
+
+    /// Factory type byte.
+    pub fn factory_type(&self) -> u8 {
+        self.as_entity().factory_type()
+    }
+}

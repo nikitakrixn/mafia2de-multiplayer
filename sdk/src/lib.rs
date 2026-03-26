@@ -26,3 +26,4 @@ pub mod game;
 pub mod memory;
 pub mod patterns;
 pub mod structures;
+pub mod types;

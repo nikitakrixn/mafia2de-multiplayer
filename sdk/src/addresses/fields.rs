@@ -756,7 +756,7 @@ pub mod swapchain_wrapper {
 // =============================================================================
 
 pub mod script_machine_manager {
-    /// +0x08 → указатель на std::vector<ScriptMachine*>
+    /// +0x08 -> указатель на std::vector<ScriptMachine*>
     pub const VECTOR: usize = 0x08;
 }
 
@@ -765,7 +765,7 @@ pub mod script_machine_manager {
 /// Используется для vector'а script machines и других
 /// std::vector в структурах движка.
 pub mod std_vector {
-    /// +0x00 → первый элемент
+    /// +0x00 -> первый элемент
     pub const BEGIN: usize = 0x00;
     pub const END: usize = 0x08;
     pub const CAPACITY: usize = 0x10;
