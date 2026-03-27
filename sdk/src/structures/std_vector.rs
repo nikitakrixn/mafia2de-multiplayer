@@ -60,11 +60,7 @@ impl<T> StdVector<T> {
         }
         let b = self.begin as usize;
         let e = self.end as usize;
-        if b == 0 || e <= b {
-            0
-        } else {
-            (e - b) / size
-        }
+        if b == 0 || e <= b { 0 } else { (e - b) / size }
     }
 
     /// Вектор пуст или невалиден.
@@ -82,11 +78,7 @@ impl<T> StdVector<T> {
         }
         let b = self.begin as usize;
         let c = self.capacity as usize;
-        if b == 0 || c <= b {
-            0
-        } else {
-            (c - b) / size
-        }
+        if b == 0 || c <= b { 0 } else { (c - b) / size }
     }
 
     /// `begin` как числовой адрес (для логов).

@@ -9,9 +9,9 @@ use common::logger;
 use super::{Player, base};
 
 impl Player {
-    /// Pointer на компонент управления (`CHuman.property_accessor`).
+    /// Pointer на компонент управления (`CHuman.property_store`).
     pub fn control_component_ptr(&self) -> Option<usize> {
-        let ptr = unsafe { self.human()?.property_accessor as usize };
+        let ptr = unsafe { self.human()?.property_store as usize };
         memory::is_valid_ptr(ptr).then_some(ptr)
     }
 
@@ -19,9 +19,8 @@ impl Player {
     pub fn are_controls_locked(&self) -> Option<bool> {
         let control = self.control_component_ptr()?;
         type Fn = unsafe extern "C" fn(usize) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::IS_LOCKED)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::IS_LOCKED) };
         Some(unsafe { func(control) != 0 })
     }
 
@@ -32,9 +31,8 @@ impl Player {
             return false;
         };
         type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED) };
         unsafe { func(control, locked as u8, 0) };
         true
     }
@@ -46,9 +44,8 @@ impl Player {
             return false;
         };
         type Fn = unsafe extern "C" fn(usize, u8, u8) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::SET_LOCKED) };
         unsafe { func(control, 1, 1) };
         true
     }
@@ -87,14 +84,17 @@ impl Player {
     pub fn get_control_style_str(&self) -> Option<String> {
         let control = self.control_component_ptr()?;
         type Fn = unsafe extern "C" fn(usize) -> *const i8;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::GET_STYLE_STR)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::GET_STYLE_STR) };
         let ptr = unsafe { func(control) };
         if ptr.is_null() {
             return None;
         }
-        Some(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned())
+        Some(
+            unsafe { CStr::from_ptr(ptr) }
+                .to_string_lossy()
+                .into_owned(),
+        )
     }
 
     /// Установить стиль управления по имени.
@@ -106,15 +106,14 @@ impl Player {
             return false;
         };
         type Fn = unsafe extern "C" fn(usize, *const i8) -> i64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::player_control::SET_STYLE_STR)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::player_control::SET_STYLE_STR) };
         unsafe { func(control, c_style.as_ptr()) != 0 }
     }
 
     /// Текущее состояние физики.
     pub fn get_phys_state(&self) -> Option<u32> {
-        let provider = unsafe { self.human()?.physics_provider as usize };
+        let provider = unsafe { self.human()?.locomotion as usize };
         if !memory::is_valid_ptr(provider) {
             return None;
         }
@@ -133,9 +132,8 @@ impl Player {
             return false;
         };
         type Fn = unsafe extern "C" fn(usize, u32) -> u64;
-        let func: Fn = unsafe {
-            memory::fn_at(base() + addresses::functions::physics::SET_PHYS_STATE)
-        };
+        let func: Fn =
+            unsafe { memory::fn_at(base() + addresses::functions::physics::SET_PHYS_STATE) };
         unsafe { func(control, state) };
         true
     }

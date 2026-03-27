@@ -3,9 +3,9 @@
 //! `CScriptEntity` теперь встраивает `CEntity` вместо raw blob.
 //! `CPoliceScriptChild` удалён — идентичный layout, используй `CScriptEntity`.
 
-use std::ffi::c_void;
-use crate::macros::assert_field_offsets;
 use super::entity::CEntity;
+use crate::macros::assert_field_offsets;
+use std::ffi::c_void;
 
 // =============================================================================
 //  C_ScriptEntity (size = 0x90)
@@ -30,7 +30,7 @@ pub struct CScriptEntity {
 
     /// Дополнительный code/state field. Init: `-1`.
     pub aux_code_or_state: i32, // +0x80
-    pub _pad_84: u32,           // +0x84
+    pub _pad_84: u32, // +0x84
 
     /// Provider/list pointer. Init: `NULL`.
     pub script_provider_or_list: *mut c_void, // +0x88
@@ -51,9 +51,15 @@ const _: () = {
 };
 
 impl CScriptEntity {
-    pub fn factory_type(&self) -> u8 { self.base.factory_type() }
-    pub fn table_id(&self) -> u32 { self.base.table_id }
-    pub fn entity_flags(&self) -> u32 { self.base.entity_flags }
+    pub fn factory_type(&self) -> u8 {
+        self.base.factory_type()
+    }
+    pub fn table_id(&self) -> u32 {
+        self.base.table_id
+    }
+    pub fn entity_flags(&self) -> u32 {
+        self.base.entity_flags
+    }
 }
 
 // =============================================================================
@@ -64,9 +70,9 @@ impl CScriptEntity {
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CScriptEntityChildEx {
-    pub base: CScriptEntity,       // +0x00..+0x8F
-    pub field_90: *mut c_void,     // +0x90
-    pub field_98: *mut c_void,     // +0x98
+    pub base: CScriptEntity,   // +0x00..+0x8F
+    pub field_90: *mut c_void, // +0x90
+    pub field_98: *mut c_void, // +0x98
 }
 
 assert_field_offsets!(CScriptEntityChildEx {

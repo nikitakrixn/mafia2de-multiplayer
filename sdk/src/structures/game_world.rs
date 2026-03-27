@@ -11,7 +11,7 @@ use crate::memory::Ptr;
 ///
 /// Цепочка доступа:
 /// ```text
-/// *(module_base + GAME_MANAGER) → GameManager*
+/// *(module_base + GAME_MANAGER) -> GameManager*
 /// GameManager + 0x180 -> CPlayer* (активный игрок)
 /// ```
 #[repr(C)]

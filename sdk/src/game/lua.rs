@@ -108,8 +108,7 @@ pub fn discover(index: usize) -> Option<LuaChainInfo> {
         let manager =
             memory::read_validated_ptr(base() + addresses::globals::SCRIPT_MACHINE_MANAGER)?;
 
-        let vector =
-            memory::read_validated_ptr(manager + fields::script_machine_manager::VECTOR)?;
+        let vector = memory::read_validated_ptr(manager + fields::script_machine_manager::VECTOR)?;
 
         let begin = memory::read::<usize>(vector + fields::std_vector::BEGIN)?;
         let end = memory::read::<usize>(vector + fields::std_vector::END)?;
@@ -124,8 +123,7 @@ pub fn discover(index: usize) -> Option<LuaChainInfo> {
         }
 
         let machine = memory::read_validated_ptr(begin + index * 8)?;
-        let lua_state =
-            memory::read_validated_ptr(machine + fields::script_machine::LUA_STATE)?;
+        let lua_state = memory::read_validated_ptr(machine + fields::script_machine::LUA_STATE)?;
 
         Some(LuaChainInfo {
             manager,

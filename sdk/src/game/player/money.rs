@@ -94,9 +94,8 @@ impl Player {
         };
 
         type ModifyMoneyFn = unsafe extern "C" fn(usize, i64, u8) -> u8;
-        let func: ModifyMoneyFn = unsafe {
-            memory::fn_at(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY)
-        };
+        let func: ModifyMoneyFn =
+            unsafe { memory::fn_at(base() + addresses::functions::player::INVENTORY_MODIFY_MONEY) };
 
         unsafe { func(inv, cents, 1) };
         true
@@ -123,11 +122,11 @@ impl Player {
                 Some(p) => p,
                 None => return,
             };
-            let money_display =
-                match memory::read_ptr(hud_mgr + fields::hud_manager::MONEY_DISPLAY) {
-                    Some(p) => p,
-                    None => return,
-                };
+            let money_display = match memory::read_ptr(hud_mgr + fields::hud_manager::MONEY_DISPLAY)
+            {
+                Some(p) => p,
+                None => return,
+            };
 
             // Сбросить таймер анимации
             std::ptr::write(
@@ -151,9 +150,9 @@ impl Player {
     /// Полная цепочка указателей до ячейки с деньгами.
     ///
     /// ```text
-    /// CHuman.inventory → slots_start → slot[5] →
-    /// → vec_begin → money_item → wallet.inner →
-    /// → money_container → value (i64 центы)
+    /// CHuman.inventory -> slots_start -> slot[5] ->
+    /// -> vec_begin -> money_item -> wallet.inner ->
+    /// -> money_container -> value (i64 центы)
     /// ```
     ///
     /// Любой указатель может быть NULL на ранних стадиях.

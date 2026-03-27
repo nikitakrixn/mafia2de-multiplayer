@@ -11,7 +11,7 @@ impl Player {
     /// ID текущего внешнего вида (одежда/модель). `None` если не активен.
     pub fn get_appearance_id(&self) -> Option<u32> {
         unsafe {
-            let comp = self.human()?.component_b8 as usize;
+            let comp = self.human()?.frame_colors as usize;
             if !memory::is_valid_ptr(comp) {
                 return None;
             }
@@ -38,14 +38,14 @@ impl Player {
         }
     }
 
-    /// Есть ли активное collision body.
-    pub fn has_collision_body(&self) -> Option<bool> {
-        unsafe { self.human().map(|h| !h.collision_body.is_null()) }
+    /// Есть ли активный water detector.
+    pub fn has_water_detector(&self) -> Option<bool> {
+        unsafe { self.human().map(|h| !h.water_detector.is_null()) }
     }
 
-    /// Указатель на locomotion controller (physics_provider).
+    /// Указатель на locomotion controller.
     pub fn locomotion_controller_ptr(&self) -> Option<usize> {
-        let ptr = unsafe { self.human()?.physics_provider as usize };
+        let ptr = unsafe { self.human()?.locomotion as usize };
         memory::is_valid_ptr(ptr).then_some(ptr)
     }
 

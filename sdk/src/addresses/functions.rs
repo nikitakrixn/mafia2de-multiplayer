@@ -1649,7 +1649,6 @@ pub mod entity_vtable {
     pub const BASE_ENTITY_DESTROY_CLEANUP: usize = 0x39_BAF0;
 }
 
-
 pub mod player_vtable {
     /// vtable[96] — player+0x490: set/clear mask for bits [1..3].
     pub const STATE_FLAGS_490_SETCLEAR_BITS_1_3: usize = 0x0C_9240;

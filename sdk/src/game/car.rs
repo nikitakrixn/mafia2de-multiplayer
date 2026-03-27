@@ -11,9 +11,9 @@
 //! на доступ через `as_ref()`, чтобы compile-time ассерты защищали от дрифта.
 
 use crate::addresses::fields::entity as entity_fields;
-use crate::{addresses, memory};
 use crate::memory::Ptr;
 use crate::structures::CCar;
+use crate::{addresses, memory};
 
 use super::base;
 use crate::types::Vec3;
@@ -101,12 +101,7 @@ impl Car {
     ///
     /// Подтверждено: `CCar_SetPos` / `CCar_SetRotation` выставляют `car_flags |= 0x1000`.
     pub fn is_dirty(&self) -> bool {
-        unsafe {
-            self.ptr
-                .as_ref()
-                .map(|car| car.is_dirty())
-                .unwrap_or(false)
-        }
+        unsafe { self.ptr.as_ref().map(|car| car.is_dirty()).unwrap_or(false) }
     }
 
     /// Variant index.
@@ -135,12 +130,7 @@ impl Car {
     ///
     /// Подтверждено: slot[67] = `(end - begin) / 24`.
     pub fn record_count(&self) -> usize {
-        unsafe {
-            self.ptr
-                .as_ref()
-                .map(|car| car.record_count())
-                .unwrap_or(0)
-        }
+        unsafe { self.ptr.as_ref().map(|car| car.record_count()).unwrap_or(0) }
     }
 
     // -------------------------------------------------------------------------
@@ -206,16 +196,14 @@ pub fn scan_all_cars() -> Vec<Car> {
     let mut out = Vec::new();
 
     // Читаем синглтон EntityDatabase
-    let Some(db) = (unsafe {
-        memory::read_validated_ptr(base() + addresses::globals::ENTITY_DATABASE)
-    }) else {
+    let Some(db) =
+        (unsafe { memory::read_validated_ptr(base() + addresses::globals::ENTITY_DATABASE) })
+    else {
         return out;
     };
 
     // Количество entity в базе
-    let Some(entity_count) =
-        (unsafe { memory::read::<u64>(db + 0x18) }).map(|v| v as usize)
-    else {
+    let Some(entity_count) = (unsafe { memory::read::<u64>(db + 0x18) }).map(|v| v as usize) else {
         return out;
     };
 

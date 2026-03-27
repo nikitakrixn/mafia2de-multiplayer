@@ -1,7 +1,7 @@
 //! Система гаража — хранение машин игрока.
 
-use super::std_vector::StdVector;
 use super::VehicleWrapper;
+use super::std_vector::StdVector;
 use crate::macros::assert_field_offsets;
 use std::ffi::c_void;
 

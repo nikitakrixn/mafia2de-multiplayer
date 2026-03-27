@@ -5,7 +5,7 @@
 //! - `IDXGISwapChain1*` (для Present hook и overlay)
 //! - `ID3D11RenderTargetView*` текущего backbuffer
 //! - `HWND` и размеры рендера
-//! 
+//!
 //! Все функции читают данные из глобального singleton'а
 //! `M2DE_C_RenderDeviceD3D11`. Если рендер ещё не инициализирован —
 //! возвращают `None`.
@@ -81,7 +81,10 @@ unsafe fn ref_from_addr<T>(addr: usize) -> Option<&'static T> {
     }
 
     let ptr = Ptr::<T>::new(addr);
-    debug_assert!(ptr.raw().is_aligned(), "unaligned ref_from_addr: 0x{addr:X}");
+    debug_assert!(
+        ptr.raw().is_aligned(),
+        "unaligned ref_from_addr: 0x{addr:X}"
+    );
 
     Some(unsafe { &*ptr.raw() })
 }

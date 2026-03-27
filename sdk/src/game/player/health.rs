@@ -114,7 +114,11 @@ impl Player {
         if ok1 && ok2 {
             logger::info(&format!(
                 "God Mode: {}",
-                if enabled { "ВКЛЮЧЁН" } else { "ВЫКЛЮЧЕН" }
+                if enabled {
+                    "ВКЛЮЧЁН"
+                } else {
+                    "ВЫКЛЮЧЕН"
+                }
             ));
         } else {
             logger::error("God Mode: не удалось записать флаги");

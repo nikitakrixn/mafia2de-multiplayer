@@ -2,10 +2,10 @@
 //!
 //! ## Порядок инициализации движка
 //!
-//! 1. Модуль загружен → `base()` работает
-//! 2. GameManager создан → `is_game_initialized()` = true
-//! 3. Player создан → `Player::get()` возвращает Some
-//! 4. Lua VM готова → `lua::is_ready()` = true
+//! 1. Модуль загружен -> `base()` работает
+//! 2. GameManager создан -> `is_game_initialized()` = true
+//! 3. Player создан -> `Player::get()` возвращает Some
+//! 4. Lua VM готова -> `lua::is_ready()` = true
 
 pub mod callbacks;
 pub mod camera;

@@ -18,32 +18,31 @@ mod tables;
 mod vehicle;
 
 pub use std_vector::StdVector;
-pub use vtables::CPlayerVTable;
+pub use vtables::player::CHumanVTable;
 
 pub use entity::{
-    CActor, CEntity, CEntityDBRecord, CEntityGuid, CScriptWrapper,
-    CScriptWrapperManager, CServiceIdentity, CTypeDescriptor, CWrapperFactory,
+    CActor, CEntity, CEntityDBRecord, CEntityGuid, CScriptWrapper, CScriptWrapperManager,
+    CServiceIdentity, CTypeDescriptor, CWrapperFactory,
 };
 
-pub use game_world::GameManager;
-pub use player::{CHuman, CHumanNPC, CPlayer, CPlayerSub45C};
-pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};
 pub use car::{CCar, CCarDamageSub1, CCarVehicle};
-pub use vehicle::{Vehicle, VehicleWrapper};
+pub use game_world::GameManager;
 pub use garage::{CGarage, CGarageManager};
+pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};
+pub use player::{CHuman, CHumanNPC, CPlayer, CPlayerSub45C};
 pub use tables::TableManager;
+pub use vehicle::{Vehicle, VehicleWrapper};
 
 pub use callbacks::{
-    CallbackEventDesc, CallbackFunctionEntry, DispatchContext, DispatchTimer,
-    GameCallbackManager, PendingFunctionOp,
+    CallbackEventDesc, CallbackFunctionEntry, DispatchContext, DispatchTimer, GameCallbackManager,
+    PendingFunctionOp,
 };
 
 pub use messages::{
-    DamageMessage, DamageMessagePayload, DeathMessage, DeathMessagePayload,
-    EntityMessageHeader, StanceMessage, StanceMessagePayload, WeaponMessage,
-    WeaponMessagePayload,
+    DamageMessage, DamageMessagePayload, DeathMessage, DeathMessagePayload, EntityMessageHeader,
+    StanceMessage, StanceMessagePayload, WeaponMessage, WeaponMessagePayload,
 };
 
+pub use police_script_owner::{PoliceScriptOwner, PoliceScriptOwnerNode};
 pub use render::{CRenderDeviceD3D11, RenderInitConfig, SwapChainManager, SwapChainWrapper};
 pub use script_entity::{CScriptEntity, CScriptEntityChildEx};
-pub use police_script_owner::{PoliceScriptOwner, PoliceScriptOwnerNode};

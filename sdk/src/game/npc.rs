@@ -16,10 +16,10 @@ use crate::game::{
     entity_ref::EntityRef,
     entity_types::{EntityType, FactoryType},
 };
+use crate::memory::Ptr;
 use crate::structures::CHuman;
 use crate::types::Vec3;
 use common::logger;
-use crate::memory::Ptr;
 
 /// Высокоуровневая обёртка над humanoid entity по имени.
 #[derive(Debug)]
@@ -135,12 +135,13 @@ impl Npc {
     ///
     /// Не пишем напрямую в frame node — игра обновляет не только transform,
     /// но и внутренние кеши/dirty flags.
-     pub fn set_position(&self, pos: &Vec3) {
+    pub fn set_position(&self, pos: &Vec3) {
         unsafe {
             let entity_ptr = self.entity.ptr();
             type SetPosFn = unsafe extern "C" fn(usize, *const Vec3);
-            let func: SetPosFn =
-                crate::memory::fn_at(crate::game::base() + crate::addresses::functions::entity::SET_POS);
+            let func: SetPosFn = crate::memory::fn_at(
+                crate::game::base() + crate::addresses::functions::entity::SET_POS,
+            );
             func(entity_ptr, pos);
         }
     }
@@ -188,31 +189,13 @@ impl Npc {
                 fz,
             );
 
-            crate::memory::write(
-                frame + crate::addresses::fields::entity_frame::RIGHT_X,
-                rx,
-            );
-            crate::memory::write(
-                frame + crate::addresses::fields::entity_frame::RIGHT_Y,
-                ry,
-            );
-            crate::memory::write(
-                frame + crate::addresses::fields::entity_frame::RIGHT_Z,
-                rz,
-            );
+            crate::memory::write(frame + crate::addresses::fields::entity_frame::RIGHT_X, rx);
+            crate::memory::write(frame + crate::addresses::fields::entity_frame::RIGHT_Y, ry);
+            crate::memory::write(frame + crate::addresses::fields::entity_frame::RIGHT_Z, rz);
 
-            crate::memory::write(
-                frame + crate::addresses::fields::entity_frame::UP_X,
-                0.0f32,
-            );
-            crate::memory::write(
-                frame + crate::addresses::fields::entity_frame::UP_Y,
-                0.0f32,
-            );
-            crate::memory::write(
-                frame + crate::addresses::fields::entity_frame::UP_Z,
-                1.0f32,
-            );
+            crate::memory::write(frame + crate::addresses::fields::entity_frame::UP_X, 0.0f32);
+            crate::memory::write(frame + crate::addresses::fields::entity_frame::UP_Y, 0.0f32);
+            crate::memory::write(frame + crate::addresses::fields::entity_frame::UP_Z, 1.0f32);
         }
 
         true

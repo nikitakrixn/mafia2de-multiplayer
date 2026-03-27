@@ -18,9 +18,9 @@
 use common::logger;
 
 use crate::game::{base, entity_ref::EntityRef, entity_types::FactoryType};
-use crate::{addresses, memory};
 use crate::memory::Ptr;
 use crate::structures::CScriptEntity;
+use crate::{addresses, memory};
 
 /// Дружественная обёртка над native script-entity-like объектом.
 ///
@@ -86,9 +86,7 @@ impl ScriptEntity {
             return None;
         }
 
-        Some(Self {
-            ptr: Ptr::new(ptr),
-        })
+        Some(Self { ptr: Ptr::new(ptr) })
     }
 
     /// Создать `ScriptEntity` без проверки factory type.
@@ -96,9 +94,7 @@ impl ScriptEntity {
     /// Использовать только если pointer уже получен из подтверждённого
     /// child-path reverse'а.
     pub fn new_unchecked(ptr: usize) -> Self {
-        Self {
-            ptr: Ptr::new(ptr),
-        }
+        Self { ptr: Ptr::new(ptr) }
     }
 
     /// Создать из `EntityRef`, если это top-level script entity.

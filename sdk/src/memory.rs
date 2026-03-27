@@ -195,7 +195,11 @@ pub unsafe fn write<T: Copy>(addr: usize, value: T) -> bool {
 #[inline]
 pub unsafe fn read_validated_ptr(addr: usize) -> Option<usize> {
     let value = unsafe { read::<usize>(addr)? };
-    if is_valid_ptr(value) { Some(value) } else { None }
+    if is_valid_ptr(value) {
+        Some(value)
+    } else {
+        None
+    }
 }
 
 // Алиасы для удобства
@@ -396,9 +400,7 @@ pub unsafe fn resolve_rip_relative(
     offset_pos: usize,
     instruction_len: usize,
 ) -> usize {
-    let disp = unsafe {
-        ptr::read_unaligned(ptr_from_addr::<i32>(instruction_addr + offset_pos))
-    };
+    let disp = unsafe { ptr::read_unaligned(ptr_from_addr::<i32>(instruction_addr + offset_pos)) };
     let rip = instruction_addr + instruction_len;
     (rip as isize + disp as isize) as usize
 }
@@ -502,7 +504,9 @@ impl<T> From<*mut T> for Ptr<T> {
 impl<T> From<*const T> for Ptr<T> {
     #[inline]
     fn from(ptr: *const T) -> Self {
-        Self { ptr: ptr.cast_mut() }
+        Self {
+            ptr: ptr.cast_mut(),
+        }
     }
 }
 
@@ -896,5 +900,9 @@ pub unsafe fn read_safe<T: Copy>(addr: usize) -> Option<T> {
 /// Доступность памяти проверяется автоматически.
 pub unsafe fn read_validated_ptr_safe(addr: usize) -> Option<usize> {
     let value = unsafe { read_safe::<usize>(addr)? };
-    if is_valid_ptr(value) { Some(value) } else { None }
+    if is_valid_ptr(value) {
+        Some(value)
+    } else {
+        None
+    }
 }

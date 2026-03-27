@@ -11,10 +11,7 @@ use super::Player;
 // =============================================================================
 
 impl Player {
-    /// Мировая позиция через vtable\[36\] `GetPos`.
-    ///
-    /// Автоматически вызывает правильную реализацию:
-    /// physics provider → fallback на frame node.
+    /// Мировая позиция через vtable[36] GetPos.
     pub fn get_position(&self) -> Option<Vec3> {
         unsafe {
             let vt = self.vtable()?;
@@ -27,9 +24,7 @@ impl Player {
         }
     }
 
-    /// Установить позицию через vtable\[32\] `SetPos`.
-    ///
-    /// Обновляет physics + cache + dirty flags.
+    /// Установить позицию через vtable[32] SetPos.
     pub fn set_position(&self, pos: &Vec3) -> bool {
         if !pos.is_finite() {
             return false;
@@ -94,7 +89,7 @@ impl Player {
         }
     }
 
-    /// Direction через vtable\[37\] `GetDir`.
+    /// Direction через vtable[37] GetDir.
     pub fn get_direction(&self) -> Option<Vec3> {
         unsafe {
             let vt = self.vtable()?;
@@ -107,12 +102,12 @@ impl Player {
         }
     }
 
-    /// Позиция головы через vtable\[43\] `GetHeadPos`.
+    /// Позиция головы через vtable[43] GetCameraPoint.
     pub fn get_head_position(&self) -> Option<Vec3> {
         unsafe {
             let vt = self.vtable()?;
             let mut out = Vec3::ZERO;
-            let ret = (vt.get_head_pos)(self.this_const(), &mut out);
+            let ret = (vt.get_camera_point)(self.this_const(), &mut out);
             if ret.is_null() || !out.is_finite() {
                 return None;
             }
@@ -126,11 +121,11 @@ impl Player {
 }
 
 // =============================================================================
-//  Скорость (через vtable)
+//  Скорость / Прозрачность (через vtable)
 // =============================================================================
 
 impl Player {
-    /// Velocity через vtable\[68\] `GetVelocity`.
+    /// Velocity через vtable[68] GetVelocity.
     pub fn get_velocity(&self) -> Option<Vec3> {
         unsafe {
             let vt = self.vtable()?;
@@ -143,37 +138,40 @@ impl Player {
         }
     }
 
-    /// Текущая скорость через vtable\[76\].
-    pub fn get_movement_speed(&self) -> Option<f32> {
+    /// Текущая прозрачность через vtable[76] GetTransparency.
+    /// Читает поле +0x298.
+    pub fn get_transparency(&self) -> Option<f32> {
         unsafe {
             let vt = self.vtable()?;
-            Some((vt.get_movement_speed_current)(self.this_const()))
+            Some((vt.get_transparency)(self.this_const()))
         }
     }
 
-    /// Целевая скорость (прямое чтение поля — vtable\[77\] только пишет).
-    pub fn get_movement_speed_target(&self) -> Option<f32> {
-        unsafe { self.human().map(|h| h.movement_speed_target) }
+    /// Целевая прозрачность (прямое чтение +0x294).
+    pub fn get_transparency_target(&self) -> Option<f32> {
+        unsafe { self.human().map(|h| h.transparency_target) }
     }
 
-    /// Установить скорость мгновенно через vtable\[75\].
-    pub fn set_movement_speed(&self, speed: f32) -> bool {
+    /// Установить прозрачность мгновенно через vtable[75].
+    /// Устанавливает прозрачность Visual + оружия, пишет +0x294 и +0x298.
+    pub fn set_transparency(&self, value: f32) -> bool {
         unsafe {
             let Some(vt) = self.vtable() else {
                 return false;
             };
-            (vt.set_movement_speed)(self.this_mut(), speed);
+            (vt.set_transparency)(self.this_mut(), value);
         }
         true
     }
 
-    /// Установить целевую скорость через vtable\[77\].
-    pub fn set_movement_speed_target(&self, speed: f32) -> bool {
+    /// Установить целевую прозрачность через vtable[77].
+    /// Пишет только +0x294 (текущее значение интерполирует к цели).
+    pub fn set_transparency_target(&self, value: f32) -> bool {
         unsafe {
             let Some(vt) = self.vtable() else {
                 return false;
             };
-            (vt.set_movement_speed_target)(self.this_mut(), speed);
+            (vt.set_transparency_target)(self.this_mut(), value);
         }
         true
     }

@@ -62,24 +62,23 @@ impl Player {
 // =============================================================================
 
 impl Player {
-    /// Pointer на weapon_state компонент (`CHuman.weapon_state`).
-    fn weapon_state_ptr(&self) -> Option<usize> {
-        let ws = unsafe { self.human()?.weapon_state };
-        let addr = ws as usize;
+    /// Pointer на weapon_controller компонент (`CHuman.weapon_controller`).
+    fn weapon_controller_ptr(&self) -> Option<usize> {
+        let wc = unsafe { self.human()?.weapon_controller };
+        let addr = wc as usize;
         memory::is_valid_ptr(addr).then_some(addr)
     }
 
     /// Pointer на WeaponData текущего оружия. `None` = руки пусты.
     fn current_weapon_data(&self) -> Option<usize> {
-        let ws = self.weapon_state_ptr()?;
-        unsafe { memory::read_ptr(ws + fields::weapon_state::CURRENT_WEAPON_DATA) }
+        let wc = self.weapon_controller_ptr()?;
+        unsafe { memory::read_ptr(wc + fields::weapon_state::CURRENT_WEAPON_DATA) }
     }
 
     /// Есть ли оружие в руках.
     pub fn has_weapon_in_hand(&self) -> Option<bool> {
-        let ws = self.weapon_state_ptr()?;
-        let data =
-            unsafe { memory::read_ptr_raw(ws + fields::weapon_state::CURRENT_WEAPON_DATA)? };
+        let wc = self.weapon_controller_ptr()?;
+        let data = unsafe { memory::read_ptr_raw(wc + fields::weapon_state::CURRENT_WEAPON_DATA)? };
         Some(data != 0)
     }
 
@@ -122,10 +121,8 @@ impl Player {
     pub fn get_current_ammo(&self) -> Option<i32> {
         let wd = self.current_weapon_data()?;
         unsafe {
-            let container =
-                memory::read_ptr(wd + fields::weapon_data::AMMO_CONTAINER)?;
-            let store =
-                memory::read_ptr(container + fields::value_container::STORE_PTR)?;
+            let container = memory::read_ptr(wd + fields::weapon_data::AMMO_CONTAINER)?;
+            let store = memory::read_ptr(container + fields::value_container::STORE_PTR)?;
             memory::read_value::<i32>(store + fields::value_store::VALUE)
         }
     }

@@ -985,11 +985,11 @@ pub mod car {
     pub const SIZE: usize = 0x1258;
 
     /// Embedded sub-vtables (множественное наследование).
-    pub const SUB_VTABLE_1: usize = 0xE0;   // 0x141850298
-    pub const SUB_VTABLE_2: usize = 0x1E0;  // 0x141850478
-    pub const SUB_VTABLE_3: usize = 0x1E8;  // 0x1418504C0
-    pub const SUB_VTABLE_4: usize = 0x1F8;  // 0x1418504E0
-    pub const SUB_VTABLE_5: usize = 0x210;  // 0x1418504F0
+    pub const SUB_VTABLE_1: usize = 0xE0; // 0x141850298
+    pub const SUB_VTABLE_2: usize = 0x1E0; // 0x141850478
+    pub const SUB_VTABLE_3: usize = 0x1E8; // 0x1418504C0
+    pub const SUB_VTABLE_4: usize = 0x1F8; // 0x1418504E0
+    pub const SUB_VTABLE_5: usize = 0x210; // 0x1418504F0
 
     /// Vector-like component storage.
     pub const VEC_BEGIN: usize = 0xB0;
@@ -1357,31 +1357,31 @@ pub mod crash_part {
 pub mod car_damage {
     /// Индексы основной damage group A (u32 array).
     pub const GROUP_A_BEGIN: usize = 0x6B0;
-    pub const GROUP_A_END: usize   = 0x6B8;
+    pub const GROUP_A_END: usize = 0x6B8;
 
     /// Связки parent/child между деталями.
     pub const LINK_GROUP_BEGIN: usize = 0x6C8;
-    pub const LINK_GROUP_END: usize   = 0x6D0;
+    pub const LINK_GROUP_END: usize = 0x6D0;
 
     /// Damage group B.
     pub const GROUP_B_BEGIN: usize = 0x6E0;
-    pub const GROUP_B_END: usize   = 0x6E8;
+    pub const GROUP_B_END: usize = 0x6E8;
 
     /// Damage group C.
     pub const GROUP_C_BEGIN: usize = 0x710;
-    pub const GROUP_C_END: usize   = 0x718;
+    pub const GROUP_C_END: usize = 0x718;
 
     /// Damage group D.
     pub const GROUP_D_BEGIN: usize = 0x740;
-    pub const GROUP_D_END: usize   = 0x748;
+    pub const GROUP_D_END: usize = 0x748;
 
     /// Active FX/detachable-part index list.
     pub const FX_GROUP_BEGIN: usize = 0x758;
-    pub const FX_GROUP_END: usize   = 0x760;
+    pub const FX_GROUP_END: usize = 0x760;
 
     /// Crash-event bucket groups, stride 0x260.
     pub const EVENT_BUCKETS_BEGIN: usize = 0x8A0;
-    pub const EVENT_BUCKETS_END: usize   = 0x8A8;
+    pub const EVENT_BUCKETS_END: usize = 0x8A8;
     pub const EVENT_BUCKET_STRIDE: usize = 0x260;
 
     /// Damage/crash flags dword.

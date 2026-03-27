@@ -15,17 +15,12 @@ impl Player {
             Some(inv) => {
                 logger::debug(&format!("  Инвентарь: 0x{inv:X}"));
                 unsafe {
-                    if let Some(t) =
-                        memory::read_value::<u8>(inv + fields::inventory::TYPE)
-                    {
+                    if let Some(t) = memory::read_value::<u8>(inv + fields::inventory::TYPE) {
                         logger::debug(&format!("  Тип инвентаря: {t}"));
                     }
 
-                    if let Some(start) =
-                        memory::read_ptr(inv + fields::inventory::SLOTS_START)
-                    {
-                        let end = memory::read_ptr(inv + fields::inventory::SLOTS_END)
-                            .unwrap_or(0);
+                    if let Some(start) = memory::read_ptr(inv + fields::inventory::SLOTS_START) {
+                        let end = memory::read_ptr(inv + fields::inventory::SLOTS_END).unwrap_or(0);
                         let count = if end > start { (end - start) / 8 } else { 0 };
                         logger::debug(&format!("  Слотов: {count}"));
                     }

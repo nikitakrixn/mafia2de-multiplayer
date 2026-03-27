@@ -93,9 +93,8 @@ impl EntityRef {
             return None;
         }
 
-        let native = unsafe {
-            memory::read_ptr(wrapper_ptr + addresses::fields::script_wrapper::NATIVE)?
-        };
+        let native =
+            unsafe { memory::read_ptr(wrapper_ptr + addresses::fields::script_wrapper::NATIVE)? };
 
         Self::from_ptr(native)
     }
@@ -194,7 +193,10 @@ impl EntityRef {
     /// через offset. Отдельной полной `repr(C)` структуры frame node
     /// у нас ещё нет.
     pub fn frame_node(self) -> Option<usize> {
-        let raw = unsafe { self.ptr.read_at::<usize>(addresses::fields::entity::FRAME_NODE)? };
+        let raw = unsafe {
+            self.ptr
+                .read_at::<usize>(addresses::fields::entity::FRAME_NODE)?
+        };
         memory::is_valid_ptr(raw).then_some(raw)
     }
 
@@ -207,7 +209,10 @@ impl EntityRef {
     /// Для generic `EntityRef` читается через offset,
     /// потому что это уже actor-layer, а не чистый `CEntity`.
     pub fn owner(self) -> Option<usize> {
-        let raw = unsafe { self.ptr.read_at::<usize>(addresses::fields::entity::OWNER)? };
+        let raw = unsafe {
+            self.ptr
+                .read_at::<usize>(addresses::fields::entity::OWNER)?
+        };
         if raw == 0 {
             None
         } else {
@@ -235,11 +240,7 @@ impl EntityRef {
         let z = unsafe { memory::read_value::<f32>(frame + entity_frame::POS_Z)? };
 
         let pos = Vec3 { x, y, z };
-        if pos.is_finite() {
-            Some(pos)
-        } else {
-            None
-        }
+        if pos.is_finite() { Some(pos) } else { None }
     }
 
     // =============================================================================
@@ -313,7 +314,11 @@ impl EntityRef {
 
         format!(
             "EntityRef(ptr=0x{:X}, type=0x{:02X}, tid=0x{:08X}, inst={}, vt=0x{:X})",
-            self.ptr.addr(), ft, tid, iid, vt
+            self.ptr.addr(),
+            ft,
+            tid,
+            iid,
+            vt
         )
     }
 

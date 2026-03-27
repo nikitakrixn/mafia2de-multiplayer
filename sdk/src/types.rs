@@ -3,7 +3,7 @@
 //! Используются в структурах движка (`repr(C)`) и в game API.
 //! `Vec3` — основной тип для позиций, направлений, скоростей.
 
-use std::ops::{Add, Sub, Mul, Neg};
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// Трёхмерный вектор. Layout совместим с движком Illusion Engine.
 #[repr(C)]
@@ -15,10 +15,26 @@ pub struct Vec3 {
 }
 
 impl Vec3 {
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
-    pub const UP: Self = Self { x: 0.0, y: 0.0, z: 1.0 };
-    pub const FORWARD: Self = Self { x: 0.0, y: 1.0, z: 0.0 };
-    pub const RIGHT: Self = Self { x: 1.0, y: 0.0, z: 0.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
+    pub const UP: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
+    pub const FORWARD: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
+    pub const RIGHT: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// Конструктор.
     #[inline]
@@ -76,7 +92,7 @@ impl Vec3 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
-    /// Линейная интерполяция. `t=0` → `self`, `t=1` → `other`.
+    /// Линейная интерполяция. `t=0` -> `self`, `t=1` -> `other`.
     #[inline]
     pub fn lerp(&self, other: &Self, t: f32) -> Self {
         Self {
@@ -152,7 +168,12 @@ pub struct Quat {
 }
 
 impl Quat {
-    pub const IDENTITY: Self = Self { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+    pub const IDENTITY: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 1.0,
+    };
 
     /// Конвертация в forward-вектор (направление взгляда).
     ///

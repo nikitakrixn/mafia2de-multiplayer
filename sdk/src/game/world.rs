@@ -66,8 +66,7 @@ pub fn scan_nearby_entities(
             .unwrap_or(0)
     };
     let cache_end = unsafe {
-        memory::read_ptr_raw(mgr + addresses::fields::entity_cache::TABLE_ID_CACHE_END)
-            .unwrap_or(0)
+        memory::read_ptr_raw(mgr + addresses::fields::entity_cache::TABLE_ID_CACHE_END).unwrap_or(0)
     };
 
     if cache_begin == 0 || cache_end <= cache_begin || !memory::is_valid_ptr(cache_begin) {

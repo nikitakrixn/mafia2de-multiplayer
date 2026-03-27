@@ -123,9 +123,8 @@ fn scan_all(data: &[u8], parsed: &[PatternByte]) -> Vec<usize> {
 /// Для загруженных модулей (через [`get_module_info`]) это гарантировано.
 pub unsafe fn find(base: usize, size: usize, pattern: &str) -> Option<usize> {
     let parsed = parse(pattern);
-    let data = unsafe {
-        std::slice::from_raw_parts(ptr::with_exposed_provenance::<u8>(base), size)
-    };
+    let data =
+        unsafe { std::slice::from_raw_parts(ptr::with_exposed_provenance::<u8>(base), size) };
     scan_first(data, &parsed).map(|offset| base + offset)
 }
 
@@ -136,9 +135,8 @@ pub unsafe fn find(base: usize, size: usize, pattern: &str) -> Option<usize> {
 /// `[base .. base+size)` должен быть readable.
 pub unsafe fn find_all(base: usize, size: usize, pattern: &str) -> Vec<usize> {
     let parsed = parse(pattern);
-    let data = unsafe {
-        std::slice::from_raw_parts(ptr::with_exposed_provenance::<u8>(base), size)
-    };
+    let data =
+        unsafe { std::slice::from_raw_parts(ptr::with_exposed_provenance::<u8>(base), size) };
     scan_all(data, &parsed)
         .into_iter()
         .map(|offset| base + offset)

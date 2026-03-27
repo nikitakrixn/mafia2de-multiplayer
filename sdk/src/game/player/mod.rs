@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use crate::addresses;
 use crate::memory::{self, Ptr};
-use crate::structures::{GameManager, CEntity, CHuman, CPlayer, CPlayerVTable};
+use crate::structures::{CEntity, CHuman, CHumanVTable, CPlayer, GameManager};
 use common::logger;
 
 use super::base;
@@ -155,9 +155,9 @@ impl Player {
     ///
     /// `self.ptr` должен указывать на валидный Player/Human объект.
     #[inline]
-    pub(crate) unsafe fn vtable(&self) -> Option<&CPlayerVTable> {
+    pub(crate) unsafe fn vtable(&self) -> Option<&CHumanVTable> {
         let entity = unsafe { self.entity()? };
-        let vt_ptr = entity.vtable as *const CPlayerVTable;
+        let vt_ptr = entity.vtable as *const CHumanVTable;
         if vt_ptr.is_null() {
             return None;
         }
