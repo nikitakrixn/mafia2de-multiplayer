@@ -2,13 +2,11 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use common::logger;
-use protocol::{
-    ClientPacket, PlayerId, ServerPacket, DEFAULT_PORT, MAX_PLAYERS, PROTOCOL_VERSION,
-};
+use protocol::{ClientPacket, DEFAULT_PORT, MAX_PLAYERS, PROTOCOL_VERSION, PlayerId, ServerPacket};
 
 /// Следующий выдаваемый PlayerId.
 static NEXT_PLAYER_ID: AtomicU16 = AtomicU16::new(1);
@@ -187,10 +185,7 @@ fn handle_client(stream: TcpStream, shared: Arc<SharedServer>) {
 
     // Cleanup
     shared.remove_client(player_id);
-    shared.broadcast_except(
-        Some(player_id),
-        ServerPacket::PlayerDespawn { player_id },
-    );
+    shared.broadcast_except(Some(player_id), ServerPacket::PlayerDespawn { player_id });
 
     if let Some(name) = shared.get_name(player_id) {
         logger::info(&format!(
@@ -331,10 +326,7 @@ fn reader_loop(
                     n, player_id, event
                 ));
 
-                shared.broadcast_except(
-                    Some(player_id),
-                    ServerPacket::Event { player_id, event },
-                );
+                shared.broadcast_except(Some(player_id), ServerPacket::Event { player_id, event });
             }
 
             ClientPacket::ChatMessage { text } => {

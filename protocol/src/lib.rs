@@ -55,13 +55,13 @@ pub struct NetPlayerSnapshot {
     pub is_dead: bool,
 
     /// Главный state code (`player + 0x430`).
-    pub state_code_430: u32,
+    pub state_code: u32,
 
     /// Player state/flags (`player + 0x3D8`).
-    pub state_flags_3d8: u32,
+    pub car_wrapper_state: u8,
 
     /// Player bitfield (`player + 0x490`).
-    pub state_flags_490: u32,
+    pub ctrl_style_mask: u32,
 
     /// `player.sub45c.state` (`player + 0x464`).
     pub sub45c_state: u32,
@@ -93,10 +93,7 @@ pub enum NetPlayerEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientPacket {
     /// Первый пакет после подключения.
-    Connect {
-        name: String,
-        version: u32,
-    },
+    Connect { name: String, version: u32 },
 
     /// Явное отключение.
     Disconnect,
@@ -108,34 +105,23 @@ pub enum ClientPacket {
     Event(NetPlayerEvent),
 
     /// Сообщение чата.
-    ChatMessage {
-        text: String,
-    },
+    ChatMessage { text: String },
 }
 
 /// Пакет от сервера к клиенту.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerPacket {
     /// Подключение принято.
-    ConnectAccepted {
-        player_id: PlayerId,
-    },
+    ConnectAccepted { player_id: PlayerId },
 
     /// Подключение отвергнуто.
-    ConnectRejected {
-        reason: String,
-    },
+    ConnectRejected { reason: String },
 
     /// Спавн удалённого игрока.
-    PlayerSpawn {
-        player_id: PlayerId,
-        name: String,
-    },
+    PlayerSpawn { player_id: PlayerId, name: String },
 
     /// Удалённый игрок отключился.
-    PlayerDespawn {
-        player_id: PlayerId,
-    },
+    PlayerDespawn { player_id: PlayerId },
 
     /// Snapshot удалённого игрока.
     Snapshot(NetPlayerSnapshot),
@@ -147,8 +133,5 @@ pub enum ServerPacket {
     },
 
     /// Чат-сообщение.
-    ChatMessage {
-        player_id: PlayerId,
-        text: String,
-    },
+    ChatMessage { player_id: PlayerId, text: String },
 }
