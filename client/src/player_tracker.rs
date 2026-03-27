@@ -141,9 +141,9 @@ fn capture_network_snapshot(player: &Player) -> Option<NetPlayerSnapshot> {
     let forward = player.get_forward_vector()?;
     let health = player.get_health()?;
     let is_dead = !player.is_alive()?;
-    let state_code_430 = player.get_state_code_430()?;
-    let state_flags_3d8 = player.get_state_flags_3d8()?;
-    let state_flags_490 = player.get_state_flags_490()?;
+    let state_code = player.get_state_code()?;
+    let car_wrapper_state = player.get_car_wrapper_state()?;
+    let ctrl_style_mask = player.get_ctrl_style_mask()?;
     let sub45c_state = player.get_sub45c_state()?;
     let in_vehicle = player.is_in_vehicle()?;
 
@@ -164,9 +164,9 @@ fn capture_network_snapshot(player: &Player) -> Option<NetPlayerSnapshot> {
         },
         health,
         is_dead,
-        state_code_430,
-        state_flags_3d8,
-        state_flags_490,
+        state_code,
+        car_wrapper_state,
+        ctrl_style_mask,
         sub45c_state,
         in_vehicle,
     })

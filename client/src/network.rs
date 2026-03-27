@@ -295,12 +295,7 @@ fn handle_incoming_packet(packet: ServerPacket) {
                 true,
                 format!("Подключен как player #{player_id}"),
             );
-            crate::overlay::multiplayer_ui::add_player(
-                player_id as u32,
-                nickname.clone(),
-                0,
-                true,
-            );
+            crate::overlay::multiplayer_ui::add_player(player_id as u32, nickname.clone(), 0, true);
             crate::overlay::multiplayer_ui::add_system_message(format!(
                 "Подключение принято. Ваш ID: {player_id}"
             ));

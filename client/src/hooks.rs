@@ -15,7 +15,7 @@ use minhook::{MH_STATUS, MinHook};
 use sdk::{addresses, memory};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallWindowProcW, SetWindowLongPtrW, GWLP_WNDPROC, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
+    CallWindowProcW, GWLP_WNDPROC, SetWindowLongPtrW, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
 };
 
 // =============================================================================
@@ -137,15 +137,7 @@ unsafe extern "system" fn wndproc_detour(
 
     let orig = ORIGINAL_WNDPROC.load(Ordering::Relaxed);
     if orig != 0 {
-        unsafe {
-            CallWindowProcW(
-                Some(std::mem::transmute(orig)),
-                hwnd,
-                msg,
-                wparam,
-                lparam,
-            )
-        }
+        unsafe { CallWindowProcW(Some(std::mem::transmute(orig)), hwnd, msg, wparam, lparam) }
     } else {
         LRESULT(0)
     }
@@ -277,9 +269,8 @@ fn install_wndproc_hook() {
 
     let hwnd = HWND(hwnd_usize as *mut _);
 
-    let old = unsafe {
-        SetWindowLongPtrW(hwnd, GWLP_WNDPROC, wndproc_detour as *const () as isize)
-    };
+    let old =
+        unsafe { SetWindowLongPtrW(hwnd, GWLP_WNDPROC, wndproc_detour as *const () as isize) };
 
     if old == 0 {
         logger::warn("[hooks] SetWindowLongPtrW returned 0 — WndProc hook may have failed");
@@ -287,7 +278,9 @@ fn install_wndproc_hook() {
     }
 
     ORIGINAL_WNDPROC.store(old as usize, Ordering::Relaxed);
-    logger::info(&format!("[hooks] WndProc hook installed, original=0x{old:X}"));
+    logger::info(&format!(
+        "[hooks] WndProc hook installed, original=0x{old:X}"
+    ));
 }
 
 pub fn try_deferred_present_hook() {

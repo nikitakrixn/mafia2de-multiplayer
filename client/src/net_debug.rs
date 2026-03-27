@@ -86,10 +86,7 @@ pub fn on_inbound(packet: &ServerPacket) {
         }
         ServerPacket::ChatMessage { player_id, text } => {
             let n = IN_CHAT_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
-            logger::info(&format!(
-                "[net/in] Chat #{n} from {}: {}",
-                player_id, text
-            ));
+            logger::info(&format!("[net/in] Chat #{n} from {}: {}", player_id, text));
         }
     }
 }
