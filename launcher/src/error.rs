@@ -18,15 +18,15 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::GameAlreadyRunning                => write!(f, "Game is already running"),
-            Self::SteamNotRunning                   => write!(f, "Steam is not running. Please start Steam first."),
-            Self::GamePathNotFound                  => write!(f, "Game executable not found"),
-            Self::DllNotFound(p)           => write!(f, "Client DLL not found: {p}"),
-            Self::DllInvalid(msg)          => write!(f, "Invalid DLL: {msg}"),
-            Self::InjectionFailed(msg)     => write!(f, "DLL injection failed: {msg}"),
-            Self::ProcessFailed(msg)       => write!(f, "Process error: {msg}"),
-            Self::Registry(msg)            => write!(f, "Registry error: {msg}"),
-            Self::Windows(e)                => write!(f, "Windows error: {e}"),
+            Self::GameAlreadyRunning => write!(f, "Game is already running"),
+            Self::SteamNotRunning => write!(f, "Steam is not running. Please start Steam first."),
+            Self::GamePathNotFound => write!(f, "Game executable not found"),
+            Self::DllNotFound(p) => write!(f, "Client DLL not found: {p}"),
+            Self::DllInvalid(msg) => write!(f, "Invalid DLL: {msg}"),
+            Self::InjectionFailed(msg) => write!(f, "DLL injection failed: {msg}"),
+            Self::ProcessFailed(msg) => write!(f, "Process error: {msg}"),
+            Self::Registry(msg) => write!(f, "Registry error: {msg}"),
+            Self::Windows(e) => write!(f, "Windows error: {e}"),
         }
     }
 }

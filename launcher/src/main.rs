@@ -50,7 +50,7 @@ fn main() {
 
 fn parse_launch_mode() -> LaunchMode {
     let args: Vec<String> = std::env::args().collect();
-    
+
     for arg in args.iter() {
         match arg.to_lowercase().as_str() {
             "--devtools" | "-d" | "devtools" => return LaunchMode::Devtools,
@@ -58,7 +58,7 @@ fn parse_launch_mode() -> LaunchMode {
             _ => {}
         }
     }
-    
+
     // По умолчанию запускаем client
     LaunchMode::Client
 }
@@ -106,8 +106,7 @@ fn find_dll(mode: LaunchMode) -> Result<std::path::PathBuf, Error> {
         LaunchMode::Devtools => DEVTOOLS_DLL,
     };
 
-    let exe_dir = std::env::current_exe()
-        .map_err(|_| Error::DllNotFound(dll_name.into()))?;
+    let exe_dir = std::env::current_exe().map_err(|_| Error::DllNotFound(dll_name.into()))?;
     let dll = exe_dir.parent().unwrap().join(dll_name);
 
     if !dll.exists() {
@@ -118,8 +117,8 @@ fn find_dll(mode: LaunchMode) -> Result<std::path::PathBuf, Error> {
 }
 
 fn validate_dll(path: &Path) -> Result<(), Error> {
-    let meta = std::fs::metadata(path)
-        .map_err(|_| Error::DllNotFound(path.display().to_string()))?;
+    let meta =
+        std::fs::metadata(path).map_err(|_| Error::DllNotFound(path.display().to_string()))?;
 
     if meta.len() < 1024 {
         return Err(Error::DllInvalid(format!(
@@ -128,8 +127,8 @@ fn validate_dll(path: &Path) -> Result<(), Error> {
         )));
     }
 
-    let mut f = std::fs::File::open(path)
-        .map_err(|_| Error::DllNotFound(path.display().to_string()))?;
+    let mut f =
+        std::fs::File::open(path).map_err(|_| Error::DllNotFound(path.display().to_string()))?;
     let mut header = [0u8; 2];
     f.read_exact(&mut header)
         .map_err(|_| Error::DllInvalid("Cannot read header".into()))?;

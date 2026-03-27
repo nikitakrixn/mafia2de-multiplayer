@@ -8,8 +8,8 @@ use windows::Win32::System::Registry::*;
 use windows::Win32::UI::Controls::Dialogs::*;
 use windows::core::{PCSTR, PSTR};
 
-use common::logger;
 use crate::error::Error;
+use common::logger;
 
 const SUB_KEY: &str = "Software\\Mafia2-Multiplayer";
 const SUB_KEY_VALUE: &str = "mafia2depath";
@@ -69,12 +69,7 @@ pub fn ensure_steam() -> Result<(), Error> {
 }
 
 fn find_steam_dir() -> Option<PathBuf> {
-    let path_str = registry_read(
-        HKEY_CURRENT_USER,
-        "Software\\Valve\\Steam",
-        "SteamPath",
-    )
-    .ok()?;
+    let path_str = registry_read(HKEY_CURRENT_USER, "Software\\Valve\\Steam", "SteamPath").ok()?;
 
     if path_str.is_empty() {
         None
@@ -143,11 +138,7 @@ fn registry_write(hkey: HKEY, subkey: &str, name: &str, value: &str) -> Result<(
         );
 
         if status != ERROR_SUCCESS {
-            let create = RegCreateKeyA(
-                hkey,
-                PCSTR(subkey_c.as_ptr() as *const u8),
-                &mut handle,
-            );
+            let create = RegCreateKeyA(hkey, PCSTR(subkey_c.as_ptr() as *const u8), &mut handle);
             if create != ERROR_SUCCESS {
                 return Err(Error::Registry(format!("Cannot create key: {subkey}")));
             }
@@ -173,9 +164,10 @@ fn registry_write(hkey: HKEY, subkey: &str, name: &str, value: &str) -> Result<(
 
 fn save_to_registry(path: &Path) {
     if let Some(s) = path.to_str()
-        && let Err(e) = registry_write(HKEY_CURRENT_USER, SUB_KEY, SUB_KEY_VALUE, s) {
-            logger::warn(&format!("Failed to save path to registry: {e}"));
-        }
+        && let Err(e) = registry_write(HKEY_CURRENT_USER, SUB_KEY, SUB_KEY_VALUE, s)
+    {
+        logger::warn(&format!("Failed to save path to registry: {e}"));
+    }
 }
 
 fn show_file_dialog() -> Result<PathBuf, Error> {

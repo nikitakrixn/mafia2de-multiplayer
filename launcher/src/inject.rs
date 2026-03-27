@@ -11,19 +11,23 @@ use windows::Win32::System::Memory::*;
 use windows::Win32::System::Threading::*;
 use windows::core::PCSTR;
 
-use common::logger;
 use crate::error::Error;
+use common::logger;
 
 struct SafeHandle(HANDLE);
 
 impl SafeHandle {
-    fn raw(&self) -> HANDLE { self.0 }
+    fn raw(&self) -> HANDLE {
+        self.0
+    }
 }
 
 impl Drop for SafeHandle {
     fn drop(&mut self) {
         if !self.0.is_invalid() {
-            unsafe { let _ = CloseHandle(self.0); }
+            unsafe {
+                let _ = CloseHandle(self.0);
+            }
         }
     }
 }
@@ -50,7 +54,9 @@ pub fn launch_and_inject(game_exe: &Path, dll_path: &Path) -> Result<u32, Error>
         }
         Err(e) => {
             logger::error(&format!("Injection failed: {e}"));
-            unsafe { let _ = TerminateProcess(process.raw(), 1); }
+            unsafe {
+                let _ = TerminateProcess(process.raw(), 1);
+            }
             return Err(e);
         }
     }
@@ -60,7 +66,9 @@ pub fn launch_and_inject(game_exe: &Path, dll_path: &Path) -> Result<u32, Error>
     let result = unsafe { ResumeThread(thread.raw()) };
     if result == u32::MAX {
         logger::error("Failed to resume main thread");
-        unsafe { let _ = TerminateProcess(process.raw(), 1); }
+        unsafe {
+            let _ = TerminateProcess(process.raw(), 1);
+        }
         return Err(Error::ProcessFailed("ResumeThread failed".into()));
     }
 
@@ -89,9 +97,10 @@ pub fn is_process_running(exe_name: &str) -> Result<bool, Error> {
                     .collect();
 
                 if let Ok(name) = std::str::from_utf8(&name_bytes)
-                    && name.eq_ignore_ascii_case(exe_name) {
-                        return Ok(true);
-                    }
+                    && name.eq_ignore_ascii_case(exe_name)
+                {
+                    return Ok(true);
+                }
 
                 if Process32Next(snap.raw(), &mut entry).is_err() {
                     break;
@@ -128,7 +137,7 @@ fn create_suspended_process(
         )?;
 
         let process = SafeHandle(pi.hProcess);
-        let thread  = SafeHandle(pi.hThread);
+        let thread = SafeHandle(pi.hThread);
         Ok((process, thread, pi.dwProcessId))
     }
 }
@@ -175,8 +184,7 @@ fn inject_dll(process: HANDLE, dll_path: &Path) -> Result<(), Error> {
 
         logger::info(&format!(
             "LoadLibraryA @ 0x{:X}, remote buffer @ 0x{:X}",
-            load_library as usize,
-            remote_buf as usize,
+            load_library as usize, remote_buf as usize,
         ));
 
         // 4. Создаём удалённый поток
@@ -197,8 +205,8 @@ fn inject_dll(process: HANDLE, dll_path: &Path) -> Result<(), Error> {
         let wait = WaitForSingleObject(thread.raw(), 15_000);
         match wait {
             WAIT_OBJECT_0 => {}
-            WAIT_TIMEOUT  => logger::warn("DLL load timed out (15s)"),
-            other         => logger::warn(&format!("WaitForSingleObject: {other:?}")),
+            WAIT_TIMEOUT => logger::warn("DLL load timed out (15s)"),
+            other => logger::warn(&format!("WaitForSingleObject: {other:?}")),
         }
 
         // 6. Проверяем результат
@@ -221,13 +229,11 @@ fn inject_dll(process: HANDLE, dll_path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-
 fn path_to_cstring(path: &Path) -> Result<CString, Error> {
     let s = path
         .to_str()
         .ok_or_else(|| Error::ProcessFailed("Path contains invalid UTF-8".into()))?;
-    CString::new(s)
-        .map_err(|_| Error::ProcessFailed("Path contains null byte".into()))
+    CString::new(s).map_err(|_| Error::ProcessFailed("Path contains null byte".into()))
 }
 
 fn scopeguard<F: FnOnce()>(f: F) -> impl Drop {
