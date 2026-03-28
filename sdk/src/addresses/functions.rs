@@ -1865,6 +1865,97 @@ pub mod player_state_tail {
 }
 
 // =============================================================================
+//  C_Car — vtable method implementations
+// =============================================================================
+
+pub mod car {
+    /// `void(C_Car*)` — C_Car::GameInit. Vtable slot [4].
+    /// Инициализирует физику, регистрирует в AI, загружает template.
+    /// IDA: `0x140E0C140`
+    pub const GAME_INIT: usize = 0xE0_C140;
+
+    /// `void(C_Car*, const Vec3*)` — C_Car::SetPos. Vtable slot [32].
+    /// Physics sync: ORs car_flags |= 0x1000 (dirty), обновляет world_matrix.
+    /// IDA: `0x14014ED90`
+    pub const SET_POS: usize = 0x14_ED90;
+
+    /// `Vec3*(C_Car*, Vec3*)` — C_Car::GetPos. Vtable slot [36].
+    /// Читает world_matrix[3/7/11] (+0x27C/+0x28C/+0x29C).
+    /// IDA: `0x140122EF0`
+    pub const GET_POS: usize = 0x12_2EF0;
+
+    /// `char(C_Car*, C_EntityMessage*)` — C_Car::RecvMessage. Vtable slot [22].
+    /// 825-байтный router входящих сообщений.
+    /// IDA: `0x1401451F0`
+    pub const RECV_MESSAGE: usize = 0x14_51F0;
+
+    /// `void(C_Car*, float)` — C_Car::Update. Vtable slot [31].
+    /// Главный тик машины.
+    /// IDA: `0x14015EE80`
+    pub const UPDATE: usize = 0x15_EE80;
+
+    /// `void(C_Car*, Vec3*)` — C_Car::CameraPos. Vtable slot [73].
+    /// Возвращает позицию камеры машины.
+    /// IDA: `0x140159330`
+    pub const CAMERA_POS: usize = 0x15_9330;
+
+    /// `void(C_Car*, bool, bool)` — C_Car::SetHorn. Vtable slot [80].
+    /// IDA: `0x140E24C60`
+    pub const SET_HORN: usize = 0xE2_4C60;
+
+    /// `void(C_Car*, const char*, bool)` — C_Car::SetSPZText. Vtable slot [87].
+    /// Устанавливает текст номерного знака.
+    /// IDA: `0x14049B500`
+    pub const SET_SPZ_TEXT: usize = 0x49_B500;
+
+    /// `void(C_Car*, E_DoorChangeState)` — C_Car::DoorChangeState. Vtable slot [93].
+    /// IDA: `0x1404AA8A0`
+    pub const DOOR_CHANGE_STATE: usize = 0x4A_A8A0;
+
+    /// `void(C_Car*)` — C_Car::ExplodeFireFinish. Vtable slot [84].
+    /// IDA: `0x140E13AF0`
+    pub const EXPLODE_FIRE_FINISH: usize = 0xE1_3AF0;
+
+    /// `void(C_Car*)` — C_Car::Register2AI. Vtable slot [110].
+    /// IDA: `0x140125DF0`
+    pub const REGISTER_2_AI: usize = 0x12_5DF0;
+
+    /// `void(C_Car*, S_Wheel&)` — C_Car::OnTyreCrash. Vtable slot [91].
+    /// IDA: `0x1404853B0`
+    pub const ON_TYRE_CRASH: usize = 0x48_53B0;
+
+    /// `void(C_Car*, float)` — C_Car::SetVehicleDirty. Vtable slot [86].
+    /// IDA: `0x1401238F0`
+    pub const SET_VEHICLE_DIRTY: usize = 0x12_38F0;
+
+    // Seat management (C_ActorVehicle)
+
+    /// `void(C_ActorVehicle*)` — C_ActorVehicle::Clear. Vtable slot [50].
+    /// IDA: `0x140C22A80`
+    pub const AV_CLEAR: usize = 0xC2_2A80;
+
+    /// `void(C_ActorVehicle*, S_BaseSeat*, bool)` — AddSeat. Vtable slot [51].
+    /// IDA: `0x140C1FC60`
+    pub const AV_ADD_SEAT: usize = 0xC1_FC60;
+
+    /// `void(C_ActorVehicle*, uint, uint, I_Human2*)` — LockSeat. Vtable slot [52].
+    /// IDA: `0x140C428B0`
+    pub const AV_LOCK_SEAT: usize = 0xC4_28B0;
+
+    /// `void(C_ActorVehicle*, uint, uint)` — UnlockSeat. Vtable slot [54].
+    /// IDA: `0x140C5B4F0`
+    pub const AV_UNLOCK_SEAT: usize = 0xC5_B4F0;
+
+    /// `uint(C_ActorVehicle*)` — GetSeatCount. Vtable slot [56].
+    /// IDA: `0x140C39FF0`
+    pub const AV_GET_SEAT_COUNT: usize = 0xC3_9FF0;
+
+    /// `int(C_ActorVehicle*, uint)` — GetFreeSeatIndex. Vtable slot [61].
+    /// IDA: `0x140C35790`
+    pub const AV_GET_FREE_SEAT_INDEX: usize = 0xC3_5790;
+}
+
+// =============================================================================
 //  C_Car embedded damage/crash subobject (car + 0xE0)
 // =============================================================================
 
