@@ -86,29 +86,14 @@ pub fn push(event: PlayerEvent) {
 /// (например, MoneyChanged — это только локальное состояние).
 pub fn to_net_event(ev: &PlayerEvent) -> Option<NetPlayerEvent> {
     match ev {
-        // Только authoritative polling events идут по сети.
-        // Raw HUMAN message transitions (EnterVehicle/LeaveVehicle) — только локальный лог.
         PlayerEvent::VehicleEntered { .. } => Some(NetPlayerEvent::EnterVehicleDone),
         PlayerEvent::VehicleLeft => Some(NetPlayerEvent::LeaveVehicleDone),
-
         PlayerEvent::Damage => Some(NetPlayerEvent::Damage),
         PlayerEvent::Death => Some(NetPlayerEvent::Death),
         PlayerEvent::Shot => Some(NetPlayerEvent::Shot),
         PlayerEvent::WeaponSelect => Some(NetPlayerEvent::WeaponSelect),
         PlayerEvent::WeaponHide => Some(NetPlayerEvent::WeaponHide),
-
-        // Всё остальное — не транслируем
-        PlayerEvent::EnterVehicle
-        | PlayerEvent::EnterVehicleDone
-        | PlayerEvent::LeaveVehicle
-        | PlayerEvent::LeaveVehicleDone
-        | PlayerEvent::AnimNotify
-        | PlayerEvent::MoneyChanged { .. }
-        | PlayerEvent::MovementStarted { .. }
-        | PlayerEvent::MovementStopped { .. }
-        | PlayerEvent::Teleported { .. }
-        | PlayerEvent::ControlsLockedChanged { .. }
-        | PlayerEvent::ControlStyleChanged { .. } => None,
+        _ => None,
     }
 }
 
@@ -124,8 +109,6 @@ pub fn process_pending() {
     for ev in &drained {
         log_event(ev);
 
-        // Только whitelist-события идут в сетевой слой.
-        // push_local_event сам проверяет is_connected.
         if let Some(net_ev) = to_net_event(ev) {
             crate::network::push_local_event(net_ev);
         }
@@ -135,16 +118,16 @@ pub fn process_pending() {
 fn log_event(ev: &PlayerEvent) {
     match ev {
         PlayerEvent::EnterVehicle => {
-            logger::debug("[player-event] EnterVehicle");
+            logger::debug("[player-event] EnterVehicle (message phase)");
         }
         PlayerEvent::EnterVehicleDone => {
-            logger::debug("[player-event] EnterVehicleDone");
+            logger::debug("[player-event] EnterVehicleDone (message phase)");
         }
         PlayerEvent::LeaveVehicle => {
-            logger::debug("[player-event] LeaveVehicle");
+            logger::debug("[player-event] LeaveVehicle (message phase)");
         }
         PlayerEvent::LeaveVehicleDone => {
-            logger::debug("[player-event] LeaveVehicleDone");
+            logger::debug("[player-event] LeaveVehicleDone (message phase)");
         }
 
         PlayerEvent::VehicleEntered { vehicle_ptr } => {
@@ -220,6 +203,10 @@ fn log_event(ev: &PlayerEvent) {
         }
     }
 }
+
+// =============================================================================
+//  Форматирование денег
+// =============================================================================
 
 fn format_money(cents: i64) -> String {
     format!("$ {}.{:02}", cents / 100, (cents % 100).abs())

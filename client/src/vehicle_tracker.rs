@@ -73,8 +73,8 @@ pub fn update_main_thread() {
     }
 
     let current = match player.get_vehicle_ptr() {
-        Some(ptr) if ptr != 0 => VehicleState::InVehicle(ptr),
-        _ => VehicleState::OnFoot,
+        Some(ptr) => VehicleState::InVehicle(ptr),
+        None => VehicleState::OnFoot,
     };
 
     let mut guard = match tracker().lock() {
