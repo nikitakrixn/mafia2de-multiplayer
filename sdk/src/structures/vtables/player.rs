@@ -133,7 +133,7 @@ pub struct CHumanVTable {
     pub get_camera_point: unsafe extern "C" fn(this: *const c_void, out: *mut Vec3) -> *mut Vec3,
     /// [44] `SetFrame(C_Frame*)`. Замена frame-узла (+0x78).
     pub set_frame: usize,
-    /// [45] `SetOwner(C_Entity*)`. Записывает vehicle → +0x80.
+    /// [45] `SetOwner(C_Entity*)`. Записывает vehicle -> +0x80.
     pub set_owner: usize,
     /// [46] Заглушка (`return 0`).
     pub _slot_46: usize,
@@ -179,7 +179,7 @@ pub struct CHumanVTable {
     pub enable_anim_fps_lod: usize,
     /// [63] `AnimFPSLodEnabled() const`.
     pub anim_fps_lod_enabled: usize,
-    /// [64] `GetPosRequest(E_PosRequestType)`. locomotion→vfunc[14].
+    /// [64] `GetPosRequest(E_PosRequestType)`. locomotion->vfunc[14].
     pub get_pos_request: usize,
 
     // ====================================================================
@@ -189,7 +189,7 @@ pub struct CHumanVTable {
     pub get_dir_request: usize,
     /// [66] `GetTMRequest(E_TMRequestType, C_Matrix&)`.
     pub get_tm_request: usize,
-    /// [67] `QueryPhysicsBodyZone`. switch(0-6) → locomotion vfunc[46].
+    /// [67] `QueryPhysicsBodyZone`. switch(0-6) -> locomotion vfunc[46].
     pub query_physics_body_zone: usize,
     /// [68] `GetVelocity() const`. locomotion: provider+0x230.
     pub get_velocity: unsafe extern "C" fn(this: *const c_void, out: *mut Vec3) -> *mut Vec3,
@@ -247,7 +247,7 @@ pub struct CHumanVTable {
     pub lock_controls: usize,
     /// [91] `IsControlLockFinished() const`.
     pub is_control_lock_finished: usize,
-    /// [92] `SetPlayerCtrlStyle(char const*)`. Хеширует строку → +0x438.
+    /// [92] `SetPlayerCtrlStyle(char const*)`. Хеширует строку -> +0x438.
     pub set_player_ctrl_style: usize,
     /// [93] `GetPlayerCtrlStyle() const`. `return *(qword*)(this+0x520)`.
     pub get_player_ctrl_style: usize,

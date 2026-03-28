@@ -18,6 +18,7 @@ mod tables;
 mod vehicle;
 
 pub use std_vector::StdVector;
+pub use vtables::car::CCarVTable;
 pub use vtables::player::CHumanVTable;
 
 pub use entity::{

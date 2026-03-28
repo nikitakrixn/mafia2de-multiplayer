@@ -1,16 +1,38 @@
-//! Базовые структуры системы сущностей — C_Entity и C_Actor.
-//!
-//! Иерархия наследования:
+//! Базовые структуры системы сущностей — C_Entity, C_EntityPos, C_Actor.
 //!
 //! ```text
-//! C_Entity (0x78 байт) — корень всех сущностей
-//!   └─ C_Actor (0xA8 байт) — пространственное представление
-//!        ├─ I_Human2 -> C_Human2 -> C_Player2
-//!        ├─ C_ActorVehicle -> C_Car
-//!        ├─ C_Tree, C_Item, C_Blocker, C_Wardrobe
-//!        ├─ C_LightEntity, C_Pinup, C_DamageZone
-//!        └─ C_CleanEntity, C_StaticEntity, C_FrameWrapper
-//!   └─ ue::C_ScriptEntity — напрямую от C_Entity (без Actor)
+//! C_Entity (0x78 байт, VT: 0x14186CAC8)
+//!   │
+//!   ├─ C_EntityPos (нет новых полей, добавляет spatial pure virtuals 32-39)
+//!   │    │
+//!   │    ├─ C_Actor (0xA8 байт, VT: 0x14186D050)
+//!   │    │    │
+//!   │    │    ├─ I_Human2 (abstract, VT: 0x1418E2BD8)
+//!   │    │    │    └─ C_Human2 / CHumanNPC (VT: 0x1418E5188, ft=0x0E)
+//!   │    │    │         └─ C_Player2 / CPlayer (VT: 0x14184C060, ft=0x10)
+//!   │    │    │
+//!   │    │    ├─ C_ActorVehicle (VT: 0x1418CFE50, +seats/enter-leave)
+//!   │    │    │    └─ C_Car (VT: 0x141850030, ft=0x12)
+//!   │    │    │         + ue::game::vehicle::C_Vehicle (MI at +0xE0)
+//!   │    │    │         + C_PhThingDeform (MI через C_Vehicle)
+//!   │    │    │
+//!   │    │    ├─ C_Tree, C_Item, C_Blocker, C_Wardrobe
+//!   │    │    ├─ C_LightEntity, C_Pinup, C_DamageZone
+//!   │    │    ├─ C_CleanEntity, C_StaticEntity, C_FrameWrapper
+//!   │    │    └─ C_ActorDetector
+//!   │    │
+//!   │    └─ C_ActorDeform (VT: 0x14186D410, + C_PhThingDeform MI at +0xA8)
+//!   │         ├─ C_CrashObject (ft=0x14)
+//!   │         ├─ C_Door (ft=0x26)
+//!   │         └─ C_Boat, C_Lift, C_Jukebox, C_Radio
+//!   │
+//!   ├─ C_EntityDummy
+//!   │
+//!   ├─ ue::C_ScriptEntity (ft=0x62, НЕ Actor!)
+//!   │
+//!   ├─ C_Sound (ft=0x29, НЕ Actor!)
+//!   │
+//!   └─ C_CarVehicle (ft=0x70, VT: 0x1418EAAC8)
 //! ```
 
 use crate::macros::assert_field_offsets;
@@ -24,7 +46,7 @@ use std::ffi::c_void;
 ///
 /// **Размер: 0x78 байт** (подтверждено деструктором: `GlobalFree(this, 0x78)`).
 ///
-/// ## Конструктор (`0x14039B710`)
+/// ## Конструктор (`M2DE_CEntity_Construct`, 0x14039B710)
 ///
 /// 1. Устанавливает vtable `C_Entity`
 /// 2. Зануляет все поля
@@ -32,13 +54,24 @@ use std::ffi::c_void;
 /// 4. Генерирует `table_id = (instance_id << 8) | factory_type`
 /// 5. Регистрирует сущность в `WorldEntityManager`
 ///
-/// ## Packed ID
+/// ## Vtable слоты
 ///
-/// ```text
-/// table_id = (instance_id << 8) | factory_type
-///   └─ instance_id: 24-bit глобальный счётчик (с wraparound 0x1000000 -> 0x1000)
-///   └─ factory_type: 8-bit тип из конструктора (SetTypeID)
-/// ```
+/// | Слот | Метод | Источник |
+/// |:----:|:------|:---------|
+/// | 0 | `~C_Entity()` | ScalarDeletingDestructor |
+/// | 2 | `GetFrameNode()` | `return *(this+0x78)` |
+/// | 3 | `Init(S_EntityInitProps*)` | Инициализация из SDS |
+/// | 4 | `GameInit()` | Старт уровня |
+/// | 5 | `GameDone()` | Конец уровня |
+/// | 6 | `GameRestore()` | Восстановление после загрузки |
+/// | 7 | `OnActivate()` | Активация в мире |
+/// | 8 | `OnDeactivate()` | Деактивация |
+/// | 9 | `IsActive()` | Проверка флага |
+/// | 13 | `GameSaveDependencies()` | Сериализация RB-tree подписок |
+/// | 17 | `EntityInvalidate()` | Инвалидация связей |
+/// | 18 | `AddOnEvent()` | Создание 32B сообщения |
+/// | 22 | `RecvMessage()` | Приём сообщений |
+/// | 23 | `InvalidateRelation()` | Удаление подписок |
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CEntity {
@@ -54,7 +87,7 @@ pub struct CEntity {
     pub ext_ptr_18: *mut c_void, // +0x18
 
     /// Флаг реентерабельности для итерации observer-списка.
-    /// Устанавливается в 1 на время обхода, восстанавливается после.
+    /// C_EntityPos записывает сюда `3` при конструировании.
     pub observer_guard: u8, // +0x20
     pub _pad_21: [u8; 3], // +0x21..+0x23
 
@@ -62,7 +95,8 @@ pub struct CEntity {
     pub table_id: u32, // +0x24
 
     /// Флаги сущности.
-    /// - bit 5 (0x20): активирована
+    /// - bit 5 (0x20): активирована (`OnActivate` ORs это)
+    /// - bit 7 (0x80): C_ActorDeform устанавливает в конструкторе
     /// - bits 17/18 (0x60000): стриминг
     pub entity_flags: u32, // +0x28
     pub _pad_2c: u32, // +0x2C
@@ -71,8 +105,7 @@ pub struct CEntity {
     pub name_hash: u64, // +0x30
 
     /// Ссылка на родительскую сущность.
-    /// Записывается в vtable[3] `Init(S_EntityInitProps const*)`.
-    /// Уведомляет `WorldEntityManager` с кодом 1.
+    /// Записывается в vtable[3] `Init(S_EntityInitProps*)`.
     pub parent_ref: *mut c_void, // +0x38
 
     /// Корень RB-tree подписок на сообщения (sentinel, alloc 0x38).
@@ -89,8 +122,6 @@ pub struct CEntity {
     pub _zero_58: usize, // +0x58
 
     /// Вектор observer/callback записей.
-    /// Каждая запись: `{ptr, flags}` (16 байт).
-    /// Итерируется с масками: 1 (Init), 4 (GameInit), 0x10 (GameSaveDeps).
     pub observer_begin: *mut c_void, // +0x60
     /// Конец вектора observer-записей.
     pub observer_end: *mut c_void, // +0x68
@@ -134,7 +165,7 @@ impl CEntity {
         self.table_id >> 8
     }
 
-    /// Проверяет флаг активации (bit 5).
+    /// Проверяет флаг активации (bit 5, устанавливается в `OnActivate`).
     #[inline]
     pub fn is_activated(&self) -> bool {
         (self.entity_flags & 0x20) != 0
@@ -155,19 +186,41 @@ impl CEntity {
 ///
 /// **Размер: 0xA8 байт**.
 ///
-/// ## Конструктор (`0x14039A7E0`)
+/// ## Иерархия
 ///
-/// 1. Вызывает `C_Entity::C_Entity()`
+/// ```text
+/// C_Entity -> C_EntityPos (pure virtuals) -> C_Actor (реализация)
+/// ```
+///
+/// C_EntityPos не добавляет полей — только объявляет SetPos/GetPos/SetDir
+/// и т.д. как pure virtual. C_Actor реализует их через `frame_node`.
+///
+/// ## Конструктор (`M2DE_CActor_Construct`, 0x14039A7E0)
+///
+/// 1. Вызывает `CEntity_Construct()`
 /// 2. Устанавливает vtable `C_Actor`
 /// 3. Зануляет `frame_node`, `owner`, компонентные поля
 /// 4. Устанавливает `factory_type = 5` (промежуточный тип Actor)
 ///
-/// ## Промежуточный класс C_EntityPos
+/// ## Vtable слоты поверх C_Entity
 ///
-/// Между C_Entity и C_Actor существует невидимый слой C_EntityPos,
-/// который добавляет пространственные методы: SetPos, GetPos, SetDir,
-/// SetRot, SetScale, GameSavePRS, GameLoadPRS. В DE этот слой вложен
-/// в vtable C_Actor (слоты 32–44).
+/// | Слот | Метод | Описание |
+/// |:----:|:------|:---------|
+/// | 4 | `GameInit()` | C_Actor override |
+/// | 5 | `GameDone()` | C_Actor override — высокоуровневая деактивация |
+/// | 7 | `OnActivate()` | C_Actor override |
+/// | 8 | `OnDeactivate()` | C_Actor override |
+/// | 31 | `Update(float)` | Базовый тик актора |
+/// | 32 | `SetPos(C_Vector&)` | Запись в frame_node |
+/// | 33 | `SetDir(C_Vector&)` | Направление через frame |
+/// | 34 | `SetRot(C_Quat&)` | Кватернион через frame |
+/// | 35 | `SetScale(float)` | Масштабирование 3x3 матрицы |
+/// | 36–39 | `GetPos/Dir/Rot/Scale` | Чтение из frame_node |
+/// | 41 | `GameSavePRS()` | Сериализация позиции/вращения/масштаба |
+/// | 42 | `GameLoadPRS()` | Десериализация, вызывает SetPos+SetRot |
+/// | 43 | `GetCameraPoint()` | Базовая реализация |
+/// | 44 | `SetFrame(C_Frame*)` | Замена frame_node (+0x78) |
+/// | 47 | `IsDead()` | Базовый — всегда false |
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CActor {
@@ -186,10 +239,14 @@ pub struct CActor {
     /// - `vehicle_ptr` = сидит в машине
     ///
     /// Записывается через vtable[45] `SetOwner(C_Entity*)`.
+    /// При записи broadcast'ит EnterVehicle msg 0xD0004.
     pub owner: *mut c_void, // +0x80
 
-    /// Компонентные указатели (зависят от типа).
-    /// NULL в чистом Actor. Heap-указатели у C_Car, C_CarVehicle.
+    /// Компонентные указатели (зависят от типа наследника).
+    ///
+    /// - Чистый C_Actor: все NULL
+    /// - C_Car / C_CarVehicle: heap-указатели
+    /// - I_Human2: часть компонентного блока
     pub component_88: *mut c_void, // +0x88
     /// Компонентный указатель.
     pub component_90: *mut c_void, // +0x90
@@ -202,7 +259,7 @@ pub struct CActor {
     /// |:--------:|:----|
     /// | 6 | Player |
     /// | 3 | CarVehicle |
-    /// | 0x36–0x3A | C_Car |
+    /// | 0x36–0x3A | C_Car (различные кузова) |
     pub entity_subtype: u32, // +0xA0
     pub _pad_a4: u32, // +0xA4
 }
