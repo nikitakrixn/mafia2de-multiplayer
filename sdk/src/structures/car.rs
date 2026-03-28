@@ -4,7 +4,7 @@
 //! C_Entity (0x78)
 //!   └─ C_EntityPos (spatial pure virtuals)
 //!        └─ C_Actor (0xA8, frame_node, owner, components)
-//!             └─ C_ActorVehicle (VT: 0x1418CFE50, +seats, +enter/leave)
+//!             └─ C_ActorVehicle (0xE0, VT: 0x1418CFE50, +seats, +enter/leave)
 //!                  │  Конструктор: M2DE_CActorVehicle_Construct (0x140C0EB10)
 //!                  │  Зануляет 7 полей: +0xA8..+0xD8
 //!                  │
@@ -32,9 +32,93 @@
 //!
 //! ## C_CarVehicle ft=0x70
 
-use super::entity::CEntity;
+use super::entity::{CActor, CEntity};
 use crate::macros::assert_field_offsets;
 use std::ffi::c_void;
+
+// =============================================================================
+//  C_ActorVehicle — промежуточный класс (0xE0 байт)
+// =============================================================================
+
+/// Промежуточный класс транспорта с сиденьями.
+///
+/// **Размер: 0xE0 байт**.
+///
+/// ```text
+/// C_Actor (0xA8)
+///   └─ C_ActorVehicle (0xE0, VT: 0x1418CFE50)
+///        Конструктор: 0x140C0EB10
+///        Зануляет 7 qword: +0xA8..+0xD8
+/// ```
+///
+/// ## Конструктор
+///
+/// ```text
+/// M2DE_CActor_Construct(this);
+/// *this = VT_CActorVehicle;
+/// this[21] = 0;  // +0xA8 seat_data
+/// this[22] = 0;  // +0xB0 pending_dispatch_begin
+/// this[23] = 0;  // +0xB8 pending_dispatch_end
+/// this[24] = 0;  // +0xC0 seat_state
+/// this[25] = 0;  // +0xC8 records_begin
+/// this[26] = 0;  // +0xD0 records_end
+/// this[27] = 0;  // +0xD8 records_cap
+/// ```
+///
+/// Vtable слоты [50–71] в C_Car приходят из этого класса.
+#[repr(C)]
+pub struct CActorVehicle {
+    /// Базовый актор (entity + frame + owner + components).
+    pub actor: CActor, // +0x00..+0xA7
+
+    /// Данные сидений (zeroed конструктором).
+    pub seat_data: *mut c_void, // +0xA8
+
+    /// Pending dispatch begin (очередь операций входа/выхода).
+    pub pending_dispatch_begin: *mut c_void, // +0xB0
+    /// Pending dispatch end.
+    pub pending_dispatch_end: *mut c_void, // +0xB8
+
+    /// Seat state pointer (zeroed конструктором).
+    pub seat_state: *mut c_void, // +0xC0
+
+    /// Records begin (вектор записей, stride=24).
+    /// Vtable[67] `GetRecordCount`: `(end - begin) / 24`.
+    pub records_begin: *mut c_void, // +0xC8
+    /// Records end.
+    pub records_end: *mut c_void, // +0xD0
+    /// Records capacity.
+    pub records_cap: *mut c_void, // +0xD8
+}
+
+assert_field_offsets!(CActorVehicle {
+    actor                  == 0x00,
+    seat_data              == 0xA8,
+    pending_dispatch_begin == 0xB0,
+    pending_dispatch_end   == 0xB8,
+    seat_state             == 0xC0,
+    records_begin          == 0xC8,
+    records_end            == 0xD0,
+    records_cap            == 0xD8,
+});
+
+const _: () = {
+    assert!(std::mem::size_of::<CActorVehicle>() == 0xE0);
+    assert!(std::mem::offset_of!(CActorVehicle, actor.base.vtable) == 0x00);
+    assert!(std::mem::offset_of!(CActorVehicle, actor.base.table_id) == 0x24);
+    assert!(std::mem::offset_of!(CActorVehicle, actor.frame_node) == 0x78);
+    assert!(std::mem::offset_of!(CActorVehicle, actor.owner) == 0x80);
+    assert!(std::mem::offset_of!(CActorVehicle, actor.entity_subtype) == 0xA0);
+};
+
+impl CActorVehicle {
+    /// Количество записей в records-векторе (stride = 24).
+    pub fn record_count(&self) -> usize {
+        let begin = self.records_begin as usize;
+        let end = self.records_end as usize;
+        if end > begin { (end - begin) / 24 } else { 0 }
+    }
+}
 
 // =============================================================================
 //  C_Car — сущность машины (ft=0x12, ~0x1258 байт)
@@ -45,12 +129,12 @@ use std::ffi::c_void;
 /// **Размер аллокации: ~0x1258 байт**.
 /// **Runtime count в FreeRide: 41 entity**.
 ///
-/// ## Цепочка конструктора
+/// ## Цепочка конструктора (IDA: `M2DE_CCar_Construct`, 0x1400EE6C0)
 ///
 /// ```text
 /// C_Car::C_Car()
-///   1. C_ActorVehicle::C_ActorVehicle(this)     — Actor + seats
-///   2. C_Vehicle::C_Vehicle(this + 0xE0)        — MI subobject at +0xE0
+///   1. C_ActorVehicle::C_ActorVehicle(this)     — Actor + seats (0xE0)
+///   2. sub_140473AA0(this + 0xE0)               — C_Vehicle MI init
 ///   3. *this = VT_CCar                          — primary vtable
 ///   4. *(this+0x0E0) = VT_CCar_Vehicle          — Vehicle/PhThingDeform MI
 ///   5. *(this+0x1E0) = VT_CCar_PhysicsContact   — contact handler MI
@@ -60,69 +144,62 @@ use std::ffi::c_void;
 ///   9. C_Entity::SetType(this, 0x12)
 /// ```
 ///
-/// ## Vtable слоты primary
+/// ## Layout
 ///
-/// | Слоты | Метод | Источник |
-/// |:----:|:------|:---------|
-/// | 3 | `Init(S_EntityInitProps*)` | C_Car override |
-/// | 4-8 | `GameInit/Done/Restore/OnActivate/OnDeactivate` | C_Car overrides |
-/// | 12/15 | `GameSave/GameLoad` | C_Car override |
-/// | 19 | `IsSafeSpawn(C_Vector&, float, C_Entity*)` | C_Car specific |
-/// | 22 | `RecvMessage(C_EntityMessage*)` | C_Car: 825B router |
-/// | 24-25 | `GetCsInterface / GetCreateCsInterface` | C_Car override |
-/// | 29-31 | `UpdateIdleFX / UpdateIdleRC / Update` | C_Car specific |
-/// | 32-34 | `SetPos / SetDir / SetRot` | C_Car: physics sync |
-/// | 48-49 | `EnableUnderwaterDetection / GetUnderwaterStatus` | C_Car (MAC slot[49/50]) |
-/// | 50-71 | Seat management (C_ActorVehicle) | Clear/AddSeat/Lock/Unlock/... |
-/// | 73-77 | `CameraPos/Dir, IsModelRendered, IsInOptimPlayerRange` | C_Car specific |
-/// | 80 | `SetHorn(bool, bool)` | C_Car specific |
-/// | 87-88 | `SetSPZText / GetSPZText` | Номерной знак |
-/// | 89-90 | `OnSimulationFinished / OnRegisterToTick` | Физика |
-/// | 91-92 | `OnTyreCrash / OnTyreOff` | Повреждение шин |
-/// | 93-94 | `DoorChangeState / HoodAndTrunkChangeState` | Двери/капот |
-/// | 95 | `DeformPartEnergyChanged` | Деформация |
-/// | 98-99 | `OnContactStart / OnContactTouch` | Контакты |
-/// | 100 | `VehicleTransform` | Трансформация |
-/// | 101-102 | `OnSimulationStep / ChangeCollElementsCount` | Физика |
-/// | 103-104 | `GetInitData / DropPart` | Деформация |
-/// | 105-108 | `IsValidSound/Effect/Blood/SpawnContact` | Фильтры контактов |
-/// | 110-111 | `Register2AI / UnregisterFromAI` | Регистрация в ИИ |
-/// | 112 | `AddCollisionContact` | Запись столкновения |
+/// ```text
+/// +0x000..+0x0DF: CActorVehicle (base)
+///   +0x000..+0x0A7: CActor
+///     +0x000..+0x077: CEntity
+///     +0x078: frame_node
+///     +0x080: owner
+///     +0x088: component_88 (= attached_ops_begin в контексте CCar)
+///     +0x090: component_90 (= attached_ops_end)
+///     +0x098: component_98 (= attached_ops_cap)
+///     +0x0A0: entity_subtype
+///   +0x0A8: seat_data
+///   +0x0B0: pending_dispatch_begin
+///   +0x0B8: pending_dispatch_end
+///   +0x0C0: seat_state
+///   +0x0C8: records_begin
+///   +0x0D0: records_end
+///   +0x0D8: records_cap
+/// +0x0E0: vehicle_mi_vtable (первое собственное поле CCar)
+/// +0x1E0: physics_contact_vtable
+/// +0x1E8: simulation_callback_vtable
+/// +0x1F8: joint_break_vtable
+/// +0x210: activated_vtable
+/// +0x270: world_matrix[16]
+/// +0x2F0: self_ref
+/// ...
+/// +0xED8: physics_body
+/// +0xF10: behavior
+/// +0xF30: car_flags
+/// +0xF48: template_resource
+/// +0xF88: variant_index
+/// +0x11EC: pos_committed
+/// +0x1210: collision_body
+/// +0x1218: collision_body_refcount
+/// ```
 #[repr(C)]
 pub struct CCar {
-    _pad_000: [u8; 0x88],
+    /// Базовый класс: CActorVehicle = CActor + seats.
+    ///
+    /// Покрывает +0x00..+0xDF (0xE0 байт).
+    /// Доступ к унаследованным полям:
+    /// - `self.base.actor.base` -> CEntity
+    /// - `self.base.actor.frame_node` -> frame
+    /// - `self.base.actor.entity_subtype` -> subtype
+    /// - `self.base.records_begin/end` -> seat records
+    pub base: CActorVehicle, // +0x00..+0xDF
 
-    /// Attached ops begin (вектор операций).
-    pub attached_ops_begin: *mut c_void, // +0x88
-    /// Attached ops end.
-    pub attached_ops_end: *mut c_void, // +0x90
-    /// Attached ops capacity.
-    pub attached_ops_cap: *mut c_void, // +0x98
-
-    /// Подтип сущности (0x36, 0x37, 0x3A для разных кузовов C_Car).
-    pub entity_subtype: u32, // +0xA0
-
-    _pad_0a4: [u8; 0xB0 - 0xA4],
-
-    /// Pending dispatch begin.
-    pub pending_dispatch_begin: *mut c_void, // +0xB0
-    /// Pending dispatch end.
-    pub pending_dispatch_end: *mut c_void, // +0xB8
-
-    _pad_0c0: [u8; 0xC8 - 0xC0],
-
-    /// Records begin (вектор записей, stride=24).
-    /// Vtable[67] `GetRecordCount`: `(end - begin) / 24`.
-    /// Vtable[68] `GetRecordByIndex`: `begin + 24 * index`.
-    pub records_begin: *mut c_void, // +0xC8
-    /// Records end.
-    pub records_end: *mut c_void, // +0xD0
-    /// Records capacity.
-    pub records_cap: *mut c_void, // +0xD8
+    // =================================================================
+    //  MI sub-vtables (C_Car specific, +0xE0..+0x21F)
+    // =================================================================
 
     /// MI sub-vtable: C_Vehicle / C_PhThingDeform.
     ///
     /// VT: `M2DE_VT_CCar_Vehicle_PhThingDeform` (0x141850298).
+    /// IDA: `*(a1 + 224) = &VT` -> 224 = 0xE0.
     ///
     /// Содержит методы деформации и физики:
     /// OnSavePart, OnLoadPart, CreatePart, DeletePart,
@@ -134,30 +211,30 @@ pub struct CCar {
     _pad_0e8: [u8; 0x1E0 - 0xE8],
 
     /// MI sub-vtable 2: Physics contact handler.
-    /// VT: 0x141850478.
-    /// Содержит OnContactStart thunks.
+    /// VT: 0x141850478. IDA: `*(a1 + 480)` -> 480 = 0x1E0.
     pub physics_contact_vtable: *const c_void, // +0x1E0
 
     /// MI sub-vtable 3: Simulation callback.
-    /// VT: 0x1418504C0.
-    /// Содержит OnSimulationStep/Finished thunks.
+    /// VT: 0x1418504C0. IDA: `*(a1 + 488)` -> 488 = 0x1E8.
     pub simulation_callback_vtable: *const c_void, // +0x1E8
 
     _pad_1f0: [u8; 0x1F8 - 0x1F0],
 
     /// MI sub-vtable 4: Joint break handler.
-    /// VT: 0x1418504E0.
-    /// Содержит OnUniversalRBJointBreak.
+    /// VT: 0x1418504E0. IDA: `*(a1 + 504)` -> 504 = 0x1F8.
     pub joint_break_vtable: *const c_void, // +0x1F8
 
     _pad_200: [u8; 0x210 - 0x200],
 
     /// MI sub-vtable 5: Activated callback.
-    /// VT: 0x1418504F0.
-    /// Содержит OnActivated.
+    /// VT: 0x1418504F0. IDA: `*(a1 + 528)` -> 528 = 0x210.
     pub activated_vtable: *const c_void, // +0x210
 
     _pad_218: [u8; 0x270 - 0x218],
+
+    // =================================================================
+    //  Трансформация (+0x270..+0x2AF)
+    // =================================================================
 
     /// Матрица мира 4x4 (row-major, f32[16]).
     ///
@@ -173,6 +250,10 @@ pub struct CCar {
     pub self_ref: *mut CCar, // +0x2F0
 
     _pad_2f8: [u8; 0xED8 - 0x2F8],
+
+    // =================================================================
+    //  Физика (+0xED8..+0xF4F)
+    // =================================================================
 
     /// Physics body pointer.
     /// Vtable[43] `GetCameraPoint`: вызывает `physics_body->vfunc[9]`.
@@ -208,6 +289,10 @@ pub struct CCar {
 
     _pad_11ed: [u8; 0x1210 - 0x11ED],
 
+    // =================================================================
+    //  Collision (+0x1210)
+    // =================================================================
+
     /// Collision body pointer.
     /// Vtable[48] `EnableUnderwaterDetection`: refcounted.
     pub collision_body: *mut c_void, // +0x1210
@@ -238,11 +323,9 @@ impl CCar {
         (self.car_flags & 0x1000) != 0
     }
 
-    /// Количество записей в records-векторе.
+    /// Количество записей в records-векторе (делегирует в CActorVehicle).
     pub fn record_count(&self) -> usize {
-        let begin = self.records_begin as usize;
-        let end = self.records_end as usize;
-        if end > begin { (end - begin) / 24 } else { 0 }
+        self.base.record_count()
     }
 
     /// Валиден ли self_ref (указывает на себя).
@@ -257,42 +340,115 @@ impl CCar {
         (&self.vehicle_mi_vtable as *const *const c_void) as *const CCarDamageSub1
     }
 
-    /// Доступ к CEntity (первые 0x78 байт).
-    pub fn as_entity(&self) -> &CEntity {
-        unsafe { &*(self as *const CCar as *const CEntity) }
+    // =====================================================================
+    //  Безопасный доступ к базовым классам (через вложение, без кастов)
+    // =====================================================================
+
+    /// Доступ к CEntity.
+    #[inline]
+    pub fn entity(&self) -> &CEntity {
+        &self.base.actor.base
     }
 
-    /// Packed table_id через CEntity.
+    /// Доступ к CActor.
+    #[inline]
+    pub fn actor(&self) -> &CActor {
+        &self.base.actor
+    }
+
+    /// Packed table_id.
+    #[inline]
     pub fn table_id(&self) -> u32 {
-        self.as_entity().table_id
+        self.base.actor.base.table_id
     }
 
-    /// Factory type byte.
+    /// Factory type byte (0x12 для C_Car).
+    #[inline]
     pub fn factory_type(&self) -> u8 {
-        self.as_entity().factory_type()
+        self.base.actor.base.factory_type()
+    }
+
+    /// Entity subtype (0x36, 0x37, 0x3A для разных кузовов).
+    ///
+    /// Физически это `CActor.entity_subtype` (+0xA0), но в контексте
+    /// CCar означает тип кузова.
+    #[inline]
+    pub fn entity_subtype(&self) -> u32 {
+        self.base.actor.entity_subtype
+    }
+
+    /// Frame node pointer.
+    #[inline]
+    pub fn frame_node(&self) -> *mut c_void {
+        self.base.actor.frame_node
+    }
+
+    /// Owner entity.
+    #[inline]
+    pub fn owner(&self) -> *mut c_void {
+        self.base.actor.owner
+    }
+
+    // =====================================================================
+    //  Поля CActor, переименованные в контексте C_Car
+    // =====================================================================
+
+    /// Количество attached ops.
+    ///
+    /// В CActor это generic component_88/90/98, но в CCar
+    /// используется как вектор операций (stride = 8).
+    pub fn attached_ops_count(&self) -> usize {
+        let begin = self.base.actor.component_88 as usize;
+        let end = self.base.actor.component_90 as usize;
+        if end > begin { (end - begin) / 8 } else { 0 }
     }
 }
 
+// Compile-time проверки смещений — ТОЛЬКО собственные поля CCar
 assert_field_offsets!(CCar {
-    attached_ops_begin       == 0x88,
-    pending_dispatch_begin   == 0xB0,
-    records_begin            == 0xC8,
-    vehicle_mi_vtable        == 0xE0,
-    physics_contact_vtable   == 0x1E0,
+    base                       == 0x00,
+    vehicle_mi_vtable          == 0xE0,
+    physics_contact_vtable     == 0x1E0,
     simulation_callback_vtable == 0x1E8,
-    joint_break_vtable       == 0x1F8,
-    activated_vtable         == 0x210,
-    world_matrix             == 0x270,
-    self_ref                 == 0x2F0,
-    physics_body             == 0xED8,
-    behavior                 == 0xF10,
-    car_flags                == 0xF30,
-    template_resource        == 0xF48,
-    variant_index            == 0xF88,
-    pos_committed            == 0x11EC,
-    collision_body           == 0x1210,
-    collision_body_refcount  == 0x1218,
+    joint_break_vtable         == 0x1F8,
+    activated_vtable           == 0x210,
+    world_matrix               == 0x270,
+    self_ref                   == 0x2F0,
+    physics_body               == 0xED8,
+    behavior                   == 0xF10,
+    car_flags                  == 0xF30,
+    template_resource          == 0xF48,
+    variant_index              == 0xF88,
+    pos_committed              == 0x11EC,
+    collision_body             == 0x1210,
+    collision_body_refcount    == 0x1218,
 });
+
+// Проверяем что вся цепочка наследования корректна через nested offset_of!
+const _: () = {
+    // CEntity fields через CActorVehicle -> CActor -> CEntity
+    assert!(std::mem::offset_of!(CCar, base.actor.base.vtable) == 0x00);
+    assert!(std::mem::offset_of!(CCar, base.actor.base.table_id) == 0x24);
+    assert!(std::mem::offset_of!(CCar, base.actor.base.entity_flags) == 0x28);
+    assert!(std::mem::offset_of!(CCar, base.actor.base.name_hash) == 0x30);
+
+    // CActor fields (переиспользуются CCar для своих целей)
+    assert!(std::mem::offset_of!(CCar, base.actor.frame_node) == 0x78);
+    assert!(std::mem::offset_of!(CCar, base.actor.owner) == 0x80);
+    assert!(std::mem::offset_of!(CCar, base.actor.component_88) == 0x88); // attached_ops_begin
+    assert!(std::mem::offset_of!(CCar, base.actor.component_90) == 0x90); // attached_ops_end
+    assert!(std::mem::offset_of!(CCar, base.actor.component_98) == 0x98); // attached_ops_cap
+    assert!(std::mem::offset_of!(CCar, base.actor.entity_subtype) == 0xA0);
+
+    // CActorVehicle fields
+    assert!(std::mem::offset_of!(CCar, base.seat_data) == 0xA8);
+    assert!(std::mem::offset_of!(CCar, base.pending_dispatch_begin) == 0xB0);
+    assert!(std::mem::offset_of!(CCar, base.pending_dispatch_end) == 0xB8);
+    assert!(std::mem::offset_of!(CCar, base.seat_state) == 0xC0);
+    assert!(std::mem::offset_of!(CCar, base.records_begin) == 0xC8);
+    assert!(std::mem::offset_of!(CCar, base.records_end) == 0xD0);
+    assert!(std::mem::offset_of!(CCar, base.records_cap) == 0xD8);
+};
 
 // =============================================================================
 //  C_CarVehicle — управляемый транспорт ft=0x70
@@ -300,15 +456,18 @@ assert_field_offsets!(CCar {
 
 /// Управляемый транспорт (C_CarVehicle).
 ///
-/// ## Конструктор (`M2DE_CCarVehicle_Construct`, 0x140DF3360)
+/// ## Конструктор (IDA: `M2DE_CCarVehicle_Construct`, 0x140DF3360)
 ///
 /// ```text
-/// 1. M2DE_CActor_Construct(this)
-/// 2. Установка vtable + 4 sub-vtable
-/// 3. Инициализация 6 transform слотов DefaultEntityTransform
-/// 4. M2DE_InitContainer58_WithSentinel30(this+0x1D0)
-/// 5. M2DE_SmartPtr_AssignAddRef(this+0x2A8, NULL)
-/// 6. M2DE_Entity_SetTypeID(this, 0x70)
+/// M2DE_CActor_Construct(this);          // CActor (0xA8)
+/// *this = VT_CCarVehicle;              // primary vtable
+/// *(this+168) = VT_Sub1;               // +0xA8
+/// *(this+176) = VT_Sub2;               // +0xB0
+/// *(this+184) = VT_Sub3;               // +0xB8
+/// *(this+192) = VT_Sub4;               // +0xC0
+/// // 6× DefaultEntityTransform at +0xD0
+/// // inline strings at +0x118, +0x138, +0x158
+/// M2DE_Entity_SetTypeID(this, 0x70);
 /// ```
 ///
 /// ## Отличия от C_Car
@@ -323,12 +482,8 @@ assert_field_offsets!(CCar {
 /// | Runtime count | 41 (FreeRide) | 1 (FreeRide) |
 #[repr(C)]
 pub struct CCarVehicle {
-    _pad_000: [u8; 0xA0],
-
-    /// Entity subtype (=3 для C_CarVehicle).
-    pub entity_subtype: u32, // +0xA0
-
-    _pad_0a4: [u8; 0xA8 - 0xA4],
+    /// Базовый актор (НЕ ActorVehicle — у CCarVehicle нет seats!).
+    pub actor: CActor, // +0x00..+0xA7
 
     /// Sub-vtable 1 (0x1418EAC60).
     pub sub_vtable_1: *const c_void, // +0xA8
@@ -344,11 +499,11 @@ pub struct CCarVehicle {
     /// Transform слоты (6 × Vec3 = 0x48 байт, DefaultEntityTransform).
     pub transform_slots: [u8; 0x48], // +0xD0
 
-    /// SDS name slot 1 (cloth, 32 байта)
+    /// SDS name slot 1 (cloth, 32 байта).
     pub sds_cloth_name: [u8; 32], // +0x118
-    /// SDS name slot 2 (body, 32 байта)
+    /// SDS name slot 2 (body, 32 байта).
     pub sds_body_name: [u8; 32], // +0x138
-    /// SDS name slot 3 (look, 32 байта)
+    /// SDS name slot 3 (look, 32 байта).
     pub sds_look_name: [u8; 32], // +0x158
 
     _pad_178: [u8; 0x1A8 - 0x178],
@@ -359,10 +514,43 @@ pub struct CCarVehicle {
     _pad_1b0: [u8; 0x2E0 - 0x1B0],
 
     /// Damping factor (f32 = 0.3).
+    /// IDA: `*(a1 + 736) = 1050253722` -> f32::from_bits(1050253722) ≈ 0.3.
     pub damping_factor: f32, // +0x2E0
 }
 
+assert_field_offsets!(CCarVehicle {
+    actor            == 0x00,
+    sub_vtable_1     == 0xA8,
+    sub_vtable_2     == 0xB0,
+    sub_vtable_3     == 0xB8,
+    sub_vtable_4     == 0xC0,
+    transform_slots  == 0xD0,
+    sds_cloth_name   == 0x118,
+    sds_body_name    == 0x138,
+    sds_look_name    == 0x158,
+    ref_ptr_1        == 0x1A8,
+    damping_factor   == 0x2E0,
+});
+
+const _: () = {
+    assert!(std::mem::offset_of!(CCarVehicle, actor.base.table_id) == 0x24);
+    assert!(std::mem::offset_of!(CCarVehicle, actor.frame_node) == 0x78);
+    assert!(std::mem::offset_of!(CCarVehicle, actor.entity_subtype) == 0xA0);
+};
+
 impl CCarVehicle {
+    /// Entity subtype (=3).
+    #[inline]
+    pub fn entity_subtype(&self) -> u32 {
+        self.actor.entity_subtype
+    }
+
+    /// Factory type byte (0x70).
+    #[inline]
+    pub fn factory_type(&self) -> u8 {
+        self.actor.base.factory_type()
+    }
+
     /// Получить SDS cloth name как строку.
     pub fn get_cloth_name(&self) -> Option<&str> {
         std::ffi::CStr::from_bytes_until_nul(&self.sds_cloth_name)
@@ -387,20 +575,6 @@ impl CCarVehicle {
             .ok()
     }
 }
-
-assert_field_offsets!(CCarVehicle {
-    entity_subtype   == 0xA0,
-    sub_vtable_1     == 0xA8,
-    sub_vtable_2     == 0xB0,
-    sub_vtable_3     == 0xB8,
-    sub_vtable_4     == 0xC0,
-    transform_slots  == 0xD0,
-    sds_cloth_name   == 0x118,
-    sds_body_name    == 0x138,
-    sds_look_name    == 0x158,
-    ref_ptr_1        == 0x1A8,
-    damping_factor   == 0x2E0,
-});
 
 // =============================================================================
 //  CCarDamageSub1 — overlay для car+0xE0 (damage subobject)

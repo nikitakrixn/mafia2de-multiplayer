@@ -32,11 +32,11 @@ use std::sync::LazyLock;
 
 /// Кэш базового адреса модуля игры.
 ///
-/// `LazyLock` (Rust 1.80+) — инициализируется при первом обращении,
+/// `LazyLock` — инициализируется при первом обращении,
 /// потокобезопасно, без boilerplate.
 static GAME_BASE: LazyLock<usize> = LazyLock::new(|| {
     memory::get_module_base(addresses::GAME_MODULE)
-        .expect("Модуль игры не найден — DLL не инжектирована в процесс игры")
+        .expect("Модуль игры не найден")
 });
 
 /// Базовый адрес модуля игры.
@@ -58,8 +58,19 @@ pub fn is_game_initialized() -> bool {
     unsafe { memory::read_validated_ptr(base() + addresses::globals::GAME_MANAGER).is_some() }
 }
 
+/// Проверяет, был ли базовый адрес уже разрешён (без форсинга).
+///
+/// Полезно для диагностики на ранних стадиях инициализации,
+/// когда форсить LazyLock небезопасно.
+pub fn is_base_resolved() -> bool {
+    LazyLock::get(&GAME_BASE).is_some()
+}
+
 /// Логирует базовый адрес и размер модуля игры.
 pub fn log_module_info() {
+    if !is_base_resolved() {
+        logger::warn("log_module_info вызван до разрешения базового адреса");
+    }
     match memory::get_module_info(addresses::GAME_MODULE) {
         Some(info) => logger::info(&format!(
             "Модуль игры: base=0x{:X}, size=0x{:X} ({:.1} МБ)",
@@ -69,4 +80,11 @@ pub fn log_module_info() {
         )),
         None => logger::error("Не удалось получить информацию о модуле игры!"),
     }
+}
+
+/// Информация о модуле игры (кешированная).
+pub fn module_info() -> Option<memory::ModuleInfo> {
+    static INFO: std::sync::LazyLock<Option<memory::ModuleInfo>> =
+        std::sync::LazyLock::new(|| memory::get_module_info(addresses::GAME_MODULE));
+    *INFO
 }
