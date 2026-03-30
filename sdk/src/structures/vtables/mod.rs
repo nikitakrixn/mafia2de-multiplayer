@@ -6,3 +6,4 @@
 
 pub mod car;
 pub mod player;
+pub mod game_manager;
