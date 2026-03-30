@@ -906,3 +906,62 @@ pub unsafe fn read_validated_ptr_safe(addr: usize) -> Option<usize> {
         None
     }
 }
+
+impl<T> Ptr<T> {
+    /// Получить `&T` с lifetime, не привязанным к `&self`.
+    ///
+    /// В отличие от [`as_ref`](Self::as_ref), этот метод подходит
+    /// для случаев, когда ссылку нужно вернуть наружу из функции.
+    ///
+    /// ## Когда использовать
+    ///
+    /// - высокоуровневые обёртки (`Game::active_player()`)
+    /// - функции, возвращающие `Option<&T>`
+    ///
+    /// ## Когда НЕ использовать
+    ///
+    /// - обычный локальный доступ к полям (`ptr.as_ref()?.field`)
+    ///
+    /// В локальном коде предпочтительнее [`as_ref`](Self::as_ref),
+    /// потому что она даёт более строгие гарантии borrow checker'у.
+    ///
+    /// # Safety
+    ///
+    /// - указатель должен указывать на валидный живой объект `T`
+    /// - объект не должен быть уничтожен движком в течение жизни ссылки
+    /// - вызывающий полностью отвечает за корректность lifetime
+    #[inline]
+    pub unsafe fn to_ref<'a>(self) -> Option<&'a T> {
+        if !self.is_valid() {
+            return None;
+        }
+        debug_assert!(
+            self.ptr.is_aligned(),
+            "Ptr::to_ref on unaligned pointer {self}"
+        );
+        Some(unsafe { &*self.ptr })
+    }
+
+    /// Получить `&mut T` с lifetime, не привязанным к `&self`.
+    ///
+    /// Более опасный вариант [`as_mut`](Self::as_mut), нужен только там,
+    /// где мутабельную ссылку необходимо вернуть наружу.
+    ///
+    /// # Safety
+    ///
+    /// - указатель должен быть валиден
+    /// - объект должен быть writable
+    /// - не должно существовать других ссылок на этот объект
+    /// - вызывающий отвечает за корректность lifetime
+    #[inline]
+    pub unsafe fn to_mut<'a>(self) -> Option<&'a mut T> {
+        if !self.is_valid() {
+            return None;
+        }
+        debug_assert!(
+            self.ptr.is_aligned(),
+            "Ptr::to_mut on unaligned pointer {self}"
+        );
+        Some(unsafe { &mut *self.ptr })
+    }
+}

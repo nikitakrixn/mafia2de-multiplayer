@@ -16,7 +16,7 @@
 /// Чтение:
 /// ```text
 /// GameManager* mgr = **(GameManager***)(module_base + GAME_MANAGER);
-/// Player* player = *(Player**)(mgr + 0x180);
+/// void* player = *(void**)(mgr + 0x180); // entity_slots[0]
 /// ```
 pub const GAME_MANAGER: usize = 0x1CA_F770;
 

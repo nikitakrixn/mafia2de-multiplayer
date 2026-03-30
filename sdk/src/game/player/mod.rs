@@ -13,9 +13,8 @@ mod weapons;
 use std::ffi::c_void;
 use std::time::{Duration, Instant};
 
-use crate::addresses;
 use crate::memory::{self, Ptr};
-use crate::structures::{CEntity, CHuman, CHumanVTable, CPlayer, GameManager};
+use crate::structures::{CEntity, CHuman, CHumanVTable, CPlayer};
 use common::logger;
 
 use super::base;
@@ -33,20 +32,15 @@ pub struct Player {
 
 impl Player {
     pub fn get_active() -> Option<Self> {
-        unsafe {
-            let mgr_addr = memory::read_ptr(base() + addresses::globals::GAME_MANAGER)?;
-            let mgr_ptr = Ptr::<GameManager>::new(mgr_addr);
-            let mgr = mgr_ptr.as_ref()?;
+        let game = super::Game::get()?;
+        let ptr = game.active_player_ptr()?;
 
-            let ptr = mgr.player_ptr()?;
-            let player = ptr.as_ref()?;
-
-            if !memory::is_valid_ptr(player.base.actor.base.vtable as usize) {
-                return None;
-            }
-
-            Some(Self { ptr })
+        let player = unsafe { ptr.as_ref()? };
+        if !memory::is_valid_ptr(player.base.actor.base.vtable as usize) {
+            return None;
         }
+
+        Some(Self { ptr })
     }
 
     pub fn wait_until_ready(timeout_secs: u64) -> Option<Self> {

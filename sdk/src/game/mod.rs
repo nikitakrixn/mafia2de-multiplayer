@@ -22,9 +22,11 @@ pub mod render;
 pub mod script_entity;
 pub mod sds;
 pub mod world;
+pub mod manager;
 
 pub use entity_types::{EntityMessageType, EntityType, FactoryType};
 pub use player::Player;
+pub use manager::Game;
 
 use crate::{addresses, memory};
 use common::logger;
