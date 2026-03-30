@@ -1,203 +1,258 @@
-//! Типизированная VTable для C_Game (GameManager) — 25 слотов.
+//! Типизированная VTable для `C_Game` (GameManager).
 //!
-//! VTable RVA: `off_14186F450`.
-//! Класс идентифицируется строкой `"C_Game"` (слот [2]).
+//! VTable расположена в `.rdata` по адресу `off_14186F450` и содержит
+//! **25 виртуальных методов**.
 //!
-//! ## Маппинг слотов
+//! Класс идентифицируется строкой `"C_Game"` через слот `[2]`.
 //!
-//! | Слот | DE функция | Имя | Доказательство |
-//! |:----:|:-----------|:----|:---------------|
-//! | 0 | `0x1403D5AB0` | Dtor | Вызывает Destructor_Impl |
-//! | 1 | `0x1400A78D0` | GetModuleID | `return 7` |
-//! | 2 | `0x1403EB2C0` | GetClassName | `lea rax, "C_Game"` |
-//! | 3 | nullsub | NOP (StaticRegister) | — |
-//! | 4 | `0x1400A7D80` | GetFixedTimeStep | `return 0.005f` |
-//! | 5 | `0x1403EFE50` | Open | Строки: `"/games/%s.bin"`, `"Game open"` |
-//! | 6 | `0x1403DB0F0` | Close | Обнуляет entity_slots, ScriptContext |
-//! | 7 | `0x1403EC5D0` | IsLoaded | `(flags & 2) != 0` |
-//! | 8 | `0x1403E3880` | GameInit | Спавнит PlayerModel, бит 0 |
-//! | 9 | `0x1403E3160` | GameDone | Деспавн entities, сброс бита 0 |
-//! | 10 | `0x1403EC4F0` | IsInitialized | `flags & 1` |
-//! | 11 | `0x1403EC710` | IsFlagBit3 | `(flags & 8) != 0` |
-//! | 12 | nullsub | NOP (GameRestore) | — |
-//! | 13 | `0x1403E2890` | SetSuspended | Бит 2 в flags |
-//! | 14 | `0x1403EC4E0` | IsSuspended | `(flags & 4) != 0` |
-//! | 15 | `0x1403F9F00` | Tick | Главный update, ++tick_counter |
-//! | 16 | `0x1403EC290` | InvalidateEntity | Удаляет из entity_slots |
-//! | 17 | `0x1403EB340` | GetTickCounter | `return *(this+0x0C)` |
-//! | 18 | `0x1403E9100` | GetMissionManager | `return this + 0x58` |
-//! | 19 | `0x1403E0030` | SetFlagBit4 | `flags \|= 0x10` |
-//! | 20 | `0x1403E90B0` | GetEntityFromIndex | `*(this + 8*i + 0x180)` |
-//! | 21 | `0x1403F7A20` | SetEntityAtIndex | `*(this + 8*i + 0x180) = e` |
-//! | 22 | `0x1403ECF70` | GetGamePhase | `return *(byte*)(this+0x48)` |
-//! | 23 | `0x1403D7C30` | ActivateEntity | Добавляет в hash tables |
-//! | 24 | `0x1403EFAD0` | OnEntityDeleted | Удаляет из hash tables |
+//! ## Что уже подтверждено
+//!
+//! По коду и строкам внутри функций уверенно установлены:
+//! - загрузка/выгрузка мира (`Open`, `Close`),
+//! - инициализация/деинициализация (`GameInit`, `GameDone`),
+//! - глобальный tick,
+//! - работа с 4 entity-слотами,
+//! - inline MissionManager,
+//! - удаление/активация entity.
+//!
+//! ## Карта слотов
+//!
+//! | Слот | Функция | Назначение |
+//! |:----:|:--------|:-----------|
+//! | 0 | `Dtor` | Деструктор `C_Game` |
+//! | 1 | `GetModuleID` | Возвращает `7` |
+//! | 2 | `GetClassName` | Возвращает `"C_Game"` |
+//! | 3 | NOP | Заглушка |
+//! | 4 | `GetFixedTimeStep` | Возвращает `0.005f` |
+//! | 5 | `Open` | Загрузка игрового мира |
+//! | 6 | `Close` | Выгрузка игрового мира |
+//! | 7 | `IsLoaded` | Проверка бита loaded |
+//! | 8 | `GameInit` | Пост-загрузочная инициализация |
+//! | 9 | `GameDone` | Предвыгрузочная деинициализация |
+//! | 10 | `IsInitialized` | Проверка бита initialized |
+//! | 11 | `IsFlagBit3` | Проверка бита 3 |
+//! | 12 | NOP | Заглушка |
+//! | 13 | `SetSuspended` | Установка/сброс бита suspended |
+//! | 14 | `IsSuspended` | Проверка бита suspended |
+//! | 15 | `Tick` | Главный цикл обновления |
+//! | 16 | `InvalidateEntity` | Очистка entity-слотов |
+//! | 17 | `GetTickCounter` | Возвращает `game_tick_counter` |
+//! | 18 | `GetMissionManager` | Возвращает `this + 0x58` |
+//! | 19 | `SetFlagBit4` | Устанавливает bit 4 |
+//! | 20 | `GetEntityFromIndex` | Чтение `entity_slots[i]` |
+//! | 21 | `SetEntityAtIndex` | Запись `entity_slots[i]` |
+//! | 22 | `GetGamePhase` | Возвращает байт по `this + 0x48` |
+//! | 23 | `ActivateEntity` | Добавление entity в таблицы |
+//! | 24 | `OnEntityDeleted` | Удаление entity из таблиц |
 
 use std::ffi::{c_char, c_void};
 
-/// VTable для C_Game (GameManager) — 25 слотов.
+// -----------------------------------------------------------------------------
+// ABI-safe aliases
+// -----------------------------------------------------------------------------
+
+type FnDtor = unsafe extern "system" fn(this: *mut c_void, flags: u8);
+type FnThisU32 = unsafe extern "system" fn(this: *const c_void) -> u32;
+type FnThisBool = unsafe extern "system" fn(this: *const c_void) -> bool;
+type FnThisF32 = unsafe extern "system" fn(this: *const c_void) -> f32;
+type FnThisVoid = unsafe extern "system" fn(this: *mut c_void);
+type FnThisConstVoid = unsafe extern "system" fn(this: *const c_void) -> *mut c_void;
+type FnThisU8 = unsafe extern "system" fn(this: *const c_void) -> u8;
+type FnOpen = unsafe extern "system" fn(this: *mut c_void, game_name: *const c_char) -> bool;
+type FnClose = unsafe extern "system" fn(this: *mut c_void) -> bool;
+type FnSetBool = unsafe extern "system" fn(this: *mut c_void, value: bool);
+type FnTick = unsafe extern "system" fn(this: *mut c_void, context: *const c_void);
+type FnInvalidateEntity = unsafe extern "system" fn(this: *mut c_void, entity: *const c_void);
+type FnGetEntityFromIndex =
+    unsafe extern "system" fn(this: *const c_void, index: u32) -> *mut c_void;
+type FnSetEntityAtIndex =
+    unsafe extern "system" fn(this: *mut c_void, entity: *mut c_void, index: u32);
+type FnActivateEntity =
+    unsafe extern "system" fn(this: *mut c_void, entity: *mut c_void, activate: bool);
+type FnOnEntityDeleted =
+    unsafe extern "system" fn(this: *mut c_void, entity: *mut c_void);
+
+/// VTable для `C_Game`.
 ///
-/// Все слоты подтверждены через:
-/// - Строки внутри функций (`"C_Game"`, `"/games/%s.bin"`)
-/// - Битовые маски флагов (+0x08)
-/// - Поведение (обнуление entity_slots, entity hash table операции)
-/// - Кросс-ссылки с Mac Classic (vtable `__ZTV6C_Game`)
+/// Все слоты в этом описании соответствуют реальному layout в `.rdata`.
 #[repr(C)]
 pub struct CGameVTable {
-    // ====================================================================
+    // =========================================================================
     //  Жизненный цикл (0–4)
-    // ====================================================================
+    // =========================================================================
 
-    /// `[0]` Деструктор.
+    /// `[0]` Деструктор `C_Game`.
     ///
-    /// Очищает: pending-векторы (+0x10C10, +0x10C28),
-    /// entity hash tables (+0x1A0, +0x86D8),
-    /// MissionManager (+0x58), entity_slots (+0x180..+0x198).
-    pub dtor: unsafe extern "fastcall" fn(this: *mut c_void, flags: u32),
+    /// Очищает:
+    /// - pending-векторы,
+    /// - обе hash table entity,
+    /// - inline MissionManager,
+    /// - служебные буферы и хвостовые контейнеры.
+    pub dtor: FnDtor,
 
-    /// `[1]` GetModuleID. Возвращает 7.
-    ///
-    /// Общий для системы модулей. C_Game = модуль #7.
-    pub get_module_id: unsafe extern "fastcall" fn(this: *const c_void) -> u32,
+    /// `[1]` Возвращает module id = `7`.
+    pub get_module_id: FnThisU32,
 
-    /// `[2]` GetClassName. Возвращает `"C_Game"`.
-    pub get_class_name: unsafe extern "fastcall" fn(this: *const c_void) -> *const c_char,
+    /// `[2]` Возвращает строку `"C_Game"`.
+    pub get_class_name: unsafe extern "system" fn(this: *const c_void) -> *const c_char,
 
-    /// `[3]` StaticRegister. NOP в DE.
+    /// `[3]` Заглушка.
     pub _slot_03_nop: usize,
 
-    /// `[4]` GetFixedTimeStep. Возвращает `0.005f` (200 Hz).
-    pub get_fixed_time_step: unsafe extern "fastcall" fn(this: *const c_void) -> f32,
-
-    // ====================================================================
-    //  Загрузка мира (5–7)
-    // ====================================================================
-
-    /// `[5]` Open — загрузка игрового мира.
+    /// `[4]` Возвращает фиксированный шаг симуляции: `0.005f`.
     ///
-    /// Парсит файл `/games/{name}.bin`, загружает SDS-ресурсы,
-    /// заполняет SDS-пути (+0x10..+0x28).
-    /// Устанавливает бит 1 (loaded) в `game_state_flags`.
-    pub open: unsafe extern "fastcall" fn(this: *mut c_void, game_name: *const c_char) -> bool,
+    /// Это соответствует 200 Гц.
+    pub get_fixed_time_step: FnThisF32,
 
-    /// `[6]` Close — выгрузка игрового мира.
+    // =========================================================================
+    //  Загрузка / выгрузка мира (5–7)
+    // =========================================================================
+
+    /// `[5]` Загрузка игрового мира.
     ///
-    /// Обнуляет `entity_slots` (+0x180..+0x198),
-    /// очищает `ScriptContext`, `PlayerModelManager`.
-    /// Выгружает все SDS-ресурсы.
-    /// Сбрасывает бит 1 (loaded).
-    pub close: unsafe extern "fastcall" fn(this: *mut c_void) -> bool,
+    /// Основные действия:
+    /// - парсит `/games/{name}.bin`,
+    /// - загружает SDS-ресурсы,
+    /// - настраивает пути `sds_path_*`,
+    /// - подготавливает ScriptContext,
+    /// - устанавливает флаг loaded (bit 1).
+    pub open: FnOpen,
 
-    /// `[7]` IsLoaded. `(game_state_flags & 2) != 0`.
-    pub is_loaded: unsafe extern "fastcall" fn(this: *const c_void) -> bool,
-
-    // ====================================================================
-    //  Инициализация (8–12)
-    // ====================================================================
-
-    /// `[8]` GameInit — пост-загрузо��ная инициализация.
+    /// `[6]` Выгрузка игрового мира.
     ///
-    /// Спавнит PlayerModel через `PlayerModelManager`,
-    /// активирует entity из `EntityDatabase`.
-    /// Устанавливает бит 0 (initialized).
-    pub game_init: unsafe extern "fastcall" fn(this: *mut c_void),
+    /// Основные действия:
+    /// - обнуляет `entity_slots`,
+    /// - очищает ScriptContext,
+    /// - очищает PlayerModelManager,
+    /// - запускает выгрузку SDS,
+    /// - сбрасывает флаг loaded (bit 1).
+    pub close: FnClose,
 
-    /// `[9]` GameDone — деинициализация перед выгрузкой.
+    /// `[7]` Проверка состояния loaded.
     ///
-    /// Деактивирует все entity из `EntityDatabase`.
-    /// Обнуляет `entity_slots` (+0x180..+0x198).
-    /// Сбрасывает бит 0 (initialized).
-    pub game_done: unsafe extern "fastcall" fn(this: *mut c_void),
+    /// Эквивалентно: `(game_state_flags & 2) != 0`.
+    pub is_loaded: FnThisBool,
 
-    /// `[10]` IsInitialized. `game_state_flags & 1`.
-    pub is_initialized: unsafe extern "fastcall" fn(this: *const c_void) -> bool,
+    // =========================================================================
+    //  Инициализация / деинициализация (8–12)
+    // =========================================================================
 
-    /// `[11]` IsFlagBit3. `(game_state_flags & 8) != 0`.
-    pub is_flag_bit3: unsafe extern "fastcall" fn(this: *const c_void) -> bool,
+    /// `[8]` Пост-загрузочная инициализация мира.
+    ///
+    /// Основные действия:
+    /// - спавнит player model,
+    /// - активирует entity из базы,
+    /// - сбрасывает `game_tick_counter`,
+    /// - устанавливает бит initialized (bit 0).
+    pub game_init: FnThisVoid,
 
-    /// `[12]` NOP. В Classic это GameRestore, в DE заглушка.
+    /// `[9]` Деинициализация перед выгрузкой мира.
+    ///
+    /// Основные действия:
+    /// - деактивирует entity,
+    /// - очищает `entity_slots`,
+    /// - сбрасывает initialized (bit 0).
+    pub game_done: FnThisVoid,
+
+    /// `[10]` Проверка состояния initialized.
+    ///
+    /// Эквивалентно: `(game_state_flags & 1) != 0`.
+    pub is_initialized: FnThisBool,
+
+    /// `[11]` Проверка бита 3 в `game_state_flags`.
+    pub is_flag_bit3: FnThisBool,
+
+    /// `[12]` Заглушка.
+    ///
+    /// В текущем DE-билде логика не реализована.
     pub _slot_12_nop: usize,
 
-    // ====================================================================
+    // =========================================================================
     //  Управление состоянием (13–14)
-    // ====================================================================
+    // =========================================================================
 
-    /// `[13]` SetSuspended. Управляет битом 2 в `game_state_flags`.
-    pub set_suspended: unsafe extern "fastcall" fn(this: *mut c_void, suspended: bool),
-
-    /// `[14]` IsSuspended. `(game_state_flags & 4) != 0`.
-    pub is_suspended: unsafe extern "fastcall" fn(this: *const c_void) -> bool,
-
-    // ====================================================================
-    //  Основной тик (15–16)
-    // ====================================================================
-
-    /// `[15]` Tick — главный цикл обновления.
+    /// `[13]` Установить / снять suspended-флаг.
     ///
-    /// Инкрементирует `game_tick_counter` (+0x0C).
-    /// Обрабатывает entity из обеих hash table.
-    /// В конце обрабатывает pending-векторы (add/remove).
-    pub tick: unsafe extern "fastcall" fn(this: *mut c_void, context: *const c_void),
+    /// Управляет bit 2 в `game_state_flags`.
+    pub set_suspended: FnSetBool,
 
-    /// `[16]` InvalidateEntity — удаляет entity из `entity_slots`.
+    /// `[14]` Проверка suspended-флага.
     ///
-    /// Проходит по слотам [0..3], если entity == context → обнуляет.
-    pub invalidate_entity:
-        unsafe extern "fastcall" fn(this: *mut c_void, context: *const c_void),
+    /// Эквивалентно: `(game_state_flags & 4) != 0`.
+    pub is_suspended: FnThisBool,
 
-    // ====================================================================
+    // =========================================================================
+    //  Основной update (15–16)
+    // =========================================================================
+
+    /// `[15]` Главный игровой тик.
+    ///
+    /// Основные действия:
+    /// - увеличивает `game_tick_counter`,
+    /// - обходит entity из hash table,
+    /// - обновляет streaming / deferred entity logic,
+    /// - в конце обрабатывает pending add/remove vectors.
+    pub tick: FnTick,
+
+    /// `[16]` Инвалидация entity в `entity_slots`.
+    ///
+    /// Если переданный entity совпадает с одним из 4 слотов,
+    /// соответствующий слот обнуляется.
+    pub invalidate_entity: FnInvalidateEntity,
+
+    // =========================================================================
     //  Запросы (17–22)
-    // ====================================================================
+    // =========================================================================
 
-    /// `[17]` GetTickCounter. `return *(u32*)(this + 0x0C)`.
+    /// `[17]` Получить глобальный счётчик тиков.
     ///
-    /// В DE 114 мест читают поле напрямую, без vtable-вызова.
-    /// Vtable-версия используется редко.
-    pub get_tick_counter: unsafe extern "fastcall" fn(this: *const c_void) -> u32,
+    /// Эквивалентно чтению `game_tick_counter` по `+0x0C`.
+    pub get_tick_counter: FnThisU32,
 
-    /// `[18]` GetMissionManager. `return this + 0x58`.
+    /// `[18]` Получить указатель на inline MissionManager.
     ///
-    /// Возвращает указатель на inline-подобъек�� MissionManager.
-    pub get_mission_manager: unsafe extern "fastcall" fn(this: *const c_void) -> *mut c_void,
+    /// Фактически возвращает `this + 0x58`.
+    pub get_mission_manager: FnThisConstVoid,
 
-    /// `[19]` SetFlagBit4. `game_state_flags |= 0x10`.
-    pub set_flag_bit4: unsafe extern "fastcall" fn(this: *mut c_void),
+    /// `[19]` Установить bit 4 в `game_state_flags`.
+    pub set_flag_bit4: FnThisVoid,
 
-    /// `[20]` GetEntityFromIndex. `*(this + 8*index + 0x180)`.
+    /// `[20]` Получить entity по индексу слота.
     ///
-    /// Индекс 0 = активный игрок. Массив из 4 слотов.
-    pub get_entity_from_index:
-        unsafe extern "fastcall" fn(this: *const c_void, index: u32) -> *mut c_void,
+    /// Эквивалентно: `entity_slots[index]`.
+    pub get_entity_from_index: FnGetEntityFromIndex,
 
-    /// `[21]` SetEntityAtIndex. `*(this + 8*index + 0x180) = entity`.
+    /// `[21]` Записать entity в slot по индексу.
     ///
-    /// Парный метод к `GetEntityFromIndex`.
-    pub set_entity_at_index:
-        unsafe extern "fastcall" fn(this: *mut c_void, entity: *mut c_void, index: u32),
+    /// Эквивалентно: `entity_slots[index] = entity`.
+    pub set_entity_at_index: FnSetEntityAtIndex,
 
-    /// `[22]` GetGamePhase. `return *(u8*)(this + 0x48)`.
+    /// `[22]` Получить игровую фазу.
     ///
-    /// Текущая фаза игры. Смещение +0x48 попадает в зону `_reserved_30`.
-    pub get_game_phase: unsafe extern "fastcall" fn(this: *const c_void) -> u8,
+    /// Возвращает байт из внутреннего поля `C_Game` по смещению `+0x48`.
+    pub get_game_phase: FnThisU8,
 
-    // ====================================================================
-    //  Управление entity (23–24)
-    // ====================================================================
+    // =========================================================================
+    //  Работа с entity tables (23–24)
+    // =========================================================================
 
-    /// `[23]` ActivateEntity — добавляет entity в hash tables.
+    /// `[23]` Активировать entity.
     ///
-    /// Если `tick_in_progress` — откладывает в pending-вектор.
-    /// Иначе добавляет в `entity_table_1` и/или `entity_table_2`
-    /// в зависимости от типа entity.
-    pub activate_entity:
-        unsafe extern "fastcall" fn(this: *mut c_void, entity: *mut c_void, activate: bool),
-
-    /// `[24]` OnEntityDeleted — обработка удаления entity.
+    /// Если `tick_in_progress == 0`:
+    /// - entity добавляется напрямую в hash table
     ///
-    /// Удаляет из hash tables. Если `tick_in_progress` —
-    /// добавляет в pending-remove вектор.
-    pub on_entity_deleted:
-        unsafe extern "fastcall" fn(this: *mut c_void, entity: *mut c_void),
+    /// Если `tick_in_progress != 0`:
+    /// - операция откладывается в `pending_add_entities`
+    pub activate_entity: FnActivateEntity,
+
+    /// `[24]` Обработка удаления entity.
+    ///
+    /// Если `tick_in_progress == 0`:
+    /// - entity удаляется напрямую из hash table
+    ///
+    /// Если `tick_in_progress != 0`:
+    /// - операция откладывается в `pending_remove_entities`
+    pub on_entity_deleted: FnOnEntityDeleted,
 }
 
 const _: () = {
