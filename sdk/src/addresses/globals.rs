@@ -382,10 +382,12 @@ pub const POLICE_SCRIPT_OWNER_SHUTDOWN_FLAG: usize = 0x1C9_FBC0;
 /// IDA: `0x14314_0E30`
 pub const ACTION_CODE_MANAGER: usize = 0x314_0E30;
 
-/// `g_M2DE_pMission` — синглтон C_Mission (288B).
+/// `g_M2DE_pMission` — синглтон `C_Mission` (288B).
 ///
-/// Vtable: M2DE_VT_CMission (`0x14186EFE8`).
-/// Уничтожается в ShutdownAllManagers после C_Game.
+/// Vtable: `M2DE_VT_CMission` (`0x14186EFE8`).
+/// Конструктор: `M2DE_CMission_Constructor` (`0x1403D1920`).
+/// Уничтожается в `ShutdownAllManagers` после `C_Game`.
+/// Тот же объект что и `g_M2DE_IMission_Singleton` (`0x141CAE1C8`).
 ///
 /// IDA: `0x141CAF778`
 pub const MISSION: usize = 0x1CA_F778;

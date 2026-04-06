@@ -186,8 +186,9 @@ impl GarageVehicleId {
     }
 }
 
-/// Подтверждённые ID событий GameCallbackManager.
-/// Получены из runtime-дампа (39 событий).
+/// ID событий `GameCallbackManager`.
+///
+/// Всего 38 типов (ID 6 пропущен, 4097 = нестандартный).
 pub mod game_events {
     pub const SYSTEM_INIT: i32 = 1;
     pub const SYSTEM_DONE: i32 = 2;

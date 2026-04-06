@@ -2352,3 +2352,112 @@ pub mod actors_pack {
     /// IDA: `0x1403F2670`
     pub const PARSE_FROM_BIN_DATA_INIT: usize = 0x3F_2670;
 }
+
+// =============================================================================
+//  C_Mission / I_Mission
+// =============================================================================
+
+pub mod mission {
+    /// Конструктор `I_Mission` (базовый).
+    ///
+    /// Идентично `I_Game_Constructor`: ставит vtable `M2DE_VT_CTickedModule`,
+    /// регистрирует в `m_AllModules`, перезаписывает на `M2DE_VT_IMission_Abstract`.
+    /// Устанавливает `g_M2DE_IMission_Singleton = this`.
+    ///
+    /// IDA: `0x14039C260`
+    pub const I_CONSTRUCTOR: usize = 0x39_C260;
+
+    /// Конструктор `C_Mission`.
+    ///
+    /// Вызывает `I_Mission_Constructor`, перезаписывает vtable на `M2DE_VT_CMission`.
+    /// Инициализирует: state_flags(+0x08=0), scene_ptr(+0x10=0),
+    /// unk_11c(+0x11C=0), game_name_buf(+0x18=0).
+    ///
+    /// IDA: `0x1403D1920`
+    pub const CONSTRUCTOR: usize = 0x3D_1920;
+
+    /// Деструктор `C_Mission` (impl).
+    ///
+    /// Проверяет `state_flags & 1`, вызывает `sub_1403E1050` если set.
+    /// Затем вызывает `I_Mission::~I_Mission` (`sub_14039E850`).
+    ///
+    /// IDA: `0x1403D3D20`
+    pub const DESTRUCTOR_IMPL: usize = 0x3D_3D20;
+
+    /// Scalar deleting destructor `C_Mission`.
+    ///
+    /// IDA: `0x1403D5DD0`
+    pub const DESTRUCTOR_SCALAR: usize = 0x3D_5DD0;
+
+    /// `bool (C_Mission*, const char* name)` — загрузка миссии.
+    ///
+    /// Fires `MISSION_BEFORE_OPEN` (9), копирует имя в `game_name_buf (+0x18)`,
+    /// fires `MISSION_AFTER_OPEN` (10), устанавливает `state_flags |= 2`.
+    ///
+    /// IDA: `0x1403F05A0`
+    pub const OPEN: usize = 0x3F_05A0;
+
+    /// `bool (C_Mission*)` — выгрузка миссии.
+    ///
+    /// Fires `MISSION_BEFORE_CLOSE` (11), очищает сцену,
+    /// fires `MISSION_AFTER_CLOSE` (12), сбрасывает `state_flags & ~2`.
+    ///
+    /// IDA: `0x1403DB2D0`
+    pub const CLOSE: usize = 0x3D_B2D0;
+
+    /// `bool (C_Mission*)` — инициализация (создаёт сцену).
+    ///
+    /// IDA: `0x1403EBAB0`
+    pub const INIT: usize = 0x3E_BAB0;
+
+    /// `bool (C_Mission*)` — деинициализация (уничтожает сцену).
+    ///
+    /// IDA: `0x1403E1050`
+    pub const DONE: usize = 0x3E_1050;
+
+    /// `bool (C_Mission*)` — проверка `state_flags & 1`.
+    ///
+    /// IDA: `0x1403EC500`
+    pub const IS_GAME_INITED: usize = 0x3E_C500;
+
+    /// `bool (C_Mission*)` — проверка `state_flags & 2`.
+    ///
+    /// IDA: `0x1403EC5E0`
+    pub const IS_OPENED: usize = 0x3E_C5E0;
+}
+
+// =============================================================================
+//  Engine initialization
+// =============================================================================
+
+pub mod init {
+    /// Создаёт все глобальные менеджеры.
+    ///
+    /// Порядок создания:
+    /// C_Game(68680B), C_Mission(288B), EntityDatabase(180464B),
+    /// C_ScriptDataStorage(9688B), C_SDSScriptMachineManager(288B),
+    /// C_SDSManager(160B), C_CarManager(64B), C_SDSLoadUnloadNotify(144B),
+    /// C_PlayerModelManager(112B), C_ActorActionListenerRegistrator(24B),
+    /// C_EntityList(56B).
+    ///
+    /// IDA: `0x1403DD280`
+    pub const INIT_ALL_MANAGERS: usize = 0x3D_D280;
+
+    /// Регистрирует все 38 типов событий в `GameCallbackManager`.
+    ///
+    /// Вызывается один раз при старте движка.
+    /// После регистрации: создаёт `GameWorldSingleton`, инициализирует
+    /// `GameWorldModule`, сохраняет `HMODULE` в `g_M2DE_pGameModule+0x18`.
+    ///
+    /// IDA: `0x1400D9510`
+    pub const REGISTER_ALL_CALLBACK_EVENTS: usize = 0xD_9510;
+
+    /// Создаёт `SystemInitDone` модуль и регистрирует callbacks.
+    ///
+    /// Регистрирует: SystemInit(1,10), SystemInit(1,1002),
+    /// SystemDone(2,2000), SystemDone(2,100), RegGameSaveCb(27,90).
+    /// Затем вызывает `M2DE_InitAllManagers`.
+    ///
+    /// IDA: `0x1403EC010`
+    pub const INIT_SYSTEM_INIT_DONE_MODULE: usize = 0x3E_C010;
+}
