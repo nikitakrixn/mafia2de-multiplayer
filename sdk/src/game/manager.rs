@@ -84,37 +84,34 @@ impl Game {
         unsafe { self.as_ref().map(|g| g.game_tick_counter) }
     }
 
-    /// Путь SDS для city/shop ресурсов.
+    /// Путь SDS для городских ресурсов (`+0x010`).
     #[inline]
-    pub fn city_sds_path(&self) -> Option<&str> {
+    pub fn sds_path_city(&self) -> Option<&str> {
         let gm = unsafe { self.as_ref()? };
-        let ptr = gm.sds_path_city;
-        if ptr.is_null() {
+        if gm.sds_path_city.is_null() {
             return None;
         }
-        unsafe { CStr::from_ptr(ptr).to_str().ok() }
+        unsafe { CStr::from_ptr(gm.sds_path_city).to_str().ok() }
     }
 
-    /// Путь SDS для streaming ресурсов.
+    /// Имя текущего скрипта / миссии (`+0x038`).
     #[inline]
-    pub fn streaming_sds_path(&self) -> Option<&str> {
+    pub fn script_name(&self) -> Option<&str> {
         let gm = unsafe { self.as_ref()? };
-        let ptr = gm.sds_path_streaming;
-        if ptr.is_null() {
+        if gm.script_name.is_null() {
             return None;
         }
-        unsafe { CStr::from_ptr(ptr).to_str().ok() }
+        unsafe { CStr::from_ptr(gm.script_name).to_str().ok() }
     }
 
-    /// Путь SDS для traffic ресурсов.
+    /// Путь к `.bin` файлу актёров игрока (`+0x040`).
     #[inline]
-    pub fn traffic_sds_path(&self) -> Option<&str> {
+    pub fn actors_bin_path(&self) -> Option<&str> {
         let gm = unsafe { self.as_ref()? };
-        let ptr = gm.sds_path_traffic;
-        if ptr.is_null() {
+        if gm.actors_bin_path.is_null() {
             return None;
         }
-        unsafe { CStr::from_ptr(ptr).to_str().ok() }
+        unsafe { CStr::from_ptr(gm.actors_bin_path).to_str().ok() }
     }
 
     /// Raw entity pointer из одного из 4 слотов.
@@ -203,12 +200,12 @@ impl Game {
         Some(unsafe { (vt.get_tick_counter)(gm as *const _ as *const _) })
     }
 
-    /// VTable[18] — `GetMissionManager`.
+    /// VTable[18] — `GetActorsPack`.
     #[inline]
-    pub fn vtbl_get_mission_manager(&self) -> Option<usize> {
+    pub fn vtbl_get_actors_pack(&self) -> Option<usize> {
         let gm = unsafe { self.as_ref()? };
         let vt = unsafe { &*gm.vtable };
-        let ptr = unsafe { (vt.get_mission_manager)(gm as *const _ as *const _) } as usize;
+        let ptr = unsafe { (vt.get_actors_pack)(gm as *const _ as *const _) } as usize;
         if ptr == 0 { None } else { Some(ptr) }
     }
 
@@ -225,11 +222,10 @@ impl Game {
         }
     }
 
-    /// VTable[22] — `GetGamePhase`.
+    /// Игровая фаза — читает поле `game_phase` (`+0x048`).
+    /// Тип погоды / игровая фаза (`+0x048`).
     #[inline]
     pub fn vtbl_get_game_phase(&self) -> Option<u8> {
-        let gm = unsafe { self.as_ref()? };
-        let vt = unsafe { &*gm.vtable };
-        Some(unsafe { (vt.get_game_phase)(gm as *const _ as *const _) })
+        unsafe { self.as_ref().map(|g| g.weather_type) }
     }
 }

@@ -1,283 +1,294 @@
-//! Корневая игровая структура — GameManager (`C_Game`).
+//! Корневая игровая структура — `C_Game`.
 //!
-//! Это центральный объект игрового мира:
-//! - хранит состояние загрузки/инициализации игры,
-//! - ведёт глобальный счётчик игровых тиков,
-//! - содержит пути к SDS-ресурсам,
-//! - владеет inline-менеджером миссии,
-//! - хранит 4 entity-слота (включая активного игрока),
-//! - содержит две hash table для entity,
-//! - держит pending-списки для отложенного добавления/удаления entity.
+//! Центральный объект игрового мира в Mafia II: Definitive Edition.
 //!
 //! ## Иерархия
 //!
 //! ```text
 //! I_Game
 //!   └─ C_TickedModule
-//!       └─ C_Game (GameManager)
+//!       └─ C_Game
 //! ```
 //!
-//! ## Layout
+//! ## Layout (`C_Game`, 0x10C48 байт)
 //!
 //! ```text
-//! C_Game (0x10C48 = 68680 байт)
-//!   ├─ +0x000 vtable (off_14186F450)
-//!   ├─ +0x008 game_state_flags
-//!   ├─ +0x00C game_tick_counter
-//!   ├─ +0x010 sds_path_city
-//!   ├─ +0x018 sds_path_extra
-//!   ├─ +0x020 sds_path_streaming
-//!   ├─ +0x028 sds_path_traffic
-//!   ├─ +0x058 MissionManager inline (0x128 байт)
-//!   ├─ +0x180 entity_slots[4]
-//!   │    [0] = active player
-//!   ├─ +0x1A0 EntityHashTable #1
-//!   ├─ +0x86D8 EntityHashTable #2
-//!   ├─ +0x10C10 pending_add_entities
-//!   ├─ +0x10C28 pending_remove_entities
-//!   ├─ +0x10C40 tick_in_progress
-//!   └─ +0x10C44 tick_entity_index
+//! +0x000  vtable              -> M2DE_VT_CGame (25 слотов)
+//! +0x008  game_state_flags    u32
+//! +0x00C  game_tick_counter   u32
+//! +0x010  game_name           *c_char
+//! +0x018  game_str1           *c_char
+//! +0x020  game_str2           *c_char
+//! +0x028  game_str3           *c_char
+//! +0x010  sds_path_city       *c_char  (пример: "/sds/City/")
+//! +0x018  sds_path_shops      *c_char  (пример: "/sds/Shops/")
+//! +0x020  sds_path_traffic    *c_char  (пример: "/sds/Traffic/")
+//! +0x028  sds_path_cars       *c_char  (пример: "/sds/Cars/")
+//! +0x030  sds_count           u32
+//! +0x038  script_name         *c_char  (пример: "CITY_trick")
+//! +0x040  actors_bin_path     *c_char  (пример: "/missions/CITY/actors_player.bin")
+//! +0x048  weather_type        u8   (из .bin тег 3, byte[0])
+//! +0x049  _unk_049            u8   (из .bin тег 3, byte[1])
+//! +0x050  game_bin_data       *mut c_void  (загруженный .bin буфер)
+//! +0x058  actors_pack         C_ActorsPack (0x128 байт)
+//! +0x180  entity_slots        [*mut c_void; 4]
+//! +0x1A0  entity_table_1      EntityHashTable (0x46B0 байт)
+//! +0x86D0 entity_table_2_count u32
+//! +0x86D8 entity_table_2      EntityHashTable (0x46B0 байт)
+//! +0x10C08 threshold_float    f32 (= 0.2)
+//! +0x10C10 pending_add        [u64; 3]  (std::vector begin/end/cap)
+//! +0x10C28 pending_remove     [u64; 3]  (std::vector begin/end/cap)
+//! +0x10C40 tick_in_progress   u8
+//! +0x10C44 tick_entity_index  i32 (init = -1)
 //! ```
-//!
-//! ## Статистика использования
-//!
-//! По xrefs на `g_M2DE_GlobalManager`:
-//!
-//! | Поле | Обращений | Назначение |
-//! |:-----|:---------:|:-----------|
-//! | `+0x180` | **166** | entity slot 0 — активный игрок |
-//! | `+0x0C` | **114** | глобальный счётчик тиков |
-//! | `+0x08` | 15 | флаги состояния |
-//! | `+0x10..+0x28` | 1–2 | базовые пути SDS |
 //!
 //! ## Флаги состояния (`game_state_flags`, +0x08)
 //!
-//! Известные биты:
-//! - bit 0 = мир инициализирован (`GameInit` / `GameDone`)
-//! - bit 1 = мир загружен (`Open` / `Close`)
-//! - bit 2 = suspended
-//! - bit 3 = неизвестно, но проверяется отдельным vfunc
-//! - bit 4 = устанавливается отдельным vfunc
+//! | Бит | Константа | Назначение |
+//! |:---:|:----------|:-----------|
+//! | 0 | `STATE_GAME_INIT` | initialized — `GameInit` вызван |
+//! | 1 | `STATE_OPEN` | loaded — `Open` вызван |
+//! | 2 | `STATE_PAUSED` | игра на паузе |
+//! | 3 | `STATE_UNK3` | неизвестно |
+//! | 4 | `STATE_DELETE_PENDING` | объект помечен на удаление |
 
-use super::vtables::game_manager::CGameVTable;
 use super::CPlayer;
+use super::vtables::game_manager::CGameVTable;
 use crate::macros::assert_field_offsets;
 use crate::memory::Ptr;
 use std::ffi::{c_char, c_void};
 
-/// Хеш-таблица сущностей (inline подобъект внутри GameManager).
+/// Флаги состояния `C_Game` (`game_state_flags`, +0x08).
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GameStateFlag {
+    /// Бит 0 — мир инициализирован (`GameInit` вызван).
+    GameInit = 0x01,
+    /// Бит 1 — мир загружен (`Open` вызван).
+    Open = 0x02,
+    /// Бит 2 — игра на паузе (`SetSuspended` / tick context).
+    Paused = 0x04,
+    /// Бит 3 — назначение не установлено (всегда true когда мир загружен).
+    Unk3 = 0x08,
+    /// Бит 4 — объект помечен на удаление (`STATE_DELETE_PENDING`).
+    DeletePending = 0x10,
+}
+
+impl GameStateFlag {
+    pub fn is_set(self, flags: u32) -> bool {
+        flags & (self as u32) != 0
+    }
+}
+
+/// Индексы entity-слотов в `C_Game`.
+#[repr(usize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntitySlot {
+    /// Слот 0 — активный игрок (`C_Human`).
+    Player = 0,
+    Slot1 = 1,
+    Slot2 = 2,
+    Slot3 = 3,
+}
+
+/// Хеш-таблица entity (inline подобъект внутри `C_Game`).
 ///
-/// Используется для хранения и быстрого поиска entity по `table_id >> 8`.
-/// Внутри `C_Game` таких таблиц две:
-/// - основная по `+0x1A0`,
-/// - вторичная по `+0x86D8`.
+/// Внутри `C_Game` таких таблиц две: по `+0x1A0` и `+0x86D8`.
 ///
-/// ## Внутренний layout
+/// ## Layout (0x46B0 байт)
 ///
 /// | Смещение | Тип | Описание |
 /// |:---------|:----|:---------|
-/// | `+0x00` | `*u16` | начало массива бакетов (`self + 0x3EB0`) |
-/// | `+0x08` | `*u16` | конец массива бакетов |
+/// | `+0x00` | `*u16` | указатель на начало массива бакетов |
+/// | `+0x08` | `*u16` | указатель на конец массива бакетов |
 /// | `+0x10` | `u32` | число записей |
-/// | `+0x18..+0x28` | — | служебные поля |
 /// | `+0x30..+0x3EB0` | — | 250 записей по 64 байта |
-/// | `+0x3EB0..+0x46B0` | `[u16; 1024]` | хеш-бакеты (`0xFFFF` при init) |
+/// | `+0x3EB0..+0x46B0` | `[u16; 1024]` | хеш-бакеты (init = `0xFFFF`) |
 ///
 /// Конструктор: `M2DE_EntityHashTable_Constructor` (`0x1403D0F50`).
-///
-/// Полный размер: **0x46B0 байт (18096)**.
 #[repr(C)]
 pub struct EntityHashTable {
     _data: [u8; 0x46B0],
 }
 
-/// Менеджер миссий (inline подобъект внутри `C_Game`).
+/// Inline подобъект `C_ActorsPack` внутри `C_Game` (`+0x58`).
 ///
-/// Хранит текущее состояние миссии, связанный скриптовый контекст и
-/// служебные миссионные данные.
-///
-/// Расположен по смещению `+0x58` внутри `C_Game`.
+/// Возвращается vtable-слотом `[18] GetActorsPack()`.
 ///
 /// ## Иерархия
 ///
 /// ```text
-/// GameModuleBase (vtable off_14186D9C8)
-///   └─ MissionManager (vtable off_14186EFB8, строка "C_Mission")
+/// I_ActorsPack  (vtable M2DE_VT_IActorsPack  @ 0x14186D9C8)
+///   └─ C_ActorsPack (vtable M2DE_VT_CActorsPack @ 0x14186EFB8)
 /// ```
 ///
-/// Конструкторы:
-/// - `M2DE_GameModuleBase_Constructor` (`0x14039C1A0`)
-/// - `M2DE_MissionManager_Constructor` (`0x1403D10D0`)
-///
-/// Полный размер: **0x128 байт (296)**.
+/// Конструктор: `M2DE_CActorsPack_Constructor`.
+/// Размер: **0x128 байт**.
 #[repr(C)]
-pub struct MissionManagerSub {
+pub struct CActorsPackSub {
     _data: [u8; 0x128],
 }
 
-/// Глобальный менеджер игры (C_Game).
+/// Глобальный объект `C_Game` — корень игрового мира.
 ///
-/// Центральная структура движка. Содержит состояние игры,
-/// ссылки на активные entity, хеш-таблицы для поиска,
-/// менеджер миссий и базовые пути к SDS-ресурсам.
-///
-/// **Размер: 0x10C48 байт (68680).**
-///
-/// Глобальный указатель: `g_M2DE_GlobalManager`.
+/// Глобальный указатель: `g_M2DE_CGame` (`0x141CAF770`).
 /// Конструктор: `M2DE_CGame_Constructor` (`0x1403D1650`).
-/// Создаётся в `M2DE_InitAllManagers`.
 ///
-/// Полный размер: **0x10C48**.
+/// Размер: **0x10C48 байт**.
 #[repr(C)]
 pub struct GameManager {
     // =========================================================================
     //  Заголовок (+0x00..+0x58)
     // =========================================================================
-
-    /// `+0x00`: VTable `C_Game`.
-    ///
-    /// Адрес в `.rdata`: `off_14186F450`.
-    /// Содержит 25 виртуальных методов.
+    /// `+0x000` VTable `C_Game` -> `M2DE_VT_CGame` (`0x14186F450`), 25 слотов.
     pub vtable: *const CGameVTable,
 
-    /// `+0x08`: Флаги состояния игры.
+    /// `+0x008` Флаги состояния игры.
     ///
-    /// Известные биты:
-    /// - bit 0 = initialized
-    /// - bit 1 = loaded
-    /// - bit 2 = suspended
-    /// - bit 3 = неизвестно
-    /// - bit 4 = устанавливается отдельной виртуальной функцией
+    /// | Бит | Константа | Назначение |
+    /// |:---:|:----------|:-----------|
+    /// | 0 | `STATE_GAME_INIT` | initialized |
+    /// | 1 | `STATE_OPEN` | loaded / opened |
+    /// | 2 | `STATE_PAUSED` | игра на паузе |
+    /// | 3 | `STATE_UNK3` | неизвестно |
+    /// | 4 | `STATE_DELETE_PENDING` | объект помечен на удаление |
     pub game_state_flags: u32,
 
-    /// +0x0C: Глобальный счётчик игрового времени.
+    /// `+0x00C` Монотонный счётчик игрового времени.
     ///
-    /// Это не просто "счётчик кадров".
-    /// Значение увеличивается в `C_Game::Tick` на delta из tick-context,
-    /// то есть представляет собой монотонный таймер игрового мира.
-    ///
-    /// Runtime-наблюдения:
-    /// - в меню = 0
-    /// - в игре растёт примерно на число миллисекунд
-    /// - на pause menu не увеличивается
-    ///
-    /// Используется как глобальный timestamp:
-    /// - сохранение снимка события,
-    /// - вычисление elapsed time,
-    /// - сравнение с дедлайнами.
+    /// Увеличивается в `C_Game::Tick` на delta из tick-context.
+    /// В меню = 0, на pause menu не растёт.
+    /// Используется как timestamp для таймеров и дедлайнов.
     pub game_tick_counter: u32,
 
-    /// `+0x10`: Базовый путь SDS для городских и shop-ресурсов.
+    /// `+0x010` Базовый путь SDS для городских ресурсов.
+    ///
+    /// Пример: `"/sds/City/"`.
     pub sds_path_city: *const c_char,
 
-    /// `+0x18`: Дополнительный SDS-путь.
+    /// `+0x018` Базовый путь SDS для shop-ресурсов.
     ///
-    /// Используется редко. Замечен в логике ночных/альтернативных вариантов.
-    pub sds_path_extra: *const c_char,
+    /// Пример: `"/sds/Shops/"`.
+    pub sds_path_shops: *const c_char,
 
-    /// `+0x20`: Базовый путь SDS для streaming-ресурсов.
-    pub sds_path_streaming: *const c_char,
-
-    /// `+0x28`: Базовый путь SDS для traffic / vehicle model ресурсов.
+    /// `+0x020` Базовый путь SDS для traffic-ресурсов.
+    ///
+    /// Пример: `"/sds/Traffic/"`.
     pub sds_path_traffic: *const c_char,
 
-    /// `+0x30..+0x50`: пока неразобранные служебные указатели.
+    /// `+0x028` Базовый путь SDS для vehicle model ресурсов.
     ///
-    /// Через `g_M2DE_GlobalManager` напрямую почти не используются,
-    /// но участвуют во внутренней логике `C_Game`.
-    _reserved_30: [u64; 5],
+    /// Пример: `"/sds/Cars/"`.
+    pub sds_path_cars: *const c_char,
+
+    /// `+0x030` Счётчик SDS-слотов, заполняется в `C_Game::Open`.
+    ///
+    /// `*(_DWORD *)(a1 + 48) = v42` в `ParseData` — количество SDS записей.
+    pub sds_count: u32,
+
+    _pad_034: u32,
+
+    /// `+0x038` Имя текущего скрипта / миссии.
+    ///
+    /// Пример: `"CITY_trick"`.
+    pub script_name: *const c_char,
+
+    /// `+0x040` Путь к `.bin` файлу актёров игрока.
+    ///
+    /// Пример: `"/missions/CITY/actors_player.bin"`.
+    pub actors_bin_path: *const c_char,
+
+    /// `+0x048` Тип погоды.
+    ///
+    /// Заполняется из `.bin` секции тег 3, byte[0].
+    pub weather_type: u8,
+
+    /// `+0x049` Неизвестный байт.
+    ///
+    /// Заполняется из `.bin` секции тег 3, byte[1].
+    pub _unk_049: u8,
+
+    _pad_04a: [u8; 6],
+
+    /// `+0x050` Указатель на бинарные данные игры.
+    ///
+    /// Содержит бинарную структуру (не C-строку).
+    /// Magic bytes в наблюдаемых сессиях: `rpmg` (`0x676D7072`).
+    pub game_bin_data: *mut c_void,
 
     // =========================================================================
-    //  Inline MissionManager (+0x58..+0x180)
+    //  Inline C_ActorsPack (+0x058..+0x180)
     // =========================================================================
-
-    /// `+0x58`: inline-подобъект менеджера миссии.
+    /// `+0x058` Inline-подобъект `C_ActorsPack`.
     ///
-    /// Возвращается виртуальной функцией `GetMissionManager()`.
-    pub mission_manager: MissionManagerSub,
+    /// Доступен через vtable-слот `[18] GetActorsPack()` -> `this + 0x58`.
+    pub actors_pack: CActorsPackSub,
 
     // =========================================================================
     //  Entity slots (+0x180..+0x1A0)
     // =========================================================================
-
-    /// `+0x180..+0x198`: массив из 4 entity-слотов.
+    /// `+0x180` Массив из 4 entity-слотов.
     ///
-    /// Доступ через vtable:
-    /// - `GetEntityFromIndex(i)` → `*(this + 0x180 + i*8)`
-    /// - `SetEntityAtIndex(i, entity)` → запись туда же
+    /// | Индекс | Назначение |
+    /// |:------:|:-----------|
+    /// | 0 | активный игрок (`C_Human`) |
+    /// | 1–3 | дополнительные контекстные entity |
     ///
-    /// Известно:
-    /// - `entity_slots[0]` = активный игрок
-    /// - `entity_slots[1..=3]` = дополнительные контекстные entity
-    ///
-    /// Тип элементов оставлен как `*mut c_void`, потому что только слот 0
-    /// уверенно известен как `C_Player2` / `C_Human`.
+    /// Доступ через vtable: `GetEntityFromIndex(i)` / `SetEntityAtIndex(i, e)`.
     pub entity_slots: [*mut c_void; 4],
 
     // =========================================================================
-    //  Entity hash tables
+    //  Entity hash tables (+0x1A0..+0x10C08)
     // =========================================================================
-
-    /// `+0x1A0`: основная hash table entity.
+    /// `+0x1A0` Основная hash table entity.
     pub entity_table_1: EntityHashTable,
 
-    /// `+0x4850..+0x86D0`: пока неразобранная область.
+    /// `+0x4850..+0x86D0` Неразобранная область между таблицами.
     _gap_4850: [u8; 0x3E80],
 
-    /// `+0x86D0`: счётчик второй таблицы.
+    /// `+0x86D0` Счётчик записей второй hash table.
     pub entity_table_2_count: u32,
 
-    /// `+0x86D4`: padding.
     _pad_86d4: u32,
 
-    /// `+0x86D8`: вторичная hash table entity.
+    /// `+0x86D8` Вторичная hash table entity.
     pub entity_table_2: EntityHashTable,
 
-    /// `+0xCD88..+0x10C08`: пока неразобранная область.
+    /// `+0xCD88..+0x10C08` Неразобранная область.
     _gap_cd88: [u8; 0x3E80],
 
     // =========================================================================
     //  Хвостовые поля (+0x10C08..+0x10C48)
     // =========================================================================
-
-    /// `+0x10C08`: пороговое значение.
+    /// `+0x10C08` Пороговое значение для логики `Tick`.
     ///
-    /// Инициализируется как `0.2f`.
-    /// Используется в логике `Tick` для расчёта частоты части обновлений.
+    /// Инициализируется как `0.2f` (`3E4CCCCDh`).
     pub threshold_float: f32,
 
-    /// `+0x10C0C`: padding.
     _pad_10c0c: u32,
 
-    /// `+0x10C10..+0x10C28`: pending-add vector.
+    /// `+0x10C10` Pending-add вектор (`std::vector<C_Entity*>`).
     ///
-    /// Формат как у `std::vector<T>`:
-    /// - begin
-    /// - end
-    /// - capacity_end
-    ///
-    /// Здесь откладываются entity на добавление,
-    /// если `tick_in_progress != 0`.
+    /// Entity откладываются сюда если `tick_in_progress != 0`.
+    /// Формат: `[begin, end, capacity_end]`.
     pub pending_add_entities: [u64; 3],
 
-    /// `+0x10C28..+0x10C40`: pending-remove vector.
+    /// `+0x10C28` Pending-remove вектор (`std::vector<C_Entity*>`).
     ///
-    /// Здесь откладываются entity на удаление,
-    /// если `tick_in_progress != 0`.
+    /// Entity откладываются сюда если `tick_in_progress != 0`.
+    /// Формат: `[begin, end, capacity_end]`.
     pub pending_remove_entities: [u64; 3],
 
-    /// `+0x10C40`: флаг "тик в процессе".
+    /// `+0x10C40` Флаг активного обхода entity в `Tick`.
     ///
-    /// Пока установлен, операции добавления/удаления entity
-    /// не применяются напрямую, а складываются в pending-векторы.
+    /// Пока установлен — add/remove операции идут в pending-векторы.
     pub tick_in_progress: u8,
 
-    /// `+0x10C41..+0x10C43`: padding.
     _pad_10c41: [u8; 3],
 
-    /// `+0x10C44`: индекс текущего entity при обходе в `Tick`.
+    /// `+0x10C44` Индекс текущего entity при обходе в `Tick`.
     ///
-    /// Начальное значение: `-1`.
+    /// Инициализируется как `-1`.
     pub tick_entity_index: i32,
 }
 
@@ -286,10 +297,15 @@ assert_field_offsets!(GameManager {
     game_state_flags        == 0x008,
     game_tick_counter       == 0x00C,
     sds_path_city           == 0x010,
-    sds_path_extra          == 0x018,
-    sds_path_streaming      == 0x020,
-    sds_path_traffic        == 0x028,
-    mission_manager         == 0x058,
+    sds_path_shops          == 0x018,
+    sds_path_traffic        == 0x020,
+    sds_path_cars           == 0x028,
+    sds_count               == 0x030,
+    script_name             == 0x038,
+    actors_bin_path         == 0x040,
+    weather_type            == 0x048,
+    game_bin_data           == 0x050,
+    actors_pack             == 0x058,
     entity_slots            == 0x180,
     entity_table_1          == 0x1A0,
     entity_table_2_count    == 0x86D0,
@@ -305,29 +321,21 @@ const _: () = {
     assert!(std::mem::size_of::<GameManager>() == 0x10C48);
 };
 
-/// Индекс слота активного игрока в `entity_slots`.
-pub const ENTITY_SLOT_PLAYER: usize = 0;
-
-/// Количество entity-слотов в `C_Game`.
+pub const ENTITY_SLOT_PLAYER: usize = EntitySlot::Player as usize;
 pub const ENTITY_SLOT_COUNT: usize = 4;
 
 impl GameManager {
     /// Типизированный указатель на активного игрока (slot 0).
-    ///
-    /// Возвращает `None`, если игрок ещё не создан.
     #[inline]
     pub fn player_ptr(&self) -> Option<Ptr<CPlayer>> {
-        let ptr = self.entity_slots[ENTITY_SLOT_PLAYER] as *mut CPlayer;
-        let addr = ptr as usize;
+        let addr = self.entity_slots[ENTITY_SLOT_PLAYER] as usize;
         crate::memory::is_valid_ptr(addr).then_some(Ptr::new(addr))
     }
 
-    /// Получить ссылку на активного игрока.
+    /// Ссылка на активного игрока.
     ///
     /// # Safety
-    ///
-    /// - `entity_slots[0]` должен указывать на живой `CPlayer`
-    /// - вызывать только в корректном игровом контексте
+    /// `entity_slots[0]` должен указывать на живой `CPlayer`.
     #[inline]
     pub unsafe fn get_player(&self) -> Option<&CPlayer> {
         let ptr = self.entity_slots[ENTITY_SLOT_PLAYER] as *const CPlayer;
@@ -337,12 +345,11 @@ impl GameManager {
         Some(unsafe { &*ptr })
     }
 
-    /// Получить мутабельную ссылку на активного игрока.
+    /// Мутабельная ссылка на активного игрока.
     ///
     /// # Safety
-    ///
-    /// - те же требования, что и у [`get_player`](Self::get_player)
-    /// - не должно быть других активных ссылок на этот объект
+    /// Те же требования что у [`get_player`](Self::get_player).
+    /// Не должно быть других активных ссылок на этот объект.
     #[inline]
     pub unsafe fn get_player_mut(&mut self) -> Option<&mut CPlayer> {
         let ptr = self.entity_slots[ENTITY_SLOT_PLAYER] as *mut CPlayer;
@@ -352,7 +359,7 @@ impl GameManager {
         Some(unsafe { &mut *ptr })
     }
 
-    /// Получить raw entity pointer из одного из 4 слотов.
+    /// Raw pointer из entity-слота по индексу.
     #[inline]
     pub fn entity_slot(&self, index: usize) -> Option<*mut c_void> {
         if index >= ENTITY_SLOT_COUNT {
@@ -368,101 +375,76 @@ impl GameManager {
         !self.entity_slots[ENTITY_SLOT_PLAYER].is_null()
     }
 
-    /// Текущий тик игры (монотонно растущий).
-    ///
-    /// Инкрементируется каждый кадр в `Tick` [15].
-    /// Используется для таймеров: `deadline = tick() + delay`.
+    /// Текущий тик игры.
     #[inline]
     pub fn tick(&self) -> u32 {
         self.game_tick_counter
     }
 
-    /// Сколько тиков прошло с момента `since`.
-    ///
-    /// Используется wrapping arithmetic, так что работает и при переполнении.
+    /// Количество тиков прошедших с момента `since` (wrapping).
     #[inline]
     pub fn ticks_since(&self, since: u32) -> u32 {
         self.game_tick_counter.wrapping_sub(since)
     }
 
-    /// Мир инициализирован (бит 0 — `GameInit` вызван).
+    /// Мир инициализирован (bit 0).
     #[inline]
     pub fn is_initialized(&self) -> bool {
-        (self.game_state_flags & 1) != 0
+        GameStateFlag::GameInit.is_set(self.game_state_flags)
     }
 
-    /// Мир загружен (бит 1 — `Open` вызван).
+    /// Мир загружен (bit 1).
     #[inline]
     pub fn is_loaded(&self) -> bool {
-        (self.game_state_flags & 2) != 0
+        GameStateFlag::Open.is_set(self.game_state_flags)
     }
 
-    /// Игра приостановлена (бит 2 — `SetSuspended(true)` вызван).
+    /// Игра приостановлена (bit 2).
     #[inline]
     pub fn is_suspended(&self) -> bool {
-        (self.game_state_flags & 4) != 0
+        GameStateFlag::Paused.is_set(self.game_state_flags)
     }
 
-    /// Игра полностью готова (инициализирована и загружена).
+    /// Мир полностью готов (initialized + loaded).
     #[inline]
     pub fn is_ready(&self) -> bool {
-        (self.game_state_flags & 0x3) == 0x3
+        let mask = GameStateFlag::GameInit as u32 | GameStateFlag::Open as u32;
+        self.game_state_flags & mask == mask
     }
 
     /// Выполняется обход entity в `Tick`.
-    ///
-    /// Когда `true`, операции добавления/удаления entity
-    /// откладываются в pending-векторы.
     #[inline]
     pub fn is_tick_in_progress(&self) -> bool {
         self.tick_in_progress != 0
     }
 
-    /// Получить текущую игровую фазу.
-    ///
-    /// Значение хранится во внутреннем поле `C_Game` и доступно
-    /// через виртуальную функцию `[22] GetGamePhase`.
+    /// Текущий тип погоды / игровая фаза (vtable slot `[22]`).
     #[inline]
     pub fn game_phase(&self) -> u8 {
         unsafe { ((*self.vtable).get_game_phase)(self as *const _ as *const c_void) }
     }
 
-    /// Получить inline MissionManager через vtable.
-    ///
-    /// Обычно это просто `self + 0x58`, но этот метод отражает
-    /// реальную виртуальную функцию движка.
+    /// Указатель на inline `C_ActorsPack` (vtable slot `[18]`).
     #[inline]
-    pub fn mission_manager_ptr(&self) -> *mut c_void {
-        unsafe { ((*self.vtable).get_mission_manager)(self as *const _ as *const c_void) }
+    pub fn actors_pack_ptr(&self) -> *mut c_void {
+        unsafe { ((*self.vtable).get_actors_pack)(self as *const _ as *const c_void) }
     }
 
-    /// Базовый путь для городских SDS-файлов.
-    ///
-    /// Возвращает `None` если мир не загружен.
-    /// Использование: `format!("{}{}.sds", path, object_name)`.
+    /// Имя текущего скрипта / миссии (`script_name`, `+0x038`).
     #[inline]
-    pub fn city_sds_path(&self) -> Option<&std::ffi::CStr> {
-        if self.sds_path_city.is_null() {
+    pub fn get_script_name(&self) -> Option<&std::ffi::CStr> {
+        if self.script_name.is_null() {
             return None;
         }
-        Some(unsafe { std::ffi::CStr::from_ptr(self.sds_path_city) })
+        Some(unsafe { std::ffi::CStr::from_ptr(self.script_name) })
     }
 
-    /// Базовый путь для streaming SDS-файлов.
+    /// Путь к `.bin` файлу актёров игрока (`actors_bin_path`, `+0x040`).
     #[inline]
-    pub fn streaming_sds_path(&self) -> Option<&std::ffi::CStr> {
-        if self.sds_path_streaming.is_null() {
+    pub fn get_actors_bin_path(&self) -> Option<&std::ffi::CStr> {
+        if self.actors_bin_path.is_null() {
             return None;
         }
-        Some(unsafe { std::ffi::CStr::from_ptr(self.sds_path_streaming) })
-    }
-
-    /// Базовый путь для traffic SDS-файлов.
-    #[inline]
-    pub fn traffic_sds_path(&self) -> Option<&std::ffi::CStr> {
-        if self.sds_path_traffic.is_null() {
-            return None;
-        }
-        Some(unsafe { std::ffi::CStr::from_ptr(self.sds_path_traffic) })
+        Some(unsafe { std::ffi::CStr::from_ptr(self.actors_bin_path) })
     }
 }
