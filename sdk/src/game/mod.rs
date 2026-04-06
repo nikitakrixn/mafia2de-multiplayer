@@ -24,11 +24,13 @@ pub mod sds;
 pub mod world;
 pub mod manager;
 pub mod application;
+pub mod mission;
 
 pub use entity_types::{EntityMessageType, EntityType, FactoryType};
 pub use player::Player;
 pub use manager::Game;
 pub use application::Application;
+pub use mission::Mission;
 
 use crate::{addresses, memory};
 use common::logger;
