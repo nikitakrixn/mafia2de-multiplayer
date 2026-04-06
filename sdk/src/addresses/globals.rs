@@ -381,3 +381,76 @@ pub const POLICE_SCRIPT_OWNER_SHUTDOWN_FLAG: usize = 0x1C9_FBC0;
 ///
 /// IDA: `0x14314_0E30`
 pub const ACTION_CODE_MANAGER: usize = 0x314_0E30;
+
+/// `g_M2DE_pMission` — синглтон C_Mission (288B).
+///
+/// Vtable: M2DE_VT_CMission (`0x14186EFE8`).
+/// Уничтожается в ShutdownAllManagers после C_Game.
+///
+/// IDA: `0x141CAF778`
+pub const MISSION: usize = 0x1CA_F778;
+
+/// `g_M2DE_IGame_Singleton` — I_Game singleton holder.
+///
+/// Устанавливается в I_Game::I_Game(), тот же объект что и C_Game.
+///
+/// IDA: `0x141CADDB0` (M2DE_IGame_Singleton — уточнить, сейчас STREAMING_ENTITY_MANAGER)
+pub const IGAME_SINGLETON: usize = 0x1CA_DDB0;
+
+/// `g_M2DE_CSdsEventHandler` — синглтон C_SdsEventHandler (16B).
+///
+/// Создаётся лениво в GameTick. Vtable: off_1418D3EE8.
+/// Строка: "game::diskcache::C_SdsEventHandler".
+///
+/// IDA: `0x1431362E8`
+pub const SDS_EVENT_HANDLER: usize = 0x313_62E8;
+
+/// `g_M2DE_MinimapController` — синглтон C_MinimapController.
+///
+/// Возвращается через sub_14011FCB0.
+///
+/// IDA: `0x141CA4978`
+pub const MINIMAP_CONTROLLER: usize = 0x1CA_4978;
+
+/// `g_M2DE_MissionPackManager` — менеджер mission pack'ов.
+///
+/// Используется в GameTick для получения текущего номера миссии.
+///
+/// IDA: `0x141C9F2B8`
+pub const MISSION_PACK_MANAGER: usize = 0x1C9_F2B8;
+
+/// `g_M2DE_pGameModule` — указатель на системный игровой модуль.
+///
+/// Содержит:
+/// - `+0x18`: HMODULE из `GetModuleHandleA(NULL)` — exe base address
+/// - `+0x28`: wchar_t[] command line или имя модуля
+///
+/// ПРИМЕЧАНИЕ: это НЕ `C_Application`. `C_Application` хранится отдельно.
+///
+/// IDA: `0x141CAF7A0`
+pub const GAME_MODULE: usize = 0x1CA_F7A0;
+
+/// `g_M2DE_CApplication` — синглтон `C_Application` (264B).
+///
+/// Хранится в `C_GlobalObjectAllocationItem<C_Application>` по `off_141C276A8 + 0x10`.
+/// Создаётся лениво через `sub_1400AAD40` (`M2DE_CApplication_Factory`).
+/// Конструктор: `M2DE_CApplication_Constructor` (`0x1400EDFA0`).
+/// Размер объекта: 264B (`0x108`).
+///
+/// IDA: `0x141C276B8`
+pub const APPLICATION: usize = 0x1C2_76B8;
+
+/// `g_M2DE_pGameWorld` — синглтон `C_GameWorld` (392B).
+///
+/// Создаётся лениво в `M2DE_CreateGameWorldSingleton`.
+/// Используется в `SystemInit`, `SystemDone`, `GameTick_ProcessMissionPack`.
+///
+/// IDA: `0x141CAE1C0`
+pub const GAME_WORLD: usize = 0x1CA_E1C0;
+
+/// `g_M2DE_CApplication_EventRegistry` — реестр событий `C_Application`.
+///
+/// Используется в `SystemInit`/`SystemDone` для регистрации/снятия модуля.
+///
+/// IDA: `0x141C59260`
+pub const APPLICATION_EVENT_REGISTRY: usize = 0x1C5_9260;

@@ -596,7 +596,6 @@ impl CCarVehicle {
 #[repr(C)]
 pub struct CCarDamageSub1 {
     /// Vtable pointer (+0x00 = car+0xE0).
-    /// MAC: `ue::game::vehicle::C_Vehicle` vtable.
     pub vtable: *const c_void, // +0x00
 
     _pad_008: [u8; 0x30 - 0x08],

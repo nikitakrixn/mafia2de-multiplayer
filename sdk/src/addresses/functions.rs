@@ -2024,7 +2024,7 @@ pub mod car_damage {
     /// IDA: `0x1404C1E10`
     pub const APPLY_RUNTIME_FLAGS: usize = 0x4C_1E10;
 
-    // ── Crash-part constructors ─────────────────────────────────────────
+    // Crash-part constructors
 
     pub const CRASH_PART_POOL_ALLOC: usize = 0x47_B390;
     pub const CRASH_PART_BODY_CTOR: usize = 0x47_3060;
@@ -2037,4 +2037,232 @@ pub mod car_damage {
     pub const CRASH_PART_MOTOR_CTOR: usize = 0x47_3860;
 
     pub const CRASH_PART_ATTACH_TO_CONTEXT: usize = 0x2E_9350;
+}
+
+// =============================================================================
+//  C_Game
+// =============================================================================
+
+pub mod game {
+    /// `char (C_Game*)` — конструктор C_Game.
+    ///
+    /// Вызывает I_Game ctor, ставит vtable, зануляет поля +0x08..+0x50.
+    /// Конструирует inline C_ActorsPack (+0x58), EntityHashTable (+0x1A0, +0x86D8).
+    /// Инициализирует threshold=0.2f (+0x10C08), sentinel=-1 (+0x10C44).
+    ///
+    /// IDA: `0x1403D1650`
+    pub const CONSTRUCTOR: usize = 0x3D_1650;
+
+    /// `char (C_Game*, const char* name)` — загрузка игрового мира.
+    ///
+    /// Парсит `/games/{name}.bin`, загружает SDS-ресурсы,
+    /// заполняет sds_path_* (+0x10..+0x28), script_name (+0x38),
+    /// actors_bin_path (+0x40), game_bin_data (+0x50).
+    /// Устанавливает STATE_OPEN (bit1) при успехе.
+    ///
+    /// IDA: `0x1403EFE50`
+    pub const OPEN: usize = 0x3E_FE50;
+
+    /// `bool (C_Game*)` — выгрузка игрового мира.
+    ///
+    /// Обнуляет entity_slots (+0x180..+0x198), очищает ScriptContext и PlayerModelManager,
+    /// запускает выгрузку SDS, сбрасывает STATE_OPEN (bit1).
+    ///
+    /// IDA: `0x1403DB0F0`
+    pub const CLOSE: usize = 0x3D_B0F0;
+
+    /// Reload мира: Close + Open с новым именем.
+    ///
+    /// `char (ctx*, ...)` — читает имя из `ctx + 0x18`, вызывает Close затем Open.
+    /// При успехе пишет `ctx + 0x98 = 1`, затем обнуляет `ctx + 0x18`.
+    ///
+    /// IDA: `0x14015AAB0`
+    pub const RELOAD: usize = 0x15_AAB0;
+}
+
+pub mod player_model_manager {
+    /// Конструктор `C_PlayerModelManager`.
+    ///
+    /// MAC: `C_PlayerModelManager::C_PlayerModelManager`.
+    /// Строка: `"Player Model Manager"`. Устанавливает `M2DE_g_PlayerModelManager`.
+    /// Инициализирует module object (+0x38), vtable `off_14186F520`.
+    ///
+    /// IDA: `0x1403D1980`
+    pub const CONSTRUCTOR: usize = 0x3D_1980;
+
+    /// Спавн entity игрока (`C_Human`) в мире.
+    ///
+    /// MAC: `C_PlayerModelManager::CreatePlayer`.
+    /// Читает DLC данные через `GameWorldSingleton`, открывает модель,
+    /// создаёт entity через `M2DE_TypeRegistry_CreateByTypeId(16)`,
+    /// привязывает к frame, загружает EntityDataStorage.
+    /// Вызывается из `C_Game::Open` после загрузки `ingame.sds`.
+    ///
+    /// IDA: `0x1403DDDA0`
+    pub const CREATE_PLAYER: usize = 0x3D_DDA0;
+
+    /// Смена модели игрока.
+    ///
+    /// MAC: `C_PlayerModelManager::ChangeModel`.
+    /// `bool (C_PlayerModelManager*, const char* model_name, uint slot)`
+    /// Загружает `/sds/player/{name}.sds`, меняет frame node.
+    /// При неудаче ставит `C_Game::STATE_PAUSED` (bit2) и триггерит reload
+    /// через `g_M2DE_MissionPackManager + 0x9C = 1`.
+    ///
+    /// IDA: `0x1403D9C80`
+    pub const CHANGE_MODEL: usize = 0x3D_9C80;
+}
+
+// =============================================================================
+//  C_SlotManager (SDS slot system)
+// =============================================================================
+
+pub mod slot_manager {
+    /// Добавить preload-слот в менеджер.
+    ///
+    /// `void (C_SlotManager*, uint slot_type, const char* name, u64 unk)`
+    /// Аллоцирует 96B объект (vtable off_14186F2B0), копирует имя (+0x18).
+    /// Добавляет в вектор preload_slots.
+    /// Вызывается из C_Game::Open ParseData тег 1 при entry_type == 5.
+    ///
+    /// IDA: `0x1403D9140`
+    pub const ADD_PRELOAD_SLOT: usize = 0x3D_9140;
+}
+
+// =============================================================================
+//  Shutdown / Cleanup
+// =============================================================================
+
+pub mod shutdown {
+    /// Уничтожает все глобальные менеджеры в обратном порядке инициализации.
+    ///
+    /// Порядок: C_Game -> C_Mission -> C_ScriptDataStorage -> EntityTypeRegistry
+    /// -> SDSManager -> CarManager -> SDSLoadUnloadNotify
+    /// -> ActorActionListenerRegistrator -> PlayerModelManager
+    /// -> EntityList -> EntityDatabase.
+    ///
+    /// IDA: `0x1403E0150`
+    pub const SHUTDOWN_ALL_MANAGERS: usize = 0x3E_0150;
+
+    /// Полный shutdown игрового модуля.
+    ///
+    /// Очищает g_M2DE_pGameModule, вызывает ShutdownAllManagers,
+    /// затем уничтожает SystemInitDoneModule.
+    ///
+    /// IDA: `0x1403DF770`
+    pub const SHUTDOWN_GAME_MODULE: usize = 0x3D_F770;
+
+    /// Точка входа для выгрузки игрового модуля.
+    ///
+    /// Вызывает ShutdownCallbackSystem затем ShutdownGameModule.
+    ///
+    /// IDA: `0x1400D9960`
+    pub const GAME_MODULE_UNLOAD: usize = 0xD_9960;
+
+    /// Уничтожает callback/event инфраструктуру.
+    ///
+    /// Очищает: qword_141CADDB8, g_M2DE_pGameCallbackManager,
+    /// qword_141CAE1F8, qword_141CAE238, qword_141CAE230.
+    ///
+    /// IDA: `0x1403A5440`
+    pub const SHUTDOWN_CALLBACK_SYSTEM: usize = 0x3A_5440;
+}
+
+// =============================================================================
+//  C_Application (GameModule)
+// =============================================================================
+
+pub mod application {
+    /// Конструктор `C_Application`.
+    ///
+    /// MAC: `C_Application::C_Application`.
+    /// Инициализирует: vtable(`0x1418538F8`), module_id(+0x08=-1),
+    /// C_String(+0x10), game_name_buf(+0x18=0), tick_counter(+0x98=0),
+    /// reload_flag(+0x9C=0), unk_9d(+0x9D=1),
+    /// SaveLoadCallbacks(+0xA0/+0xB0/+0xC0),
+    /// mission_number(+0xD0=-1), mission_part(+0xD8=0),
+    /// DLCMissionPackData(+0xE0=alloc(64)), sys_notify_vtable(+0xE8),
+    /// unk_f0(+0xF0=0), unk_f8(+0xF8), sentinel(+0x100=-1).
+    ///
+    /// IDA: `0x1400EDFA0`
+    pub const CONSTRUCTOR: usize = 0xED_FA0;
+
+    /// Фабрика `C_Application` — аллоцирует 264B и вызывает конструктор.
+    ///
+    /// `C_GlobalObjectAllocationItem<C_Application>` lazy-init factory.
+    /// Сохраняет результат в `*(a1 + 0x10)` = `g_M2DE_CApplication`.
+    ///
+    /// IDA: `0x1400AAD40`
+    pub const FACTORY: usize = 0xA_AD40;
+
+    /// Деструктор `C_Application`.
+    ///
+    /// IDA: `0x1400F4400`
+    pub const DESTRUCTOR: usize = 0xF_4400;
+
+    /// Регистрация всех callbacks в `GameCallbackManager`.
+    ///
+    /// Vtable slot [3].
+    ///
+    /// IDA: `0x140157200`
+    pub const STATIC_REGISTER: usize = 0x15_7200;
+
+    /// `SYSTEM_INIT` callback (event 1, priority 10100).
+    ///
+    /// IDA: `0x1401597B0`
+    pub const ON_SYSTEM_INIT: usize = 0x15_97B0;
+
+    /// `SYSTEM_DONE` callback (event 2, priority 200).
+    ///
+    /// IDA: `0x140159580`
+    pub const ON_SYSTEM_DONE: usize = 0x15_9580;
+
+    /// `NO_GAME_START` callback (event 20, priority 500).
+    ///
+    /// Читает имя SDS линии 'game', копирует в ctx+0x18 для Tick/Reload.
+    ///
+    /// IDA: `0x1401559C0`
+    pub const ON_NO_GAME_START: usize = 0x15_59C0;
+
+    /// `NO_GAME_END` callback (event 21, priority 500).
+    ///
+    /// IDA: `0x14010F350`
+    pub const ON_NO_GAME_END: usize = 0x10_F350;
+
+    /// `GAME_INIT` callback (event 13, priority 20000).
+    ///
+    /// IDA: `0x1401154F0`
+    pub const ON_GAME_INIT: usize = 0x11_54F0;
+
+    /// `NO_GAME_TICK` callback (event 22, priority 501) — world reload.
+    ///
+    /// Читает имя из ctx+0x18, вызывает `C_Game::Close` затем `C_Game::Open`.
+    ///
+    /// IDA: `0x14015AAB0`
+    pub const ON_NO_GAME_TICK_RELOAD: usize = 0x15_AAB0;
+
+    /// Event 37 callback (priority 10000) — ожидание загрузки SDS слота.
+    ///
+    /// IDA: `0x14015BA60`
+    pub const ON_TICK_SLOT_WAITING: usize = 0x15_BA60;
+
+    /// Event 27 callback (priority 120) — регистрация save/load handlers.
+    ///
+    /// IDA: `0x140145D30`
+    pub const ON_REG_GAME_SAVE_CB: usize = 0x14_5D30;
+
+    /// `GAME_DONE` callback (event 14, priority 0).
+    ///
+    /// IDA: `0x140114EF0`
+    pub const ON_GAME_DONE: usize = 0x11_4EF0;
+
+    /// `MISSION_BEFORE_OPEN` callback (event 9, priority 50).
+    ///
+    /// IDA: `0x140134510`
+    pub const ON_MISSION_BEFORE_OPEN: usize = 0x13_4510;
+
+    /// `MISSION_AFTER_CLOSE` callback (event 12, priority 4000).
+    ///
+    /// IDA: `0x140134460`
+    pub const ON_MISSION_AFTER_CLOSE: usize = 0x13_4460;
 }
