@@ -2083,7 +2083,6 @@ pub mod game {
 pub mod player_model_manager {
     /// Конструктор `C_PlayerModelManager`.
     ///
-    /// MAC: `C_PlayerModelManager::C_PlayerModelManager`.
     /// Строка: `"Player Model Manager"`. Устанавливает `M2DE_g_PlayerModelManager`.
     /// Инициализирует module object (+0x38), vtable `off_14186F520`.
     ///
@@ -2092,7 +2091,6 @@ pub mod player_model_manager {
 
     /// Спавн entity игрока (`C_Human`) в мире.
     ///
-    /// MAC: `C_PlayerModelManager::CreatePlayer`.
     /// Читает DLC данные через `GameWorldSingleton`, открывает модель,
     /// создаёт entity через `M2DE_TypeRegistry_CreateByTypeId(16)`,
     /// привязывает к frame, загружает EntityDataStorage.
@@ -2103,7 +2101,6 @@ pub mod player_model_manager {
 
     /// Смена модели игрока.
     ///
-    /// MAC: `C_PlayerModelManager::ChangeModel`.
     /// `bool (C_PlayerModelManager*, const char* model_name, uint slot)`
     /// Загружает `/sds/player/{name}.sds`, меняет frame node.
     /// При неудаче ставит `C_Game::STATE_PAUSED` (bit2) и триггерит reload
@@ -2175,7 +2172,6 @@ pub mod shutdown {
 pub mod application {
     /// Конструктор `C_Application`.
     ///
-    /// MAC: `C_Application::C_Application`.
     /// Инициализирует: vtable(`0x1418538F8`), module_id(+0x08=-1),
     /// C_String(+0x10), game_name_buf(+0x18=0), tick_counter(+0x98=0),
     /// reload_flag(+0x9C=0), unk_9d(+0x9D=1),
@@ -2226,10 +2222,15 @@ pub mod application {
 
     /// `NO_GAME_END` callback (event 21, priority 500).
     ///
+    /// Просто вызывает `M2DE_CGame_Close(g_M2DE_CGame)`.
+    ///
     /// IDA: `0x14010F350`
     pub const ON_NO_GAME_END: usize = 0x10_F350;
 
     /// `GAME_INIT` callback (event 13, priority 20000).
+    ///
+    /// Загружает `ChameleonMapper.tbl`, активирует SDS stream map line
+    /// из `game_name_buf` (+0x18), затем очищает буфер.
     ///
     /// IDA: `0x1401154F0`
     pub const ON_GAME_INIT: usize = 0x11_54F0;
@@ -2258,11 +2259,96 @@ pub mod application {
 
     /// `MISSION_BEFORE_OPEN` callback (event 9, priority 50).
     ///
+    /// Инициализирует `DLCMissionPackData` (+0xE0) из `mission_part` (+0xD8).
+    /// Вызывает `LoadStreamMap`, загружает material если `mission_part >= 2`.
+    ///
     /// IDA: `0x140134510`
     pub const ON_MISSION_BEFORE_OPEN: usize = 0x13_4510;
 
     /// `MISSION_AFTER_CLOSE` callback (event 12, priority 4000).
     ///
+    /// Освобождает материалы через `GfxDevice`, выгружает DLC через `GameWorldSingleton`.
+    ///
     /// IDA: `0x140134460`
     pub const ON_MISSION_AFTER_CLOSE: usize = 0x13_4460;
+
+    /// Загрузка SDS stream map на основе `mission_part` и DLC данных.
+    ///
+    /// Вызывается из `OnMissionBeforeOpen`.
+    ///
+    /// IDA: `0x14012EEF0`
+    pub const LOAD_STREAM_MAP: usize = 0x12_EEF0;
+}
+
+// =============================================================================
+//  C_ActorsPack / I_ActorsPack
+// =============================================================================
+
+pub mod actors_pack {
+    /// Конструктор `I_ActorsPack` (базовый).
+    ///
+    /// Устанавливает vtable `M2DE_VT_IActorsPack`, зануляет поля.
+    /// Инициализирует: flags(+0x08=0), state_flags(+0x88=0),
+    /// entities vector(+0x90/+0x98/+0xA0=0), scene_callback(+0xA8=0),
+    /// close_counter(+0xB0=-1).
+    ///
+    /// IDA: `0x14039C1A0`
+    pub const I_CONSTRUCTOR: usize = 0x39_C1A0;
+
+    /// Конструктор `C_ActorsPack`.
+    ///
+    /// Вызывает `I_ActorsPack_Constructor`, затем перезаписывает vtable
+    /// на `M2DE_VT_CActorsPack`. Зануляет поля +0xB8..+0x11F.
+    /// Устанавливает `scene_callback(+0xA8) = &off_141C2EC30`.
+    /// `close_counter_2(+0x120) = -1`.
+    ///
+    /// IDA: `0x1403D10D0`
+    pub const CONSTRUCTOR: usize = 0x3D_10D0;
+
+    /// `bool (C_ActorsPack*, const char* path)` — загрузка из `.bin` файла.
+    ///
+    /// Читает заголовок (magic `0x12345678`), вызывает `ParseFromBinDataInit`.
+    /// Устанавливает `state_flags |= 2` (opened).
+    ///
+    /// IDA: `0x1403EFCD0`
+    pub const OPEN: usize = 0x3E_FCD0;
+
+    /// `bool (C_ActorsPack*)` — выгрузка.
+    ///
+    /// Вызывает `CloseTickInit` затем `CloseTick(0, force=true)`.
+    ///
+    /// IDA: `0x1403DB0C0`
+    pub const CLOSE: usize = 0x3D_B0C0;
+
+    /// Инициализация итератора закрытия.
+    ///
+    /// `close_counter = (entities_end - entities_begin) / 8 - 1`.
+    ///
+    /// IDA: `0x1403DB720`
+    pub const CLOSE_TICK_INIT: usize = 0x3D_B720;
+
+    /// Пошаговая выгрузка entity.
+    ///
+    /// `bool (C_ActorsPack*, timer, force)`.
+    /// Итерирует entity в обратном порядке, вызывает `C_Entity::Release`.
+    /// При `force=true` — выгружает всё за один вызов.
+    /// После завершения: освобождает `bin_data(+0xB8)`, сбрасывает `state_flags & ~2`.
+    ///
+    /// IDA: `0x1403DB590`
+    pub const CLOSE_TICK: usize = 0x3D_B590;
+
+    /// Поиск frame в сцене по имени.
+    ///
+    /// Ищет в векторе entity по FNV-1a hash имени.
+    /// Fallback: `I_Mission::GetScene()->FindFrame(name)`.
+    ///
+    /// IDA: `0x1403A6D30`
+    pub const FIND_PARENT_IN_SCENE: usize = 0x3A_6D30;
+
+    /// Парсинг бинарных данных актёров (инициализация).
+    ///
+    /// Вызывается из `Open` и `C_Game::Open`.
+    ///
+    /// IDA: `0x1403F2670`
+    pub const PARSE_FROM_BIN_DATA_INIT: usize = 0x3F_2670;
 }

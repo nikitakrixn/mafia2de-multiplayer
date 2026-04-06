@@ -5,6 +5,7 @@
 //! compile-time ассертами.
 
 pub mod application;
+pub mod actors_pack;
 pub mod car;
 pub mod game_manager;
 pub mod player;

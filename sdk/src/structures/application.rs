@@ -1,6 +1,6 @@
 //! Структура `C_Application` — главный объект игрового модуля.
 //!
-//! MAC: `C_Application`. M2DE singleton: `g_M2DE_pGameModule`.
+//! M2DE singleton: `g_M2DE_pGameModule`.
 //!
 //! ## Иерархия
 //!
@@ -12,7 +12,7 @@
 //! ## Layout (из `M2DE_CApplication_Constructor` @ `0x1400EDFA0`)
 //!
 //! ```text
-//! +0x000  vtable              → M2DE_VT_CApplication (5 слотов)
+//! +0x000  vtable              -> M2DE_VT_CApplication (5 слотов)
 //! +0x008  module_id           i32  (init = -1)
 //! +0x010  game_name_str       C_String (ue::sys::utils::C_String)
 //! +0x018  game_name_buf       char  (init = 0, заполняется в Start)
@@ -41,7 +41,7 @@ use std::ffi::c_void;
 /// Vtable: `M2DE_VT_CApplication` (`0x1418538F8`).
 #[repr(C)]
 pub struct CApplication {
-    /// `+0x000` VTable → `M2DE_VT_CApplication`.
+    /// `+0x000` VTable -> `M2DE_VT_CApplication`.
     pub vtable: *const CApplicationVTable,
 
     /// `+0x008` Module ID (init = -1).
@@ -61,13 +61,15 @@ pub struct CApplication {
     /// `*(_BYTE *)(a1 + 24) = 0` в конструкторе.
     pub game_name_buf: [u8; 128],
 
-    /// `+0x098` Счётчик тиков / внутренний флаг.
+    /// `+0x098` Счётчик/результат последнего тика.
     ///
-    /// `*(_DWORD *)(a1 + 152) = 0` в конструкторе.
+    /// `*(_DWORD *)(a1 + 152) = 1` при успешном reload в `Tick`.
+    /// `*(_DWORD *)(a1 + 152) = 2` при паузе в `GameTick_Hook`.
     pub tick_counter: u32,
 
-    /// `+0x09C` Флаг reload (init = 0).
+    /// `+0x09C` Флаг паузы из `GameTick_Hook`.
     ///
+    /// Если установлен: `C_Game::STATE_PAUSED |= 4`, `tick_counter = 2`.
     /// `*(_BYTE *)(a1 + 156) = 0` в конструкторе.
     pub reload_flag: u8,
 
@@ -79,12 +81,18 @@ pub struct CApplication {
     _pad_09e: [u8; 2],
 
     /// `+0x0A0` SaveLoadCallback #0 (size 0x18). Vtable: `off_141853890`.
+    ///
+    /// Регистрируется в `RegGameSaveCb` с типами 0, 1, 4, 8, 9, 10.
     _save_cb_0: [u8; 0x10],
 
     /// `+0x0B0` SaveLoadCallback #1 (size 0x0C). Vtable: `off_1418538A8`.
+    ///
+    /// Регистрируется в `RegGameSaveCb` с типом 3.
     _save_cb_1: [u8; 0x10],
 
     /// `+0x0C0` SaveLoadCallback #2 (size 0). Vtable: `off_1418538C0`.
+    ///
+    /// Регистрируется в `RegGameSaveCb` с типом 1.
     _save_cb_2: [u8; 0x10],
 
     /// `+0x0D0` Номер текущей миссии (init = -1).

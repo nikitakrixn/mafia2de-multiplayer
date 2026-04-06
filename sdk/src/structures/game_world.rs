@@ -52,7 +52,7 @@
 //! | 3 | `STATE_UNK3` | неизвестно |
 //! | 4 | `STATE_DELETE_PENDING` | объект помечен на удаление |
 
-use super::CPlayer;
+use super::{CActorsPack, CPlayer};
 use super::vtables::game_manager::CGameVTable;
 use crate::macros::assert_field_offsets;
 use crate::memory::Ptr;
@@ -109,24 +109,6 @@ pub enum EntitySlot {
 #[repr(C)]
 pub struct EntityHashTable {
     _data: [u8; 0x46B0],
-}
-
-/// Inline подобъект `C_ActorsPack` внутри `C_Game` (`+0x58`).
-///
-/// Возвращается vtable-слотом `[18] GetActorsPack()`.
-///
-/// ## Иерархия
-///
-/// ```text
-/// I_ActorsPack  (vtable M2DE_VT_IActorsPack  @ 0x14186D9C8)
-///   └─ C_ActorsPack (vtable M2DE_VT_CActorsPack @ 0x14186EFB8)
-/// ```
-///
-/// Конструктор: `M2DE_CActorsPack_Constructor`.
-/// Размер: **0x128 байт**.
-#[repr(C)]
-pub struct CActorsPackSub {
-    _data: [u8; 0x128],
 }
 
 /// Глобальный объект `C_Game` — корень игрового мира.
@@ -221,8 +203,10 @@ pub struct GameManager {
     // =========================================================================
     /// `+0x058` Inline-подобъект `C_ActorsPack`.
     ///
+    /// `+0x058` Inline-подобъект `C_ActorsPack`.
+    ///
     /// Доступен через vtable-слот `[18] GetActorsPack()` -> `this + 0x58`.
-    pub actors_pack: CActorsPackSub,
+    pub actors_pack: CActorsPack,
 
     // =========================================================================
     //  Entity slots (+0x180..+0x1A0)

@@ -4,6 +4,7 @@ pub mod std_vector;
 pub mod vtables;
 
 mod application;
+mod actors_pack;
 mod callbacks;
 mod car;
 mod entity;
@@ -28,6 +29,7 @@ pub use entity::{
 };
 
 pub use application::CApplication;
+pub use actors_pack::CActorsPack;
 pub use car::{CCar, CCarDamageSub1, CCarVehicle};
 pub use game_world::{
     ENTITY_SLOT_COUNT, ENTITY_SLOT_PLAYER, EntitySlot, GameManager, GameStateFlag,
