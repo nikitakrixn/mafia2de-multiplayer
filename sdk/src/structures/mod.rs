@@ -3,6 +3,7 @@
 pub mod std_vector;
 pub mod vtables;
 
+mod application;
 mod callbacks;
 mod car;
 mod entity;
@@ -26,8 +27,11 @@ pub use entity::{
     CServiceIdentity, CTypeDescriptor, CWrapperFactory,
 };
 
+pub use application::CApplication;
 pub use car::{CCar, CCarDamageSub1, CCarVehicle};
-pub use game_world::GameManager;
+pub use game_world::{
+    ENTITY_SLOT_COUNT, ENTITY_SLOT_PLAYER, EntitySlot, GameManager, GameStateFlag,
+};
 pub use garage::{CGarage, CGarageManager};
 pub use inventory::{Inventory, InventoryData, InventorySlot, MoneyValue};
 pub use player::{CHuman, CHumanNPC, CPlayer, CPlayerSub45C};

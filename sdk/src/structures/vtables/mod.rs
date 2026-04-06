@@ -4,6 +4,7 @@
 //! виртуальной таблицы конкретного класса. Смещения проверяются
 //! compile-time ассертами.
 
+pub mod application;
 pub mod car;
-pub mod player;
 pub mod game_manager;
+pub mod player;
