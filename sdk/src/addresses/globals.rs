@@ -435,11 +435,11 @@ pub const GAME_MODULE: usize = 0x1CA_F7A0;
 /// `g_M2DE_CApplication` — синглтон `C_Application` (264B).
 ///
 /// Хранится в `C_GlobalObjectAllocationItem<C_Application>` по `off_141C276A8 + 0x10`.
-/// Создаётся лениво через `sub_1400AAD40` (`M2DE_CApplication_Factory`).
+/// Создаётся лениво через `M2DE_CApplication_Factory` (`0x1400AAD40`).
 /// Конструктор: `M2DE_CApplication_Constructor` (`0x1400EDFA0`).
 /// Размер объекта: 264B (`0x108`).
 ///
-/// IDA: `0x141C276B8`
+/// IDA: `0x141C276B8` (= off_141C276A8 + 0x10)
 pub const APPLICATION: usize = 0x1C2_76B8;
 
 /// `g_M2DE_pGameWorld` — синглтон `C_GameWorld` (392B).

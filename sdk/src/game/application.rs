@@ -19,12 +19,8 @@ impl Application {
     #[inline]
     pub fn get() -> Option<Self> {
         let addr = unsafe { memory::read_ptr(base() + addresses::globals::APPLICATION)? };
-        if !memory::is_valid_ptr(addr) {
-            return None;
-        }
-        Some(Self {
-            ptr: Ptr::new(addr),
-        })
+        if !memory::is_valid_ptr(addr) { return None; }
+        Some(Self { ptr: Ptr::new(addr) })
     }
 
     /// Сырой адрес объекта.
