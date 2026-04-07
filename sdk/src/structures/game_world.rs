@@ -54,6 +54,7 @@
 
 use super::{CActorsPack, CPlayer};
 use super::vtables::game_manager::CGameVTable;
+use super::EntityHashTable;
 use crate::macros::assert_field_offsets;
 use crate::memory::Ptr;
 use std::ffi::{c_char, c_void};
@@ -89,26 +90,6 @@ pub enum EntitySlot {
     Slot1 = 1,
     Slot2 = 2,
     Slot3 = 3,
-}
-
-/// Хеш-таблица entity (inline подобъект внутри `C_Game`).
-///
-/// Внутри `C_Game` таких таблиц две: по `+0x1A0` и `+0x86D8`.
-///
-/// ## Layout (0x46B0 байт)
-///
-/// | Смещение | Тип | Описание |
-/// |:---------|:----|:---------|
-/// | `+0x00` | `*u16` | указатель на начало массива бакетов |
-/// | `+0x08` | `*u16` | указатель на конец массива бакетов |
-/// | `+0x10` | `u32` | число записей |
-/// | `+0x30..+0x3EB0` | — | 250 записей по 64 байта |
-/// | `+0x3EB0..+0x46B0` | `[u16; 1024]` | хеш-бакеты (init = `0xFFFF`) |
-///
-/// Конструктор: `M2DE_EntityHashTable_Constructor` (`0x1403D0F50`).
-#[repr(C)]
-pub struct EntityHashTable {
-    _data: [u8; 0x46B0],
 }
 
 /// Глобальный объект `C_Game` — корень игрового мира.
