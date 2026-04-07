@@ -108,7 +108,7 @@ pub fn connect(ip: &str, port: u16, nickname: &str) -> bool {
         guard.inbound.clear();
     }
 
-    crate::overlay::multiplayer_ui::set_connection_status(
+    crate::overlay::state::set_connection_status(
         false,
         format!("Подключение к {addr}..."),
     );
@@ -123,7 +123,7 @@ pub fn connect(ip: &str, port: u16, nickname: &str) -> bool {
                 guard.local_player_id = None;
             }
 
-            crate::overlay::multiplayer_ui::set_connection_status(
+            crate::overlay::state::set_connection_status(
                 false,
                 format!("Ошибка подключения: {e}"),
             );
@@ -191,9 +191,9 @@ pub fn disconnect() -> bool {
     TRANSPORT_STOP.store(true, Ordering::Release);
 
     crate::remote_players::clear_all();
-    crate::overlay::multiplayer_ui::clear_players();
-    crate::overlay::multiplayer_ui::set_connection_status(false, "Отключен".to_string());
-    crate::overlay::multiplayer_ui::add_system_message("Отключено от сервера".to_string());
+    crate::overlay::state::clear_players();
+    crate::overlay::state::set_connection_status(false, "Отключен".to_string());
+    crate::overlay::state::add_system_message("Отключено от сервера".to_string());
 
     logger::info("[network] session stopped");
     true
@@ -244,7 +244,7 @@ pub fn send_chat_message(text: String) {
     };
 
     if !guard.connected {
-        crate::overlay::multiplayer_ui::add_system_message(
+        crate::overlay::state::add_system_message(
             "Нельзя отправить сообщение: нет подключения".to_string(),
         );
         return;
@@ -290,13 +290,13 @@ fn handle_incoming_packet(packet: ServerPacket) {
                 guard.nickname.clone()
             };
 
-            crate::overlay::multiplayer_ui::clear_players();
-            crate::overlay::multiplayer_ui::set_connection_status(
+            crate::overlay::state::clear_players();
+            crate::overlay::state::set_connection_status(
                 true,
                 format!("Подключен как player #{player_id}"),
             );
-            crate::overlay::multiplayer_ui::add_player(player_id as u32, nickname.clone(), 0, true);
-            crate::overlay::multiplayer_ui::add_system_message(format!(
+            crate::overlay::state::add_player(player_id as u32, nickname.clone(), 0, true);
+            crate::overlay::state::add_system_message(format!(
                 "Подключение принято. Ваш ID: {player_id}"
             ));
 
@@ -313,7 +313,7 @@ fn handle_incoming_packet(packet: ServerPacket) {
                 guard.local_player_id = None;
             }
 
-            crate::overlay::multiplayer_ui::set_connection_status(
+            crate::overlay::state::set_connection_status(
                 false,
                 format!("Отказ: {reason}"),
             );
@@ -324,8 +324,8 @@ fn handle_incoming_packet(packet: ServerPacket) {
                 return;
             }
 
-            crate::overlay::multiplayer_ui::add_player(player_id as u32, name.clone(), 42, false);
-            crate::overlay::multiplayer_ui::add_system_message(format!(
+            crate::overlay::state::add_player(player_id as u32, name.clone(), 42, false);
+            crate::overlay::state::add_system_message(format!(
                 "{name} присоединился к игре"
             ));
             crate::remote_players::ensure_binding(player_id, &name);
@@ -333,7 +333,7 @@ fn handle_incoming_packet(packet: ServerPacket) {
 
         ServerPacket::PlayerDespawn { player_id } => {
             crate::remote_players::remove_binding(player_id);
-            crate::overlay::multiplayer_ui::remove_player(player_id as u32);
+            crate::overlay::state::remove_player(player_id as u32);
         }
 
         ServerPacket::Snapshot(snapshot) => {
@@ -352,7 +352,7 @@ fn handle_incoming_packet(packet: ServerPacket) {
 
         ServerPacket::ChatMessage { player_id, text } => {
             let author = format!("Player#{player_id}");
-            crate::overlay::multiplayer_ui::add_chat_message(author, text);
+            crate::overlay::state::add_chat_message(author, text);
         }
     }
 }
@@ -480,9 +480,9 @@ fn transport_fail_disconnect(reason: &str) {
     TRANSPORT_STOP.store(true, Ordering::Release);
 
     crate::remote_players::clear_all();
-    crate::overlay::multiplayer_ui::clear_players();
-    crate::overlay::multiplayer_ui::set_connection_status(false, reason.to_string());
-    crate::overlay::multiplayer_ui::add_system_message(reason.to_string());
+    crate::overlay::state::clear_players();
+    crate::overlay::state::set_connection_status(false, reason.to_string());
+    crate::overlay::state::add_system_message(reason.to_string());
 }
 
 /// Автоматически оборвать session, если игра ушла в меню/выгрузку.

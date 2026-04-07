@@ -29,11 +29,8 @@ pub fn on_main_thread_tick() {
 
     crate::player_tracker::update_main_thread();
     crate::vehicle_tracker::update_main_thread();
-
     crate::player_events::process_pending();
 
-    // Блокируем управление игроком когда открыт UI (чат, меню подключения)
-    crate::overlay::multiplayer_ui::sync_player_controls();
-
+    crate::overlay::state::sync_player_controls();
     crate::network::poll_main_thread();
 }

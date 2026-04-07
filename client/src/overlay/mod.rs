@@ -1,109 +1,88 @@
-pub mod egui_input;
-pub mod multiplayer_demo;
-pub mod multiplayer_ui;
+//! Overlay — egui поверх D3D11.
+//!
+//! Единственная точка входа для рендера:
+//! - `init()` — вызывается при старте клиента
+//! - `render_frame()` — вызывается из Present1 хука каждый кадр
+
+pub mod d3d11_state;
+pub mod demo;
+pub mod input;
 pub mod state;
-pub mod state_backup;
-pub mod ui_new;
+pub mod theme;
+pub mod ui;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 
 use common::logger;
 
-// Флаги видимости и рендера
 static VISIBLE: AtomicBool = AtomicBool::new(true);
 static RENDERING: AtomicBool = AtomicBool::new(false);
 static FRAME_COUNT: AtomicU64 = AtomicU64::new(0);
 
-// Внутреннее состояние оверлея
-struct OverlayInner {
-    egui_ctx: egui::Context,
-    egui_renderer: egui_directx11::Renderer,
+struct Inner {
+    ctx: egui::Context,
+    renderer: egui_directx11::Renderer,
     screen_w: u32,
     screen_h: u32,
-    last_fps_time: Instant,
-    fps_frame_count: u32,
     start_time: Instant,
+    fps_counter: FpsCounter,
 }
 
-unsafe impl Send for OverlayInner {}
+unsafe impl Send for Inner {}
 
-static OVERLAY: OnceLock<Mutex<OverlayInner>> = OnceLock::new();
+struct FpsCounter {
+    last_time: Instant,
+    frame_count: u32,
+}
 
-// Пытаемся инициализировать оверлей
-// Может быть вызвана несколько раз — если D3D11 ещё не готов, вернём Ok(false)
-fn try_init() -> Result<bool, String> {
-    // Уже инициализирован?
-    if OVERLAY.get().is_some() {
-        return Ok(true);
+impl FpsCounter {
+    fn new() -> Self {
+        Self {
+            last_time: Instant::now(),
+            frame_count: 0,
+        }
     }
 
-    // Проверяем готовность D3D11
-    let dev_ptr = match sdk::game::render::get_d3d_device_ptr() {
-        Some(p) => p,
-        None => return Ok(false), // ещё не готов
-    };
-
-    let (width, height) = sdk::game::render::get_swapchain_size()
-        .or_else(|| sdk::game::render::get_render_size())
-        .unwrap_or((1280, 720));
-
-    let device = unsafe { state_backup::borrow_device(dev_ptr) };
-
-    // Создаём egui renderer
-    let egui_renderer = egui_directx11::Renderer::new(&*device)
-        .map_err(|e| format!("egui Renderer::new: {e:?}"))?;
-
-    let egui_ctx = egui::Context::default();
-
-    // Стиль — тёмный, полностью прозрачный фон
-    let mut style = (*egui_ctx.style()).clone();
-    style.visuals.window_fill = egui::Color32::TRANSPARENT;
-    style.visuals.panel_fill = egui::Color32::TRANSPARENT;
-    style.visuals.window_shadow = egui::Shadow::NONE;
-    style.visuals.popup_shadow = egui::Shadow::NONE;
-    style.visuals.window_stroke = egui::Stroke::NONE;
-    egui_ctx.set_style(style);
-
-    let _ = OVERLAY.set(Mutex::new(OverlayInner {
-        egui_ctx,
-        egui_renderer,
-        screen_w: width,
-        screen_h: height,
-        last_fps_time: Instant::now(),
-        fps_frame_count: 0,
-        start_time: Instant::now(),
-    }));
-
-    logger::info(&format!(
-        "[overlay] egui инициализирован ({width}x{height}, device=0x{dev_ptr:X})"
-    ));
-    Ok(true)
+    fn tick(&mut self) -> Option<f32> {
+        self.frame_count += 1;
+        let elapsed = self.last_time.elapsed().as_secs_f32();
+        if elapsed >= 0.5 {
+            let fps = self.frame_count as f32 / elapsed;
+            self.frame_count = 0;
+            self.last_time = Instant::now();
+            Some(fps)
+        } else {
+            None
+        }
+    }
 }
 
-// Инициализация оверлея — вызывается из lib.rs при старте
-// Если D3D11 не готов — ничего страшного, доинициализируем позже
+static OVERLAY: LazyLock<Mutex<Option<Inner>>> = LazyLock::new(|| Mutex::new(None));
+
+/// Попытка инициализации. Если D3D11 не готов — вернёт Ok(false).
 pub fn init() -> Result<(), String> {
     logger::info("[overlay] инициализация egui + D3D11");
     match try_init() {
-        Ok(true) => Ok(()),
+        Ok(true) => {
+            logger::info("[overlay] egui инициализирован");
+            Ok(())
+        }
         Ok(false) => {
-            logger::info("[overlay] D3D11 ещё не готов, доинициализируем при первом Present1");
+            logger::info("[overlay] D3D11 не готов, отложим до первого Present");
             Ok(())
         }
         Err(e) => Err(e),
     }
 }
 
-// Рендер кадра — вызывается из Present1 хука каждый кадр
+/// Рендер кадра — вызывается из Present1 хука.
 pub fn render_frame() {
     if !VISIBLE.load(Ordering::Relaxed) {
         return;
     }
-
-    // Не рендерим если окно не в фокусе
-    if !is_window_focused() {
+    if !crate::utils::is_window_focused() {
         return;
     }
 
@@ -111,127 +90,147 @@ pub fn render_frame() {
     if RENDERING.swap(true, Ordering::AcqRel) {
         return;
     }
-    struct Guard;
-    impl Drop for Guard {
-        fn drop(&mut self) {
-            RENDERING.store(false, Ordering::Release);
-        }
-    }
-    let _g = Guard;
+    let _guard = scopeguard(|| RENDERING.store(false, Ordering::Release));
 
     let frame = FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
 
-    // Ленивая инициализация — если ещё не создан renderer
-    if OVERLAY.get().is_none() {
-        match try_init() {
-            Ok(true) => {
-                logger::info("[overlay] отложенная инициализация успешна");
-            }
-            Ok(false) => {
-                // D3D11 всё ещё не готов
-                return;
-            }
-            Err(e) => {
-                // Логируем ошибку раз в 300 кадров
-                if frame % 300 == 0 {
-                    logger::warn(&format!("[overlay] ошибка инициализации: {e}"));
-                }
-                return;
-            }
-        }
-    }
+    // Ленивая инициализация
+    ensure_initialized(frame);
 
-    // Проверяем D3D11 ресурсы
+    // D3D11 ресурсы
     let Some(ctx_ptr) = sdk::game::render::get_d3d_context_ptr() else {
         return;
     };
     let Some(rtv_ptr) = sdk::game::render::get_backbuffer_rtv_ptr() else {
         return;
     };
-
-    let (bb_w, bb_h) = match sdk::game::render::get_swapchain_size() {
-        Some(s) if s.0 > 0 && s.1 > 0 => s,
-        _ => return,
+    let Some((bb_w, bb_h)) = sdk::game::render::get_swapchain_size().filter(|&(w, h)| w > 0 && h > 0) else {
+        return;
     };
 
-    let mut guard = match OVERLAY.get() {
-        Some(m) => match m.try_lock() {
-            Ok(g) => g,
-            Err(_) => return,
-        },
-        None => return,
+    let mut guard = match OVERLAY.try_lock() {
+        Ok(g) => g,
+        Err(_) => return,
     };
-    let inner = &mut *guard;
+    let Some(inner) = guard.as_mut() else {
+        return;
+    };
 
-    // Считаем FPS
-    inner.fps_frame_count += 1;
-    let elapsed = inner.last_fps_time.elapsed();
-    if elapsed.as_secs_f32() >= 2.0 {
-        state::set_fps(inner.fps_frame_count as f32 / elapsed.as_secs_f32());
-        inner.fps_frame_count = 0;
-        inner.last_fps_time = Instant::now();
+    // FPS
+    if let Some(fps) = inner.fps_counter.tick() {
+        state::set_fps(fps);
     }
 
-    // Обрабатываем изменение разрешения
+    // Resize
     if bb_w != inner.screen_w || bb_h != inner.screen_h {
         logger::info(&format!(
-            "[overlay] изменение разрешения: {}x{} -> {bb_w}x{bb_h}",
+            "[overlay] resize: {}x{} -> {bb_w}x{bb_h}",
             inner.screen_w, inner.screen_h
         ));
         inner.screen_w = bb_w;
         inner.screen_h = bb_h;
     }
 
-    // Снимок данных для UI
+    // Snapshot данных для UI
     let snap = state::snapshot();
 
     // Собираем ввод
     let hwnd = sdk::game::render::get_hwnd();
-    let wants_mouse = multiplayer_ui::wants_mouse();
-    let mut raw_input = egui_input::collect_raw_input(
+    let wants_input = state::wants_input();
+    let mut raw_input = input::collect(
         inner.screen_w as f32,
         inner.screen_h as f32,
         hwnd,
-        wants_mouse,
+        wants_input,
     );
     raw_input.time = Some(inner.start_time.elapsed().as_secs_f64());
 
-    // Запускаем egui frame
-    let full_output = inner.egui_ctx.run(raw_input, |ctx| {
-        ui_new::draw_overlay(ctx, &snap);
+    // egui frame
+    let full_output = inner.ctx.run(raw_input, |ctx| {
+        ui::draw(ctx, &snap);
     });
 
-    // Рендерим в D3D11 backbuffer
-    let ctx_d3d = unsafe { state_backup::borrow_context(ctx_ptr) };
-    let rtv = unsafe { state_backup::borrow_rtv(rtv_ptr) };
+    // D3D11 рендер
+    let d3d_ctx = unsafe { d3d11_state::borrow_context(ctx_ptr) };
+    let rtv = unsafe { d3d11_state::borrow_rtv(rtv_ptr) };
+    let backup = unsafe { d3d11_state::StateBackup::save(&d3d_ctx) };
 
-    // Сохраняем состояние игрового pipeline
-    let backup = unsafe { state_backup::D3D11StateBackup::save(&ctx_d3d) };
+    let (renderer_output, _, _) = egui_directx11::split_output(full_output);
 
-    let (renderer_output, _platform_output, _viewport_output) =
-        egui_directx11::split_output(full_output);
-
-    // Рендерим egui
-    if let Err(e) = inner
-        .egui_renderer
-        .render(&*ctx_d3d, &*rtv, &inner.egui_ctx, renderer_output)
-    {
+    if let Err(e) = inner.renderer.render(&*d3d_ctx, &*rtv, &inner.ctx, renderer_output) {
         if frame % 600 == 0 {
-            logger::warn(&format!("[overlay] ошибка рендера: {e:?}"));
+            logger::warn(&format!("[overlay] render error: {e:?}"));
         }
     }
 
-    // Восстанавливаем состояние игрового pipeline
-    unsafe { backup.restore(&ctx_d3d) };
+    unsafe { backup.restore(&d3d_ctx) };
 }
 
 pub fn toggle_visibility() {
     let v = !VISIBLE.load(Ordering::Relaxed);
     VISIBLE.store(v, Ordering::Release);
-    logger::info(&format!("[overlay] видимость: {v}"));
+    logger::info(&format!("[overlay] visible: {v}"));
 }
 
-// Проверяет, находится ли окно игры в фокусе
-fn is_window_focused() -> bool {
-    crate::utils::is_window_focused()
+fn try_init() -> Result<bool, String> {
+    let mut guard = OVERLAY.lock().map_err(|e| format!("lock: {e}"))?;
+    if guard.is_some() {
+        return Ok(true);
+    }
+
+    let Some(dev_ptr) = sdk::game::render::get_d3d_device_ptr() else {
+        return Ok(false);
+    };
+
+    let (w, h) = sdk::game::render::get_swapchain_size()
+        .or_else(|| sdk::game::render::get_render_size())
+        .unwrap_or((1920, 1080));
+
+    let device = unsafe { d3d11_state::borrow_device(dev_ptr) };
+
+    let renderer = egui_directx11::Renderer::new(&*device)
+        .map_err(|e| format!("Renderer::new: {e:?}"))?;
+
+    let ctx = egui::Context::default();
+    theme::apply(&ctx);
+
+    *guard = Some(Inner {
+        ctx,
+        renderer,
+        screen_w: w,
+        screen_h: h,
+        start_time: Instant::now(),
+        fps_counter: FpsCounter::new(),
+    });
+
+    logger::info(&format!("[overlay] ready ({w}x{h}, device=0x{dev_ptr:X})"));
+    Ok(true)
+}
+
+fn ensure_initialized(frame: u64) {
+    if OVERLAY.lock().map(|g| g.is_some()).unwrap_or(true) {
+        return;
+    }
+    match try_init() {
+        Ok(true) => logger::info("[overlay] deferred init OK"),
+        Ok(false) => {}
+        Err(e) => {
+            if frame % 300 == 0 {
+                logger::warn(&format!("[overlay] init error: {e}"));
+            }
+        }
+    }
+}
+
+/// Простой scope guard без внешних зависимостей.
+fn scopeguard<F: FnOnce()>(f: F) -> impl Drop {
+    struct Guard<F: FnOnce()>(Option<F>);
+    impl<F: FnOnce()> Drop for Guard<F> {
+        fn drop(&mut self) {
+            if let Some(f) = self.0.take() {
+                f();
+            }
+        }
+    }
+    Guard(Some(f))
 }

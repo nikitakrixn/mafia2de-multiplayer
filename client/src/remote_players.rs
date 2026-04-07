@@ -183,7 +183,7 @@ fn apply_snapshot_to_binding(binding: &mut RemoteBinding, snapshot: &NetPlayerSn
     }
 
     // Обновляем запись в UI (пинг пока 0 — нет RTT)
-    crate::overlay::multiplayer_ui::update_player_ping(binding.player_id as u32, 0);
+    crate::overlay::state::update_player_ping(binding.player_id as u32, 0);
 }
 
 /// Получить имя удалённого игрока по его ID.

@@ -103,32 +103,31 @@ unsafe extern "system" fn wndproc_detour(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    use crate::overlay::egui_input::{WndProcEvent, push_wndproc_event, vk_to_egui_key};
+    use crate::overlay::input::{WndProcEvent, push_event, vk_to_egui_key};
 
     // Обрабатываем только когда overlay захватил ввод
-    if crate::overlay::multiplayer_ui::wants_mouse() {
+    if crate::overlay::state::wants_input() {
         match msg {
             WM_CHAR | WM_KEYDOWN | WM_KEYUP => {
                 let vk = wparam.0 as u16;
                 match msg {
                     WM_CHAR => {
                         if let Some(ch) = char::from_u32(wparam.0 as u32) {
-                            push_wndproc_event(WndProcEvent::Char(ch));
+                            push_event(WndProcEvent::Char(ch));
                         }
                     }
                     WM_KEYDOWN => {
                         if let Some(key) = vk_to_egui_key(vk) {
-                            push_wndproc_event(WndProcEvent::KeyDown(key));
+                            push_event(WndProcEvent::KeyDown(key));
                         }
                     }
                     WM_KEYUP => {
                         if let Some(key) = vk_to_egui_key(vk) {
-                            push_wndproc_event(WndProcEvent::KeyUp(key));
+                            push_event(WndProcEvent::KeyUp(key));
                         }
                     }
                     _ => {}
                 }
-                // Блокируем — не передаём в игру
                 return LRESULT(0);
             }
             _ => {}
