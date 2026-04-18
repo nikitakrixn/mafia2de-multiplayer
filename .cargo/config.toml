@@ -8,6 +8,24 @@ build-client = "build -p client --release"
 # Собрать devtools (DLL)  
 build-dev = "build -p devtools --release"
 
+# Debug-сборка devtools (DLL)
+devtools = "build -p devtools"
+
+# Debug-сборка клиента (DLL)
+client-debug = "build -p client"
+
+# Короткие run-* алиасы (для DLL это тоже build)
+run-devtools = "build -p devtools"
+run-client-debug = "build -p client"
+
+# Запуск launcher в debug-режиме с нужным профилем инжекта
+launch-dev = "run -p launcher -- --devtools"
+launch-client = "run -p launcher -- --client"
+
+# Короткие алиасы
+ld = "run -p launcher -- --devtools"
+lc = "run -p launcher -- --client"
+
 # Собрать сервер
 build-server = "build -p server --release"
 
