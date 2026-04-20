@@ -1,96 +1,143 @@
-//! HUD — FPS, координаты, бейдж подключения, версия.
+//! HUD — компактная диагностическая панель (FPS, пинг, координаты, состояние),
+//! бейдж подключения и плашка с версией.
 
-use egui::{Align2, FontId, Pos2};
+use egui::{Align2, RichText, Vec2};
 
 use crate::overlay::state::{ConnectionInfo, Snapshot};
-use crate::overlay::theme::colors;
+use crate::overlay::theme::{self, colors};
+
+const PANEL_ID: &str = "hud_debug";
+const BADGE_ID: &str = "hud_conn_badge";
+const VERSION_ID: &str = "hud_version";
 
 pub fn draw(ctx: &egui::Context, snap: &Snapshot) {
-    let painter = ctx.layer_painter(egui::LayerId::background());
+    egui::Area::new(egui::Id::new(PANEL_ID))
+        .anchor(Align2::LEFT_TOP, Vec2::new(12.0, 12.0))
+        .interactable(false)
+        .order(egui::Order::Background)
+        .show(ctx, |ui| {
+            theme::overlay_frame(colors::HUD_BG).show(ui, |ui| {
+                ui.set_min_width(120.0);
+                ui.spacing_mut().item_spacing.y = 2.0;
 
-    let x = 14.0;
-    let mut y = 14.0;
+                let fps_color = match snap.fps as u32 {
+                    60.. => colors::GREEN,
+                    30..=59 => colors::YELLOW,
+                    _ => colors::RED,
+                };
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!("{:>3.0}", snap.fps))
+                            .monospace()
+                            .size(13.0)
+                            .color(fps_color)
+                            .strong(),
+                    );
+                    ui.label(
+                        RichText::new("FPS")
+                            .size(10.0)
+                            .color(colors::TEXT_MUTED)
+                            .monospace(),
+                    );
+                });
 
-    let fps_color = match snap.fps as u32 {
-        60.. => colors::GREEN,
-        30..=59 => colors::YELLOW,
-        _ => colors::RED,
-    };
+                if snap.connection.connected && snap.local_ping > 0 {
+                    let ping_color = match snap.local_ping {
+                        0..=50 => colors::GREEN,
+                        51..=100 => colors::YELLOW,
+                        _ => colors::RED,
+                    };
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new(format!("{:>3}", snap.local_ping))
+                                .monospace()
+                                .size(13.0)
+                                .color(ping_color)
+                                .strong(),
+                        );
+                        ui.label(
+                            RichText::new("ms")
+                                .size(10.0)
+                                .color(colors::TEXT_MUTED)
+                                .monospace(),
+                        );
+                    });
+                }
 
-    painter.text(
-        Pos2::new(x, y),
-        Align2::LEFT_TOP,
-        format!("{:.0} FPS", snap.fps),
-        FontId::monospace(13.0),
-        fps_color,
-    );
-    y += 18.0;
+                ui.add(egui::Separator::default().spacing(2.0));
 
-    let labels = ["X", "Y", "Z"];
-    for (i, label) in labels.iter().enumerate() {
-        painter.text(
-            Pos2::new(x, y),
-            Align2::LEFT_TOP,
-            format!("{label}: {:.1}", snap.pos[i]),
-            FontId::monospace(11.0),
-            colors::TEXT_MUTED,
-        );
-        y += 14.0;
-    }
+                for (label, value) in [
+                    ("X", snap.pos[0]),
+                    ("Y", snap.pos[1]),
+                    ("Z", snap.pos[2]),
+                ] {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new(label)
+                                .size(10.0)
+                                .monospace()
+                                .color(colors::TEXT_MUTED),
+                        );
+                        ui.label(
+                            RichText::new(format!("{value:>8.1}"))
+                                .size(11.0)
+                                .monospace()
+                                .color(colors::TEXT_SECONDARY),
+                        );
+                    });
+                }
 
-    y += 2.0;
-    painter.text(
-        Pos2::new(x, y),
-        Align2::LEFT_TOP,
-        snap.game_state,
-        FontId::monospace(11.0),
-        colors::TEXT_MUTED,
-    );
+                ui.add(egui::Separator::default().spacing(2.0));
+
+                ui.label(
+                    RichText::new(snap.game_state)
+                        .size(10.5)
+                        .color(colors::GOLD_DIM)
+                        .extra_letter_spacing(1.5),
+                );
+            });
+        });
 }
 
-/// Бейдж — рисуем текст, потом кружок слева от него.
 pub fn draw_connection_badge(ctx: &egui::Context, conn: &ConnectionInfo) {
-    let painter = ctx.layer_painter(egui::LayerId::background());
-    let screen = ctx.input(|i| i.screen_rect());
-
-    let x = screen.max.x - 14.0;
-    let y = screen.max.y - 20.0;
-
-    // Сначала статус текст (правый край)
-    let status_rect = painter.text(
-        Pos2::new(x, y),
-        Align2::RIGHT_TOP,
-        &conn.status,
-        FontId::proportional(11.0),
-        colors::TEXT_SECONDARY,
-    );
-
-    // "ONLINE" левее статуса
-    let online_rect = painter.text(
-        Pos2::new(status_rect.min.x - 8.0, y),
-        Align2::RIGHT_TOP,
-        "ONLINE",
-        FontId::proportional(11.0),
-        colors::GREEN,
-    );
-
-    // Кружок левее "ONLINE"
-    painter.circle_filled(
-        Pos2::new(online_rect.min.x - 8.0, online_rect.center().y),
-        4.0,
-        colors::GREEN,
-    );
+    egui::Area::new(egui::Id::new(BADGE_ID))
+        .anchor(Align2::RIGHT_BOTTOM, Vec2::new(-12.0, -12.0))
+        .interactable(false)
+        .order(egui::Order::Background)
+        .show(ctx, |ui| {
+            theme::overlay_frame(colors::HUD_BG).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    theme::status_dot(ui, colors::GREEN, 8.0);
+                    ui.label(
+                        RichText::new("ONLINE")
+                            .size(11.0)
+                            .color(colors::GREEN)
+                            .strong()
+                            .extra_letter_spacing(1.5),
+                    );
+                    ui.add(egui::Separator::default().vertical().spacing(4.0));
+                    ui.label(
+                        RichText::new(&conn.status)
+                            .size(11.0)
+                            .color(colors::TEXT_SECONDARY)
+                            .monospace(),
+                    );
+                });
+            });
+        });
 }
 
 pub fn draw_version(ctx: &egui::Context) {
-    let painter = ctx.layer_painter(egui::LayerId::background());
-    let screen = ctx.input(|i| i.screen_rect());
-
-    painter.text(
-        Pos2::new(screen.max.x - 8.0, 8.0),
-        Align2::RIGHT_TOP,
-        "M2:MP v0.1.0",
-        FontId::monospace(10.0),
-        colors::TEXT_MUTED,
-    );
+    egui::Area::new(egui::Id::new(VERSION_ID))
+        .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 12.0))
+        .interactable(false)
+        .order(egui::Order::Background)
+        .show(ctx, |ui| {
+            ui.label(
+                RichText::new(concat!("M2:DE MP v", env!("CARGO_PKG_VERSION")))
+                    .size(10.0)
+                    .monospace()
+                    .color(colors::TEXT_MUTED),
+            );
+        });
 }

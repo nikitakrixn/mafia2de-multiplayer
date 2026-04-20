@@ -15,7 +15,10 @@ use minhook::{MH_STATUS, MinHook};
 use sdk::{addresses, memory};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallWindowProcW, GWLP_WNDPROC, SetWindowLongPtrW, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
+    CallWindowProcW, GWLP_WNDPROC, SetWindowLongPtrW, WM_CHAR, WM_INPUT, WM_KEYDOWN, WM_KEYUP,
+    WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN, WM_MBUTTONUP,
+    WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK, WM_RBUTTONDOWN, WM_RBUTTONUP,
+    WM_XBUTTONDBLCLK, WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
 // =============================================================================
@@ -93,6 +96,7 @@ unsafe extern "system" fn present1_detour(
     }
 }
 
+
 /// WndProc хук — перехватывает WM_CHAR / WM_KEYDOWN / WM_KEYUP.
 ///
 /// WM_CHAR содержит готовый Unicode символ с учётом текущей раскладки (кириллица, etc).
@@ -105,31 +109,46 @@ unsafe extern "system" fn wndproc_detour(
 ) -> LRESULT {
     use crate::overlay::input::{WndProcEvent, push_event, vk_to_egui_key};
 
-    // Обрабатываем только когда overlay захватил ввод
+    // Обрабатываем только когда overlay захватил ввод (открыто меню/чат/etc).
     if crate::overlay::state::wants_input() {
         match msg {
-            WM_CHAR | WM_KEYDOWN | WM_KEYUP => {
-                let vk = wparam.0 as u16;
-                match msg {
-                    WM_CHAR => {
-                        if let Some(ch) = char::from_u32(wparam.0 as u32) {
-                            push_event(WndProcEvent::Char(ch));
-                        }
-                    }
-                    WM_KEYDOWN => {
-                        if let Some(key) = vk_to_egui_key(vk) {
-                            push_event(WndProcEvent::KeyDown(key));
-                        }
-                    }
-                    WM_KEYUP => {
-                        if let Some(key) = vk_to_egui_key(vk) {
-                            push_event(WndProcEvent::KeyUp(key));
-                        }
-                    }
-                    _ => {}
+            // Клавиатура — забираем себе и поглощаем, чтобы игра не реагировала.
+            WM_CHAR => {
+                if let Some(ch) = char::from_u32(wparam.0 as u32) {
+                    push_event(WndProcEvent::Char(ch));
                 }
                 return LRESULT(0);
             }
+            WM_KEYDOWN => {
+                if let Some(key) = vk_to_egui_key(wparam.0 as u16) {
+                    push_event(WndProcEvent::KeyDown(key));
+                }
+                return LRESULT(0);
+            }
+            WM_KEYUP => {
+                if let Some(key) = vk_to_egui_key(wparam.0 as u16) {
+                    push_event(WndProcEvent::KeyUp(key));
+                }
+                return LRESULT(0);
+            }
+
+            // Мышь: поглощаем, чтобы игра не двигала камеру/не стреляла.
+            // Текущее положение/кнопки overlay сам опросит через GetCursorPos/
+            // GetAsyncKeyState в `input::collect`.
+            WM_MOUSEMOVE
+            | WM_LBUTTONDOWN | WM_LBUTTONUP | WM_LBUTTONDBLCLK
+            | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_RBUTTONDBLCLK
+            | WM_MBUTTONDOWN | WM_MBUTTONUP | WM_MBUTTONDBLCLK
+            | WM_XBUTTONDOWN | WM_XBUTTONUP | WM_XBUTTONDBLCLK
+            | WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
+                return LRESULT(0);
+            }
+
+            // Raw input — игра использует его для delta мыши камерой; гасим.
+            WM_INPUT => {
+                return LRESULT(0);
+            }
+
             _ => {}
         }
     }

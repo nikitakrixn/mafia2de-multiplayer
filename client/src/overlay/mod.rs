@@ -7,6 +7,7 @@
 pub mod d3d11_state;
 pub mod demo;
 pub mod input;
+pub mod input_lock;
 pub mod state;
 pub mod theme;
 pub mod ui;
@@ -137,6 +138,7 @@ pub fn render_frame() {
     // Собираем ввод
     let hwnd = sdk::game::render::get_hwnd();
     let wants_input = state::wants_input();
+    input_lock::tick(wants_input);
     let mut raw_input = input::collect(
         inner.screen_w as f32,
         inner.screen_h as f32,

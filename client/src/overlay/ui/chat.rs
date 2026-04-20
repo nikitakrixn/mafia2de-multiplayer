@@ -1,18 +1,16 @@
-//! Чат — всегда видимые сообщения + открываемое поле ввода.
+//! Чат — пассивная "лента" внизу экрана + полноценное окно при открытии (T).
 //!
-//! Пассивный режим: последние сообщения с fade (без интерактива).
-//! Активный режим (T): полная история + поле ввода.
+//! Пассивный режим: последние сообщения с плавным fade всего блока.
+//! Активный режим: тайтл-бар, история со скроллом, поле ввода.
 
-use egui::{Align2, Color32, FontId, Pos2, RichText, ScrollArea, TextEdit, Vec2};
+use egui::{Align2, FontId, RichText, ScrollArea, TextEdit, Vec2};
 
 use crate::overlay::state::{self, ChatMsg, Snapshot};
-use crate::overlay::theme::colors;
+use crate::overlay::theme::{self, colors, sizes};
 
-// Пассивный чат
 const PASSIVE_MAX_MSGS: usize = 8;
 const PASSIVE_VISIBLE_SECS: f32 = 10.0;
 const PASSIVE_FADE_START: f32 = 7.0;
-const MSG_LINE_HEIGHT: f32 = 16.0;
 
 pub fn draw(ctx: &egui::Context, snap: &Snapshot) {
     if snap.chat_input_open {
@@ -23,7 +21,6 @@ pub fn draw(ctx: &egui::Context, snap: &Snapshot) {
 }
 
 fn draw_passive(ctx: &egui::Context, snap: &Snapshot) {
-    // Фильтруем только свежие
     let recent: Vec<&ChatMsg> = snap
         .chat_msgs
         .iter()
@@ -39,170 +36,180 @@ fn draw_passive(ctx: &egui::Context, snap: &Snapshot) {
         return;
     }
 
-    let painter = ctx.layer_painter(egui::LayerId::new(
-        egui::Order::Middle,
-        egui::Id::new("chat_passive"),
-    ));
+    let block_alpha = recent
+        .iter()
+        .map(|m| message_alpha(m))
+        .fold(0.0_f32, f32::max);
 
-    let screen = ctx.screen_rect();
-    let x = 14.0;
-    let base_y = screen.max.y - 20.0;
+    egui::Area::new(egui::Id::new("chat_passive"))
+        .anchor(Align2::LEFT_BOTTOM, Vec2::new(12.0, -12.0))
+        .interactable(false)
+        .order(egui::Order::Middle)
+        .show(ctx, |ui| {
+            theme::overlay_frame(theme::fade(colors::CHAT_BG_PASSIVE, block_alpha))
+                .show(ui, |ui| {
+                    ui.set_max_width(sizes::CHAT_WIDTH);
+                    ui.spacing_mut().item_spacing.y = 1.0;
 
-    // Фон
-    let total_h = recent.len() as f32 * MSG_LINE_HEIGHT + 12.0;
-    let bg_rect = egui::Rect::from_min_size(
-        Pos2::new(x - 6.0, base_y - total_h),
-        Vec2::new(420.0, total_h + 6.0),
-    );
-    painter.rect_filled(bg_rect, 4.0, colors::CHAT_BG_PASSIVE);
+                    for msg in &recent {
+                        draw_passive_msg(ui, msg, block_alpha);
+                    }
+                });
+        });
+}
 
-    for (i, msg) in recent.iter().enumerate() {
-        let age = msg.created.elapsed().as_secs_f32();
-        let alpha = if age > PASSIVE_FADE_START {
-            1.0 - (age - PASSIVE_FADE_START) / (PASSIVE_VISIBLE_SECS - PASSIVE_FADE_START)
-        } else {
-            1.0
-        }
-        .clamp(0.0, 1.0);
+fn draw_passive_msg(ui: &mut egui::Ui, msg: &ChatMsg, block_alpha: f32) {
+    let alpha = message_alpha(msg).min(block_alpha);
 
-        let y = base_y - (recent.len() - i) as f32 * MSG_LINE_HEIGHT;
-        let text = format_msg(msg);
-        let color = msg_color(msg, alpha);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
 
-        painter.text(
-            Pos2::new(x, y),
-            egui::Align2::LEFT_TOP,
-            text,
-            FontId::proportional(12.0),
-            color,
+        ui.label(
+            RichText::new(&msg.time)
+                .size(10.5)
+                .monospace()
+                .color(theme::fade(colors::CHAT_TIME, alpha)),
         );
-    }
+
+        if msg.system {
+            ui.label(
+                RichText::new(&msg.text)
+                    .size(12.0)
+                    .color(theme::fade(colors::CHAT_SYSTEM, alpha)),
+            );
+        } else {
+            ui.label(
+                RichText::new(format!("{}:", msg.author))
+                    .size(12.0)
+                    .strong()
+                    .color(theme::fade(colors::CHAT_AUTHOR, alpha)),
+            );
+            ui.label(
+                RichText::new(&msg.text)
+                    .size(12.0)
+                    .color(theme::fade(colors::TEXT_PRIMARY, alpha)),
+            );
+        }
+    });
 }
 
 fn draw_active(ctx: &egui::Context, snap: &Snapshot) {
     egui::Window::new("chat_active")
-        .anchor(Align2::LEFT_BOTTOM, Vec2::new(14.0, -14.0))
+        .anchor(Align2::LEFT_BOTTOM, Vec2::new(12.0, -12.0))
         .resizable(false)
         .collapsible(false)
         .title_bar(false)
-        .min_width(420.0)
-        .default_height(300.0)
+        .frame(theme::panel_frame().inner_margin(egui::Margin::ZERO))
+        .fixed_size(egui::Vec2::new(sizes::CHAT_WIDTH, 0.0))
         .show(ctx, |ui| {
-            // Заголовок
-            ui.horizontal(|ui| {
-                ui.label(
-                    RichText::new("ЧАТ")
-                        .size(11.0)
-                        .color(colors::GOLD_DIM)
-                        .extra_letter_spacing(2.0),
-                );
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        RichText::new("Enter - отправить, Esc - закрыть")
-                            .size(10.0)
-                            .color(colors::TEXT_MUTED),
-                    );
-                });
-            });
+            theme::header_bar(ui, "ЧАТЕРСЫ", Some("ENTER — отправить · ESC — закрыть"));
 
-            ui.add(egui::Separator::default().spacing(4.0));
-
-            // История сообщений
-            ScrollArea::vertical()
-                .max_height(240.0)
-                .stick_to_bottom(true)
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::same(10))
                 .show(ui, |ui| {
-                    if snap.chat_msgs.is_empty() {
+                    draw_active_history(ui, snap);
+                    ui.add_space(4.0);
+                    ui.add(egui::Separator::default().spacing(2.0));
+                    ui.add_space(4.0);
+                    draw_active_input(ui, snap);
+                });
+        });
+}
+
+fn draw_active_history(ui: &mut egui::Ui, snap: &Snapshot) {
+    ScrollArea::vertical()
+        .id_salt("chat_history")
+        .max_height(260.0)
+        .min_scrolled_height(260.0)
+        .stick_to_bottom(true)
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = 2.0;
+
+            if snap.chat_msgs.is_empty() {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    ui.label(
+                        RichText::new("Нет сообщений")
+                            .color(colors::TEXT_MUTED)
+                            .size(12.0),
+                    );
+                    ui.add_space(20.0);
+                });
+                return;
+            }
+
+            for msg in &snap.chat_msgs {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    ui.label(
+                        RichText::new(&msg.time)
+                            .color(colors::CHAT_TIME)
+                            .size(10.5)
+                            .monospace(),
+                    );
+
+                    if msg.system {
                         ui.label(
-                            RichText::new("Нет сообщений")
-                                .color(colors::TEXT_MUTED)
+                            RichText::new(&msg.text)
+                                .color(colors::CHAT_SYSTEM)
                                 .size(12.0),
                         );
-                        return;
-                    }
-
-                    for msg in &snap.chat_msgs {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(
-                                RichText::new(&msg.time)
-                                    .color(colors::CHAT_TIME)
-                                    .size(10.0)
-                                    .monospace(),
-                            );
-
-                            if msg.system {
-                                ui.label(
-                                    RichText::new(&msg.text)
-                                        .color(colors::CHAT_SYSTEM)
-                                        .size(12.0),
-                                );
-                            } else {
-                                ui.label(
-                                    RichText::new(format!("{}:", msg.author))
-                                        .color(colors::CHAT_AUTHOR)
-                                        .size(12.0)
-                                        .strong(),
-                                );
-                                ui.label(
-                                    RichText::new(&msg.text)
-                                        .color(colors::TEXT_PRIMARY)
-                                        .size(12.0),
-                                );
-                            }
-                        });
+                    } else {
+                        ui.label(
+                            RichText::new(format!("{}:", msg.author))
+                                .color(colors::CHAT_AUTHOR)
+                                .size(12.0)
+                                .strong(),
+                        );
+                        ui.label(
+                            RichText::new(&msg.text)
+                                .color(colors::TEXT_PRIMARY)
+                                .size(12.0),
+                        );
                     }
                 });
-
-            ui.add(egui::Separator::default().spacing(4.0));
-
-            // Поле ввода
-            let mut input = snap.chat_input.clone();
-
-            let response = ui.add(
-                TextEdit::singleline(&mut input)
-                    .desired_width(ui.available_width())
-                    .hint_text("Сообщение...")
-                    .font(FontId::proportional(12.0)),
-            );
-
-            state::save_chat_input(&input);
-            response.request_focus();
-
-            // Enter — отправить
-            let enter = response.has_focus()
-                && ui.input(|i| i.key_pressed(egui::Key::Enter));
-
-            if enter {
-                let text = input.trim().to_string();
-                if !text.is_empty() {
-                    state::save_chat_input("");
-                    let nick = state::get_nickname();
-                    state::add_chat_msg(&nick, &text);
-                    crate::network::send_chat_message(text);
-                }
-                state::close_chat_input();
             }
         });
 }
 
-fn format_msg(msg: &ChatMsg) -> String {
-    if msg.system {
-        format!("{} {}", msg.time, msg.text)
-    } else {
-        format!("{} {}: {}", msg.time, msg.author, msg.text)
+fn draw_active_input(ui: &mut egui::Ui, snap: &Snapshot) {
+    let mut input = snap.chat_input.clone();
+
+    let response = ui.add(
+        TextEdit::singleline(&mut input)
+            .desired_width(ui.available_width())
+            .hint_text("Сообщение...")
+            .font(FontId::proportional(13.0))
+            .margin(egui::Margin::symmetric(8, 6))
+            .char_limit(255),
+    );
+
+    state::save_chat_input(&input);
+    response.request_focus();
+
+    let send = response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+    if send {
+        let text = input.trim().to_string();
+        if !text.is_empty() {
+            state::save_chat_input("");
+            let nick = state::get_nickname();
+            state::add_chat_msg(&nick, &text);
+            crate::network::send_chat_message(text);
+        }
+        state::close_chat_input();
     }
 }
 
-fn msg_color(msg: &ChatMsg, alpha: f32) -> Color32 {
-    let base = if msg.system {
-        colors::CHAT_SYSTEM
+fn message_alpha(msg: &ChatMsg) -> f32 {
+    let age = msg.created.elapsed().as_secs_f32();
+    if age >= PASSIVE_VISIBLE_SECS {
+        0.0
+    } else if age > PASSIVE_FADE_START {
+        1.0 - (age - PASSIVE_FADE_START) / (PASSIVE_VISIBLE_SECS - PASSIVE_FADE_START)
     } else {
-        colors::TEXT_PRIMARY
-    };
-    apply_alpha(base, alpha)
-}
-
-fn apply_alpha(color: Color32, alpha: f32) -> Color32 {
-    let [r, g, b, a] = color.to_array();
-    Color32::from_rgba_unmultiplied(r, g, b, (a as f32 * alpha) as u8)
+        1.0
+    }
+    .clamp(0.0, 1.0)
 }

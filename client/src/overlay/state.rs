@@ -331,6 +331,7 @@ pub struct Snapshot {
     pub fps: f32,
     pub pos: [f32; 3],
     pub game_state: &'static str,
+    pub local_ping: u32,
 
     pub show_connect: bool,
     pub show_players: bool,
@@ -379,6 +380,12 @@ pub fn snapshot() -> Snapshot {
         crate::state::GameSessionState::ShuttingDown => "Выход",
     };
 
+    let local_ping = players
+        .iter()
+        .find(|p| p.is_local)
+        .map(|p| p.ping)
+        .unwrap_or(0);
+
     Snapshot {
         show_debug: SHOW_DEBUG.load(Ordering::Relaxed),
         fps: f32::from_bits(FPS.load(Ordering::Relaxed)),
@@ -388,6 +395,7 @@ pub fn snapshot() -> Snapshot {
             f32::from_bits(POS_Z.load(Ordering::Relaxed)),
         ],
         game_state,
+        local_ping,
         show_connect: SHOW_CONNECT.load(Ordering::Relaxed),
         show_players: SHOW_PLAYERS.load(Ordering::Relaxed),
         show_scoreboard: SHOW_SCOREBOARD.load(Ordering::Relaxed),

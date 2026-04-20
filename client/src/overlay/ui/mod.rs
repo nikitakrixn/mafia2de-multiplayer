@@ -1,6 +1,7 @@
 pub mod chat;
 pub mod connect;
 pub mod console;
+pub mod cursor;
 pub mod hud;
 pub mod notifications;
 pub mod player_list;
@@ -41,6 +42,10 @@ pub fn draw(ctx: &egui::Context, snap: &Snapshot) {
     }
 
     hud::draw_version(ctx);
+
+    if state::wants_input() {
+        cursor::draw(ctx);
+    }
 }
 
 fn handle_hotkeys() {
