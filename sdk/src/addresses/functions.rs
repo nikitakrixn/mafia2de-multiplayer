@@ -1016,6 +1016,113 @@ pub mod input {
     /// IDA: `0x14079F560` (`M2DE_InputDevice_Poll`)
     pub const DEVICE_POLL: usize = 0x79_F560;
 
+    /// Vtable[1] — обёртка над `DEVICE_POLL` (просто вызывает его и
+    /// возвращает результат).
+    ///
+    /// `char(InputDevice*)`
+    ///
+    /// IDA: `0x14079F640` (`M2DE_InputDevice_Vtbl1_PollWrapper`)
+    pub const DEVICE_VTBL1_POLL_WRAPPER: usize = 0x79_F640;
+
+    /// Vtable[7] — копирует обработанные оси `+456..+476` →
+    /// `+904..+928`. Из второго диапазона делает snapshot, который
+    /// затем читает камера/UI.
+    ///
+    /// `__int64(InputDevice*)`
+    ///
+    /// IDA: `0x1407A2160` (`M2DE_InputDevice_Vtbl7_CommitState`)
+    pub const DEVICE_VTBL7_COMMIT_STATE: usize = 0x7A_2160;
+
+    /// Vtable[8] — спрашивает у устройства "есть ли событие данной
+    /// маски на этом фрейме". Используется при сборке action-listener'ов.
+    ///
+    /// `char(InputDevice*, uint16 mask, void* out_event)`
+    ///
+    /// IDA: `0x1407A1050` (`M2DE_InputDevice_Vtbl8_GetEvent`)
+    pub const DEVICE_VTBL8_GET_EVENT: usize = 0x7A_1050;
+
+    /// Полная пауза/возобновление игровой input-подсистемы.
+    ///
+    /// `C_GameInputModule::PauseInput(bool paused)`:
+    /// 1. Сетит `m_bInputPaused` по offset `+0x2008` — этот флаг
+    ///    проверяется в `Tick` и при `true` пропускает весь
+    ///    `C_GameInput::Update` (а значит и `NotifyAllInputListeners`).
+    /// 2. Вызывает [`SYS_INPUT_PAUSE`] — Suspend/Reset на каждом
+    ///    зарегистрированном DI-устройстве, чтобы не копилась mouse-delta.
+    /// 3. Reset+UpdateAfterEnable на трёх `C_InputLayer` (offsets
+    ///    `+0x1FF0/+0x1FF8/+0x2000`).
+    /// 4. `ForceFeedbackEffectsManager::PauseAllEffects` (через
+    ///    `0x140FF8FE0`).
+    /// 5. Сетит `m_bGamePaused` (`+0x207C`) для совместимости с цепочкой
+    ///    `OnGamePaused`.
+    ///
+    /// Это единственно правильный путь полностью заморозить камеру,
+    /// движение, клики и Force Feedback из внешнего кода — игра
+    /// использует ту же функцию, когда поверх неё открывается системный
+    /// overlay (Steam UI и т. п.).
+    ///
+    /// **Не путать** с `OnGamePaused` (`0x140FF7700`) — тот срабатывает
+    /// на event 34 «Game Paused» (Esc-меню) и паузит только Force
+    /// Feedback, не блокируя сам ввод.
+    ///
+    /// `void(C_GameInputModule*, bool paused)`
+    ///
+    /// IDA: `0x140FF8FF0` (`M2DE_GameInputModule_PauseInput`)
+    pub const GAME_INPUT_MODULE_PAUSE_INPUT: usize = 0xFF_8FF0;
+
+    /// Per-frame tick `C_GameInputModule::Tick`. Если `m_bInputPaused`
+    /// (`+0x2008`) выставлен — выходит сразу. Иначе вызывает
+    /// `C_GameInput::Update` → `NotifyAllInputListeners`.
+    ///
+    /// `void(C_GameInputModule*, EventContext*)`
+    ///
+    /// IDA: `0x14100AB50` (`M2DE_GameInputModule_Tick`)
+    pub const GAME_INPUT_MODULE_TICK: usize = 0x100_AB50;
+
+    /// Низкоуровневая пауза `C_SysInput::Pause(bool)` — итерирует
+    /// связный список DI-устройств и для каждого дёргает Suspend/Reset
+    /// через vtable. Вызывается из [`GAME_INPUT_MODULE_PAUSE_INPUT`].
+    ///
+    /// `void(C_SysInput*, bool paused)`
+    ///
+    /// IDA: `0x1407A0680` (`M2DE_C_SysInput_Pause`)
+    pub const SYS_INPUT_PAUSE: usize = 0x7A_0680;
+
+    /// `C_SysInput::Init(this, HWND wnd_hint)` — vtable[1]. Создаёт
+    /// `IDirectInput8` через `DirectInput8Create`, потом дёргает
+    /// [`SYS_INPUT_CREATE_DEVICES`].
+    ///
+    /// `char(C_SysInput*, HWND)`
+    ///
+    /// IDA: `0x14079FA60` (`M2DE_C_SysInput_Init`)
+    pub const SYS_INPUT_INIT: usize = 0x79_FA60;
+
+    /// `C_SysInput::CreateDevices(this, HWND)` — создаёт DI-устройства
+    /// (keyboard, 3 mouse-варианта, joystick) и регистрирует их в
+    /// собственном RB-tree.
+    ///
+    /// `char(C_SysInput*, HWND)`
+    ///
+    /// IDA: `0x14079F770` (`M2DE_C_SysInput_CreateDevices`)
+    pub const SYS_INPUT_CREATE_DEVICES: usize = 0x79_F770;
+
+    /// `C_SysInput::CreateInstance` — выделяет 128-байтовый объект,
+    /// инициализирует RB-tree anchors и пишет указатель в singleton
+    /// [`globals::SYS_INPUT_INSTANCE`][crate::addresses::globals::SYS_INPUT_INSTANCE].
+    ///
+    /// `__int64(_QWORD *args)`
+    ///
+    /// IDA: `0x14079FF00` (`M2DE_C_SysInput_CreateInstance`)
+    pub const SYS_INPUT_CREATE_INSTANCE: usize = 0x79_FF00;
+
+    /// `C_SysInput::GetInstance` — возвращает значение указателя
+    /// `qword_141CBBB00`.
+    ///
+    /// `C_SysInput*()`
+    ///
+    /// IDA: `0x14079E6A0` (`M2DE_C_SysInput_GetInstance`)
+    pub const SYS_INPUT_GET_INSTANCE: usize = 0x79_E6A0;
+
     /// Конструктор mouse input устройства.
     /// Инициализирует буферы состояния мыши.
     ///
@@ -2108,22 +2215,6 @@ pub mod player_model_manager {
     ///
     /// IDA: `0x1403D9C80`
     pub const CHANGE_MODEL: usize = 0x3D_9C80;
-}
-
-// =============================================================================
-//  C_SlotManager (SDS slot system)
-// =============================================================================
-
-pub mod slot_manager {
-    /// Добавить preload-слот в менеджер.
-    ///
-    /// `void (C_SlotManager*, uint slot_type, const char* name, u64 unk)`
-    /// Аллоцирует 96B объект (vtable off_14186F2B0), копирует имя (+0x18).
-    /// Добавляет в вектор preload_slots.
-    /// Вызывается из C_Game::Open ParseData тег 1 при entry_type == 5.
-    ///
-    /// IDA: `0x1403D9140`
-    pub const ADD_PRELOAD_SLOT: usize = 0x3D_9140;
 }
 
 // =============================================================================
