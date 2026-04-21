@@ -456,3 +456,36 @@ pub const GAME_WORLD: usize = 0x1CA_E1C0;
 ///
 /// IDA: `0x141C59260`
 pub const APPLICATION_EVENT_REGISTRY: usize = 0x1C5_9260;
+
+/// `g_M2DE_pSysInput` — **указатель** на singleton `C_SysInput`
+/// (низкоуровневый менеджер DI-устройств).
+///
+/// Создаётся лениво через `M2DE_C_SysInput_CreateInstance`
+/// (`0x14079FF00`) и хранится по этому RVA как обычный `T*`.
+/// Получать через [`game::SysInput::get`][crate::game::SysInput::get],
+/// которая делает двойную косвенность.
+///
+/// IDA: `0x141CBBB00`
+pub const SYS_INPUT_INSTANCE: usize = 0x1CB_BB00;
+
+/// `g_M2DE_GameInputModule` — **сам объект** `C_GameInputModule` (а не
+/// указатель на него). Создаётся в статическом инициализаторе
+/// `M2DE_GameInputModule_StaticInit` (`0x14007D5B0`) через
+/// `M2DE_GameInputModule_Constructor` (`0x140FD7880`).
+///
+/// Чтобы поставить инпут на паузу (камера, движение, экшены, мышь) —
+/// `M2DE_GameInputModule_PauseInput(module_base + GAME_INPUT_MODULE, true)`.
+/// Это тот же механизм, который игра использует при показе системного
+/// overlay (Steam UI). Внутри он:
+/// - сетит pause-флаг `+0x2008` (8200), который читается в Tick и
+///   пропускает `C_GameInput::Update`,
+/// - дёргает `C_SysInput::Pause` (паузит сами DI-устройства),
+/// - сбрасывает 3 `C_InputLayer` по offsets `+0x1FF0`/`+0x1FF8`/`+0x2000`,
+/// - паузит Force Feedback.
+///
+/// Pause-флаги (для прямого чтения, если надо):
+/// - **`+0x2008` (8200)** — `m_bInputPaused` (читается в `Tick`)
+/// - `+0x207C` (8316) — `m_bGamePaused` (game-pause flag, как от Esc-меню)
+///
+/// IDA: `0x143140E30`
+pub const GAME_INPUT_MODULE: usize = 0x314_0E30;

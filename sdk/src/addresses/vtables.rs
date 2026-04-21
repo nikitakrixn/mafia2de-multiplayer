@@ -390,6 +390,36 @@ pub mod misc {
     pub const CRASH_OBJ_MGR: usize = 0x18E_9198;
 }
 
+pub mod input {
+    /// Vtable `C_GameInputModule` (`M2DE_VT_CGameInputModule`).
+    ///
+    /// 5 слотов, наследуется от `C_TickedModule`:
+    /// - `[0]` dtor
+    /// - `[1]` get_module_id (returns 7)
+    /// - `[2]` get_class_name (returns `"GameInputModule"`)
+    /// - `[3]` register_callbacks
+    /// - `[4]` get_fixed_time_step (returns 0.005f / 200 Hz)
+    ///
+    /// IDA: `0x141908AC0`
+    pub const GAME_INPUT_MODULE: usize = 0x190_8AC0;
+
+    /// Базовая (промежуточная) vtable `C_SysInput`, выставляется в
+    /// начале конструктора `M2DE_C_SysInput_CreateInstance` и потом
+    /// перезаписывается финальной [`SYS_INPUT`].
+    ///
+    /// IDA: `0x141895820`
+    pub const SYS_INPUT_BASE: usize = 0x189_5820;
+
+    /// Финальная vtable `C_SysInput` (16 слотов).
+    ///
+    /// `[0]` dtor, `[1]` `Init`, `[3]` `Update`/`RegisterDevice`,
+    /// `[4..15]` — конкретные методы (см.
+    /// [`structures::vtables::c_sys_input::CSysInputVTable`]).
+    ///
+    /// IDA: `0x141895C00`
+    pub const SYS_INPUT: usize = 0x189_5C00;
+}
+
 pub mod render_device {
     /// Самая базовая abstract render-device vtable.
     pub const ABSTRACT: usize = 0x189_AF80;
