@@ -1,5 +1,6 @@
 //! repr(C) структуры движка Mafia II: Definitive Edition.
 
+pub mod ai;
 pub mod std_vector;
 pub mod vtables;
 
@@ -7,9 +8,11 @@ mod application;
 mod actors_pack;
 mod mission;
 mod entity_hash_table;
+mod c_sys_input;
 mod callbacks;
 mod car;
 mod entity;
+mod game_input_module;
 mod game_world;
 mod garage;
 mod inventory;
@@ -25,6 +28,8 @@ pub use std_vector::StdVector;
 pub use vtables::car::CCarVTable;
 pub use vtables::player::CHumanVTable;
 
+pub use ai::{CAIController, CAITask, CHumanAIController};
+
 pub use entity::{
     CActor, CEntity, CEntityDBRecord, CEntityGuid, CScriptWrapper, CScriptWrapperManager,
     CServiceIdentity, CTypeDescriptor, CWrapperFactory,
@@ -34,7 +39,9 @@ pub use application::CApplication;
 pub use actors_pack::CActorsPack;
 pub use mission::CMission;
 pub use entity_hash_table::EntityHashTable;
+pub use c_sys_input::{CSysInput, CSysInputNode};
 pub use car::{CCar, CCarDamageSub1, CCarVehicle};
+pub use game_input_module::CGameInputModule;
 pub use game_world::{
     ENTITY_SLOT_COUNT, ENTITY_SLOT_PLAYER, EntitySlot, GameManager, GameStateFlag,
 };
