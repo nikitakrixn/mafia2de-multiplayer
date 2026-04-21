@@ -7,12 +7,14 @@
 //! 3. Player создан -> `Player::get()` возвращает Some
 //! 4. Lua VM готова -> `lua::is_ready()` = true
 
+pub mod c_sys_input;
 pub mod callbacks;
 pub mod camera;
 pub mod car;
 pub mod entity;
 pub mod entity_ref;
 pub mod entity_types;
+pub mod game_input_module;
 mod hash;
 pub mod lua;
 pub mod npc;
@@ -26,10 +28,12 @@ pub mod manager;
 pub mod application;
 pub mod mission;
 
+pub use c_sys_input::SysInput;
 pub use entity_types::{EntityMessageType, EntityType, FactoryType};
 pub use player::Player;
 pub use manager::Game;
 pub use application::Application;
+pub use game_input_module::GameInputModule;
 pub use mission::Mission;
 
 use crate::{addresses, memory};
