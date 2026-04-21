@@ -779,6 +779,39 @@ pub mod dlc_types {
     pub const UNKNOWN: u32 = 10;
 }
 
+/// `C_SlotManager::E_SlotType` — подтверждено runtime-дампом `sds_probe`.
+///
+/// ВАЖНО: значения получены сканированием `g_M2DE_SlotManager+0x30..0x38` в FreeRide:
+///
+/// - `1` — `/sds/city/*.sds` (city blocks, например `millnew`, `chinatown`)
+/// - `2` — `/sds/ground/*.sds` (terrain)
+/// - `3` — `/sds/city_univers/*.sds` (универсальный city content)
+/// - `5` — secondary player (`/sds/player/vitoh.sds`)
+/// - `6` — PLAYER (`/sds/player/vitpra.sds`)
+/// - `7` — **HCHAR** (`/sds/hchar/*.sds`: hen405, joeobl, mission NPCs)
+/// - `8` — TRAFFIC PEDS (`/sds/traffic/*.sds`: ccinbg1, citant, driver и др.)
+/// - `9` — POLICE CHARACTER (`/sds/police_char/police_char.sds`)
+/// - `10` — `/sds/cars/cars_universal.sds`
+/// - `11` — отдельные машины (`/sds/cars/<model>.sds`)
+/// - `15..52` — служебные: anims, weapons, gui, sound, speech, scripts и т.д.
+pub mod slot_type {
+    pub const CITY_BLOCK: u32 = 1;
+    pub const GROUND: u32 = 2;
+    pub const CITY_UNIVERS: u32 = 3;
+    pub const PLAYER_SECONDARY: u32 = 5;
+    pub const PLAYER: u32 = 6;
+    /// Humanoid character SDS — основной hchar пул.
+    /// Каждый слот несёт ровно 1 модель (frame/model).
+    pub const HCHAR: u32 = 7;
+    /// Traffic pedestrians — гражданские для системы трафика.
+    /// 10+ моделей в FreeRide.
+    pub const TRAFFIC_PED: u32 = 8;
+    /// Полицейские NPC.
+    pub const POLICE_CHARACTER: u32 = 9;
+    pub const CARS_UNIVERSAL: u32 = 10;
+    pub const CAR: u32 = 11;
+}
+
 /// Моудьные ID для M2DE_GetModuleNameById (0–47).
 pub mod module_ids {
     pub const GAME_MAIN_FIRST: u32 = 0;
