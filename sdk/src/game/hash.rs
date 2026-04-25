@@ -7,6 +7,7 @@
 /// ```
 ///
 /// Seed: 0x811C9DC5, Prime: 0x01000193
+#[allow(dead_code)]
 pub fn fnv1_32(data: &[u8]) -> u32 {
     let mut hash: u32 = 0x811C_9DC5;
     for &byte in data {
@@ -44,6 +45,7 @@ pub fn fnv1_64(data: &[u8]) -> u64 {
 ///     i = byte ^ (0x100000001B3 * i);
 /// }
 /// ```
+#[allow(dead_code)]
 pub fn fnv1_64_seed0(data: &[u8]) -> u64 {
     let mut hash: u64 = 0; // seed = 0, NOT 0xCBF29CE484222325
     for &byte in data {
