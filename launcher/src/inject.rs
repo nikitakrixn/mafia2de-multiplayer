@@ -35,12 +35,13 @@ impl Drop for SafeHandle {
 /// Запускает игру в приостановленном состоянии, инжектит DLL, возобновляет.
 ///
 /// Возвращает PID запущенного процесса.
-pub fn launch_and_inject(game_exe: &Path, dll_path: &Path) -> Result<u32, Error> {
+pub fn launch_and_inject(
+    game_exe: &Path,
+    dll_path: &Path,
+    working_dir: &Path,
+) -> Result<u32, Error> {
     let game_cstr = path_to_cstring(game_exe)?;
-    let dir = game_exe
-        .parent()
-        .ok_or_else(|| Error::ProcessFailed("No parent directory".into()))?;
-    let dir_cstr = path_to_cstring(dir)?;
+    let dir_cstr = path_to_cstring(working_dir)?;
 
     // 1. Создаём процесс (suspended)
     logger::info("Creating suspended game process...");
