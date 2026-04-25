@@ -43,3 +43,14 @@ chk = "check --workspace"
 
 # Clippy по всему workspace
 lint = "clippy --workspace --all-targets"
+
+# Собрать всё в release и упаковать в binary/
+#
+# После `cargo dist` в корне появится папка binary/ со всем нужным:
+# launcher.exe + client.dll + devtools.dll + server.exe + steam_appid.txt
+# + client.bat / devtools.bat / client-pair.bat.
+#
+# Положи в assets/steam_api64.dll копию из папки игры
+xtask = "run -p xtask --release --"
+dist = "run -p xtask --release -- dist"
+clean-binary = "run -p xtask --release -- clean-binary"

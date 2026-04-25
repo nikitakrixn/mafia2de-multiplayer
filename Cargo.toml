@@ -5,7 +5,17 @@ members = [
     "protocol",
     "client",
     "launcher",
-    "server", 
+    "server",
+    "devtools",
+    "xtask",
+]
+default-members = [
+    "common",
+    "sdk",
+    "protocol",
+    "client",
+    "launcher",
+    "server",
     "devtools",
 ]
 resolver = "2"

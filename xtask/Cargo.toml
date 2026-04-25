@@ -1,0 +1,11 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Build / packaging / dev tasks. Не часть рантайма мода."
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"

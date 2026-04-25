@@ -27,3 +27,10 @@ docs/
 *.exp
 *.lib
 *.log
+
+# xtask dist output (собирается через `cargo dist`)
+/binary/
+
+# assets с приватными бинарями и steam_api64.dll
+/assets/*.dll
+/assets/*.exe
