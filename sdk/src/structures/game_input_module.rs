@@ -3,7 +3,7 @@
 //! Хранит и тикает три `C_InputLayer`, регистрирует listeners экшенов,
 //! управляет паузой ввода и Force Feedback. Каждый кадр игра дёргает его
 //! `Tick` через `GameCallbackManager`, и из него вызывается
-//! `C_GameInput::Update` → `NotifyAllInputListeners`, который и кормит
+//! `C_GameInput::Update` -> `NotifyAllInputListeners`, который и кормит
 //! камеру, движение, UI-mouse-кликами.
 //!
 //! ## Singleton
@@ -25,7 +25,7 @@
 //! +0x1FF0  layer0               *C_InputLayer
 //! +0x1FF8  layer1               *C_InputLayer
 //! +0x2000  layer2               *C_InputLayer
-//! +0x2008  m_b_input_paused     u8   <-- Tick проверяет; true → весь Update пропущен
+//! +0x2008  m_b_input_paused     u8   <-- Tick проверяет; true -> весь Update пропущен
 //! +0x207C  m_b_game_paused      u8   <-- OnGamePaused/PauseInput, для совместимости
 //! +0x20A8  listeners_sentinel   *Node sentinel двусвязного списка action-listener'ов
 //! ```

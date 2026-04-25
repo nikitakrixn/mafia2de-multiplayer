@@ -48,7 +48,7 @@ use std::ffi::{c_char, c_void};
 /// Размер: **0x128 байт**.
 #[repr(C)]
 pub struct CActorsPack {
-    /// `+0x000` VTable → `M2DE_VT_CActorsPack`.
+    /// `+0x000` VTable -> `M2DE_VT_CActorsPack`.
     pub vtable: *const CActorsPackVTable,
 
     /// `+0x008` Флаг (init=0).

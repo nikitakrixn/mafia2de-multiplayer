@@ -7,8 +7,8 @@
 //! ## Layout (0x46B0 байт)
 //!
 //! ```text
-//! +0x000  bucket_begin    *u16  (→ self + 0x3EB0)
-//! +0x008  bucket_end      *u16  (→ self + 0x3EB0 + 0x800)
+//! +0x000  bucket_begin    *u16  (-> self + 0x3EB0)
+//! +0x008  bucket_end      *u16  (-> self + 0x3EB0 + 0x800)
 //! +0x010  entry_count     u32   (init=0)
 //! +0x018  unk_18          u64   (init=0)
 //! +0x020  unk_20          u64   (init=0)

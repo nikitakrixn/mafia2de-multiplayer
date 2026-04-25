@@ -96,6 +96,7 @@ pub struct CEntity {
 
     /// Флаги сущности.
     /// - bit 5 (0x20): активирована (`OnActivate` ORs это)
+    /// - bit 6 (0x40): C_Human2/NPC marker (`sub_140D712E0` ORs `0x40` в конце ctor)
     /// - bit 7 (0x80): C_ActorDeform устанавливает в конструкторе
     /// - bits 17/18 (0x60000): стриминг
     pub entity_flags: u32, // +0x28

@@ -3,30 +3,61 @@
 //! VTable лежит в `.rdata` секции игры — мы описываем layout
 //! для корректного вычисления смещений компилятором.
 //!
-//! ## Адреса в .rdata
+//! ## Адреса VTable
 //!
 //! | Класс | VTable RVA | Слотов |
 //! |:------|:-----------|:------:|
-//! | C_Entity | `0x14186CAC8` | 32 |
-//! | C_Actor | `0x14186D050` | 50 |
-//! | I_Human2 (abstract) | `0x1418E2BD8` | 110 (purecall после 49) |
-//! | C_Human2 (NPC) | `0x1418E5188` | 114 |
-//! | C_Player2 | `0x14184C060` | 110 |
+//! | `C_Entity` | `0x14186CAC8` | 32 |
+//! | `C_Actor` | `0x14186D050` | 50 |
+//! | `I_Human2` (abstract) | `0x1418E2BD8` | 110 (purecall после 49) |
+//! | `C_Human2` (NPC) | `0x1418E5188` | 114 |
+//! | `C_Player2` | `0x14184C060` | 110 |
 //!
 //! ## Зоны слотов
 //!
 //! | Слоты | Источник | Назначение |
 //! |:------|:---------|:-----------|
-//! | 0–2 | C_Entity | Жизненный цикл |
-//! | 3–16 | C_Entity | Инициализация, сериализация |
-//! | 17–31 | C_Entity | Сообщения, события |
-//! | 32–44 | C_EntityPos / C_Actor | Позиция, вращение, масштаб, PRS, frame |
-//! | 45–49 | I_Human2 | Owner, IsDead, underwater |
-//! | 50–54 | I_Human2 / C_Human2 | Tick, компонентные геттеры |
-//! | 55–64 | C_Human2 | Управление моделями |
-//! | 65–68 | C_Human2 | Запросы позиции/направления/скорости |
-//! | 69–82 | C_Human2 | Геймплей: бой, прозрачность, урон |
-//! | 83–109 | C_Human2 / C_Player2 | Управление игроком |
+//! | 0–2   | `C_Entity` | Жизненный цикл (dtor, frame_node getter) |
+//! | 3–16  | `C_Entity` | `Init`, `GameInit`/`Done`/`Restore`, `Save`/`Load` |
+//! | 17–31 | `C_Entity` | Сообщения, `RecvMessage`, `InvalidateRelation`, `Update` |
+//! | 32–44 | `C_EntityPos` / `C_Actor` | Позиция, вращение, масштаб, PRS, frame |
+//! | 45–50 | `I_Human2` / `C_Human2` | Owner, `IsDead`, underwater detection |
+//! | 51–54 | `C_Human2` | `TickPrePhysics`, `TickPostPhysics`, компонентные геттеры |
+//! | 55–64 | `C_Human2` | Управление моделями и анимацией |
+//! | 65–68 | `C_Human2` | Запросы позиции/направления/скорости |
+//! | 69–82 | `C_Human2` | Геймплей: бой, прозрачность, урон |
+//! | 83–109 | `C_Human2` / `C_Player2` | Управление игроком, fight, GUI |
+//!
+//! ## ⚠️ Различия C_Human2 (NPC) и C_Player2 (Player)
+//!
+//! Эта `CHumanVTable` идеально описывает **`C_Player2`**. Для `C_Human2`
+//! (NPC) часть слотов в Player-зоне (90+) — это no-op заглушки (NPC просто
+//! не поддерживает player-only функции типа LockControls, SetFight*, и т.д.).
+//!
+//! Безопасные различия (NPC просто возвращает 0/false):
+//! - `[90] lock_controls` — у NPC nullsub
+//! - `[96..100] set_fight_*` — у NPC nullsub
+//! - `[104] process_notification` — у NPC `HandleExtendedCode_Fallback`
+//! - `[106..107] process_notification_camera/ffx` — у NPC nullsub
+//!
+//! ## Не-виртуальные методы (прямые API, не через vtable)
+//!
+//! Критичные для MP методы, вызываемые напрямую по адресу функции:
+//! - `I_Human2::SetHealth(float)` — установка здоровья (триггерит DoDamage если HP≤0)
+//! - `I_Human2::DoAction(C_ActorAction*)` — запуск действия
+//! - `I_Human2::IsFriend(I_Human2*)` / `IsEnemy(I_Human2*)` — AI relationships
+//! - `C_Human2::AddCommand(E_Command, ue::C_CntPtr<S_HumanCommand>)` — главный API команд
+//! - `C_Human2::CleanCommands(bool, bool)` / `CleanSpecCommands` / `CleanMoveCommands`
+//! - `C_Human2::GetCurrentMoveCommand()` / `GetLastMoveCommand()`
+//! - `C_Human2::SetupAim` / `SetupAimDir` / `SetupLook`
+//! - `C_Human2::PhysIsFalling()`
+//! - `C_Human2::EnableShadows(bool)`
+//! - `C_Human2::ChangeCoat(char const*, bool)`
+//! - `C_Human2::ChangeAnimationSet(uint, bool)`
+//! - `C_Human2::SetupDeath(C_EntityMessageDamage*)`
+//!
+//! RVA для этих методов добавляются в `addresses/functions.rs` по мере
+//! верификации в живом билде (через xrefs или AOB-паттерны).
 
 use crate::types::Vec3;
 use std::ffi::c_void;

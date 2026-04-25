@@ -13,7 +13,7 @@
 //! ## Layout (0x120 = 288 байт)
 //!
 //! ```text
-//! +0x000  vtable          → M2DE_VT_CMission (14 слотов)
+//! +0x000  vtable          -> M2DE_VT_CMission (14 слотов)
 //! +0x008  state_flags     u32  (bit0=game_inited, bit1=opened)
 //! +0x010  scene_ptr       *ptr (текущая сцена)
 //! +0x018  game_name_buf   char[0x104] (имя текущей миссии)
@@ -39,7 +39,7 @@ use std::ffi::{c_char, c_void};
 /// Размер: **0x120 байт**.
 #[repr(C)]
 pub struct CMission {
-    /// `+0x000` VTable → `M2DE_VT_CMission`.
+    /// `+0x000` VTable -> `M2DE_VT_CMission`.
     pub vtable: *const CMissionVTable,
 
     /// `+0x008` Флаги состояния (init=0).

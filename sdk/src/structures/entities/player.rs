@@ -1,24 +1,44 @@
-//! Структуры гуманоидов — I_Human2, C_Human2, C_Player2.
+//! Структуры гуманоидов: `I_Human2`, `C_Human2`, `C_Player2`.
 //!
 //! ## Иерархия наследования
 //!
 //! ```text
 //! C_Entity (0x78)
 //!   └─ C_Actor (0xA8)
-//!       └─ I_Human2 (base, alloc 0xA58 компонентный блок)
+//!       └─ I_Human2 — abstract base (alloc 0xA58 компонентный блок)
 //!           └─ C_Human2 — NPC (FactoryType 0x0E)
 //!               └─ C_Player2 — игрок (FactoryType 0x10)
 //! ```
 //!
-//! ## Соответствие имён
+//! ## Карта классов
 //!
-//! | Класс движка | Rust struct | Конструктор | VTable RVA |
-//! |:-------------|:-----------|:------------|:-----------|
-//! | I_Human2 | `CHuman` | `0x140D730B0` | `0x1418E2BD8` (abstract) |
-//! | C_Human2 | `CHumanNPC` | `0x140D712E0` | `0x1418E5188` |
-//! | C_Player2 | `CPlayer` | `0x1400B9160` | `0x14184C060` |
+//! | Класс движка | Rust struct | Конструктор | VTable |
+//! |:-------------|:-----------|:------------|:-------|
+//! | `I_Human2`   | `CHuman`    | `0x140D730B0` | `0x1418E2BD8` (abstract) |
+//! | `C_Human2`   | `CHumanNPC` | `0x140D712E0` | `0x1418E5188` |
+//! | `C_Player2`  | `CPlayer`   | `0x1400B9160` | `0x14184C060` |
+//!
+//! ## Компонентный блок гуманоида (alloc 0xA58 байт)
+//!
+//! Базовый `I_Human2::I_Human2` аллоцирует один heap-блок и раскладывает
+//! в нём все компоненты гуманоида. Указатели в самом гуманоиде ссылаются
+//! на смещения внутри этого блока:
+//!
+//! - `C_HumanInventory` — инвентарь (back-ref на human)
+//! - `C_HumanAIController` — ИИ-поведение
+//! - `C_HumanWeaponController` — управление оружием
+//! - `C_HumanHeadController` — управление головой/прицеливанием взгляда
+//! - `mafia::C_FrameColors` — цвета и материалы модели
+//! - 5× `C_PlayerEmitter` (с разными type-параметрами 0/1/3/5)
+//! - `ai::sight::C_HumanDetector` + `C_ActorEmitter`/`C_ActorEar` — система sight/hear AI
+//!
+//! Активация/деактивация эмиттеров и детектора управляется через
+//! `C_Human2::OnActivate`/`OnDeactivate` и `I_Human2::ResetSenses`.
 
-use super::Inventory;
+use super::{
+    CFrameColors, CHumanAIController, CHumanHeadController, CHumanInventory,
+    CHumanWeaponController, CPlayerEmitter,
+};
 use super::entity::CActor;
 use crate::macros::assert_field_offsets;
 use std::ffi::c_void;
@@ -56,38 +76,55 @@ use std::ffi::c_void;
 pub struct CHuman {
     pub actor: CActor, // +0x000..+0x0A7
 
-    // Компонентные указатели (блок ~2648 байт)
-    /// Визуальный/ИИ компонент.
+    // ====================================================================
+    //  Компонентные указатели (alloc-блок 0xA58 байт)
+    // ====================================================================
+    //
+    // Все указатели ниже ссылаются ВНУТРЬ единого heap-блока, который
+    // `I_Human2::I_Human2` аллоцирует как `MemAlloc(0xA58)`.
+
+    /// Поздний визуальный компонент.
+    /// В базовом ctor оставляется NULL — устанавливается в `GameInit`.
     pub visual_component: *mut c_void, // +0x0A8
-    /// Конус обзора (`game::ai::sight::C_ViewCone`).
+    /// `game::ai::sight::C_ViewCone` — конус обзора AI.
+    /// Поле на этом смещении заполняется в `C_Human2::C_Human2` или `GameInit`.
     pub view_cone: *mut c_void, // +0x0B0
-    /// Цвета и материалы фрейма (`mafia::C_FrameColors`).
-    pub frame_colors: *mut c_void, // +0x0B8
-    /// Эмиттер ИИ (тип 0, back-ref на human).
-    pub emitter_ai_0: *mut c_void, // +0x0C0
-    /// Эмиттер синхронизации трансформов (тип 3).
-    pub emitter_transform: *mut c_void, // +0x0C8
-    /// Контроллер сущности.
+    /// `mafia::C_FrameColors` — цвета и материалы модели гуманоида.
+    /// Создаётся в `I_Human2::I_Human2`.
+    pub frame_colors: *mut CFrameColors, // +0x0B8
+    /// `C_PlayerEmitter` (type=0) — emitter ИИ с back-ref на гуманоида.
+    pub emitter_ai_0: *mut CPlayerEmitter, // +0x0C0
+    /// `C_PlayerEmitter` (type=3) — синхронизация трансформов.
+    /// VTable: `M2DE_vtbl_TransformSyncComponent` (`0x1418E33A8`).
+    pub emitter_transform: *mut CPlayerEmitter, // +0x0C8
+    /// Контроллер-эмиттер (back-ref на гуманоида).
+    /// Структура: `[vtable][NULL][zero_dword][this back-ref]`.
     pub entity_controller: *mut c_void, // +0x0D0
-    /// Опциональный компонент (обычно NULL).
-    pub optional_component: *mut c_void, // +0x0D8
+    /// Опциональный компонент, активируется в `GameInit`. Часто NULL.
+    /// VTable: `M2DE_vtbl_HumanOptionalComponent_D8` (`0x1418E3380`).
+    pub optional_component: *mut CPlayerEmitter, // +0x0D8
+    /// Резервное компонентное поле. В базовом ctor не инициализируется.
     pub component_e0: *mut c_void, // +0x0E0
-    /// Инвентарь (`C_HumanInventory`).
-    pub inventory: *mut Inventory, // +0x0E8
-    /// Хранилище свойств.
+    /// `C_HumanInventory` — инвентарь гуманоида (back-ref на гуманоида внутри).
+    /// VTable: `M2DE_vtbl_HumanInventory` (`0x1418E3090`). Размер 376 байт.
+    pub inventory: *mut CHumanInventory, // +0x0E8
+    /// Контейнер AI-controller'а (`property-store`).
+    /// `C_HumanAIController` лежит как inline-объект внутри этого контейнера.
     pub property_store: *mut c_void, // +0x0F0
-    /// ИИ-контроллер поведения (`C_HumanAIController`).
-    pub ai_controller: *mut c_void, // +0x0F8
-    /// Физическая группа.
+    /// `C_HumanAIController` — ИИ-контроллер поведения NPC.
+    /// Создаётся как `M2DE_CHumanAIController_Constructor(this, entity)` (`0x140D71AD0`).
+    /// VTable: `M2DE_vtbl_HumanBehaviorComponent` (`0x1418E37A8`).
+    pub ai_controller: *mut CHumanAIController, // +0x0F8
+    /// Физическая группа (минимальная struct: 3 dword nul'а).
     pub physics_group: *mut c_void, // +0x100
-    /// Контроллер оружия (`C_HumanWeaponController`).
-    pub weapon_controller: *mut c_void, // +0x108
-    /// Контроллер головы (`C_HumanHeadController`).
-    pub head_controller: *mut c_void, // +0x110
-    /// Эмиттер ИИ (тип 5).
-    pub emitter_ai_5: *mut c_void, // +0x118
-    /// Эмиттер ИИ (тип 1).
-    pub emitter_ai_1: *mut c_void, // +0x120
+    /// `C_HumanWeaponController` — управление оружием.
+    pub weapon_controller: *mut CHumanWeaponController, // +0x108
+    /// `C_HumanHeadController` — управление поворотом головы и прицеливанием взгляда.
+    pub head_controller: *mut CHumanHeadController, // +0x110
+    /// `C_PlayerEmitter` (type=5) — дополнительный AI emitter.
+    pub emitter_ai_5: *mut CPlayerEmitter, // +0x118
+    /// `C_PlayerEmitter` (type=1) — emitter ИИ (back-ref на гуманоида).
+    pub emitter_ai_1: *mut CPlayerEmitter, // +0x120
 
     pub _unk_128: [u8; 0x20], // +0x128..+0x147
 
@@ -130,7 +167,8 @@ pub struct CHuman {
     pub _unk_18c: u32, // +0x18C
 
     /// Слабая ссылка на себя (`self_ref == this`).
-    /// Регистрируется через `C_WeakPtrObj<C_Human2>::m_StaticTable`.
+    /// Регистрируется через `ue::C_WeakPtrObj<C_Human2>::m_StaticTable`.
+    /// Инициализируется в `C_Human2::C_Human2` (NPC-ctor), не в базовом `I_Human2`.
     pub self_ref: *mut CHuman, // +0x190
     pub _unk_198: u32,        // +0x198
     pub _unk_19c: u32,        // +0x19C
@@ -185,6 +223,17 @@ pub struct CHuman {
     /// Vtable[48]/[49].
     pub water_detector: *mut c_void, // +0x310
 }
+
+// Размер CHuman = 0x318 байт.
+//
+// Подтверждение: фабрика `0x140D90440` (создаёт C_HumanNPC) аллоцирует
+// `M2DE_GlobalAlloc(792)` = 0x318. Так как C_HumanNPC = I_Human2 + 0
+// дополнительных полей (NPC-ctor пишет ВСЕ свои данные внутрь зоны
+// CHuman, до +0x310 включительно), то CHuman имеет точно такой же
+// размер, как и реальный C_HumanNPC.
+const _: () = {
+    assert!(std::mem::size_of::<CHuman>() == 0x318);
+};
 
 assert_field_offsets!(CHuman {
     actor                == 0x000,
@@ -279,20 +328,47 @@ impl CHuman {
 //  CHumanNPC — NPC (FactoryType 0x0E)
 // =============================================================================
 
-/// NPC-гуманоид (C_Human2 в движке). FactoryType = 0x0E.
+/// NPC-гуманоид (`C_Human2`). FactoryType = `0x0E`.
 ///
-/// Конструктор:
-/// 1. CHuman (I_Human2 base)
-/// 2. VTable NPC, SetType(0x0E)
-/// 3. 8× SmartPtr инициализация (ID 1..7, sentinel -1)
-/// 4. Регистрация в глобальной EntityTable
-/// 5. `self_ref = this`
+/// **Размер: 0x318 байт** (фабрика `0x140D90440` аллоцирует 792 байта).
+///
+/// На уровне C++ ABI `C_Human2` **не добавляет собственных полей** сверх
+/// `I_Human2` — NPC-конструктор записывает все свои данные внутрь зоны
+/// базового `CHuman` (от +0x190 self_ref до +0x310 water_detector).
+/// Поэтому в Rust `CHumanNPC` структурно эквивалентна `CHuman`.
+///
+/// Конструктор `C_Human2::C_Human2`:
+/// 1. Вызывает `I_Human2::I_Human2` (заполняет от +0xA8 до +0x180,
+///    аллоцирует компонентный блок 0xA58 байт)
+/// 2. Устанавливает vtable `C_Human2`, `SetTypeID(0x0E)`
+/// 3. `entity_flags |= 0x40` (NPC marker bit 6)
+/// 4. Инициализирует 8× SmartPtr на +0x1C0..+0x23F (ID 1..7, sentinel -1)
+/// 5. 9-й SmartPtr на +0x270
+/// 6. Множество одиночных полей в зоне +0x2A8..+0x310
+/// 7. Регистрирует в глобальной EntityTable
+/// 8. Устанавливает `self_ref = this` (на +0x190) через
+///    `ue::C_WeakPtrObj<C_Human2>::m_StaticTable`
 #[repr(C)]
 #[allow(non_snake_case)]
 pub struct CHumanNPC {
     pub base: CHuman,
-    pub _npc_data: [u8; 0x20],
+    /// Pre-CPlayer alignment zone (32 байта).
+    ///
+    /// **Не инициализируется** ни NPC-, ни Player-конструктором.
+    /// Существует исключительно для корректного выравнивания CPlayer:
+    /// `CPlayer.car_wrapper` лежит на +0x338, что = `CHumanNPC` (0x318) + 0x20.
+    /// Если `C_HumanNPC` создан сам по себе (без наследника CPlayer), эти
+    /// 32 байта — мусор за пределами аллокации (size 0x318).
+    pub _player_alignment_pad: [u8; 0x20],
 }
+
+const _: () = {
+    // Виртуальный размер struct в Rust = 0x338 (для совместимости с CPlayer).
+    // Реальный размер C_HumanNPC объекта в памяти = 0x318 (см. фабрику).
+    assert!(std::mem::size_of::<CHumanNPC>() == 0x338);
+    assert!(std::mem::offset_of!(CHumanNPC, base) == 0x000);
+    assert!(std::mem::offset_of!(CHumanNPC, _player_alignment_pad) == 0x318);
+};
 
 impl CHumanNPC {
     pub fn as_human(&self) -> &CHuman {
@@ -395,6 +471,7 @@ pub struct CPlayer {
     /// SmartPtr команды (тип B).
     pub cmd_slot_b: usize, // +0x400
     /// -> S_HumanCommandMoveDir (alloc 0x70): направление движения.
+    /// в **`M2DE_CPlayer2_ApplyApproachMoveCommand`** использует **`this+0x408`** (`1032`).
     pub cmd_move_dir: usize, // +0x408
     /// -> S_HumanCommandStand (alloc 0x30): стойка.
     pub cmd_stand: usize, // +0x410

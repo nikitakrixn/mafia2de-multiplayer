@@ -4,12 +4,13 @@
 //! виртуальной таблицы конкретного класса. Смещения проверяются
 //! compile-time ассертами.
 
-pub mod ai;
+// Entity vtables (humanoids, vehicles, AI) — в отдельном подмодуле
+pub mod entities;
+
+// Системные vtables (не entity)
 pub mod application;
 pub mod actors_pack;
 pub mod c_sys_input;
-pub mod car;
 pub mod game_input_module;
 pub mod game_manager;
 pub mod mission;
-pub mod player;
