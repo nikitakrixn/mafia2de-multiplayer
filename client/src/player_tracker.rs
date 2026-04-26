@@ -8,6 +8,10 @@ use std::time::{Duration, Instant};
 
 use common::logger;
 use protocol::{NetPlayerSnapshot, NetVec3};
+
+fn vec3_to_net(v: Vec3) -> NetVec3 {
+    NetVec3 { x: v.x, y: v.y, z: v.z }
+}
 use sdk::game::Player;
 use sdk::types::Vec3;
 
@@ -18,8 +22,14 @@ use crate::{
 
 const TRACK_INTERVAL_MS: u64 = 150;
 const TELEPORT_DISTANCE: f32 = 40.0;
-const MOVE_EPSILON: f32 = 0.10;
-const STOP_TICKS_REQUIRED: u32 = 4;
+/// За один интервал `TRACK_INTERVAL_MS` нужно сместиться хотя бы на столько (м),
+/// чтобы включить `moving` / `is_moving`. Иначе микродрейф пола даёт ложные
+/// MovementStarted и на remote снова включается walk.
+const MOVE_START_M: f32 = 0.22;
+/// Ниже этого смещения за интервал считаем «почти стоим» — копим к снятию moving.
+const MOVE_STOP_M: f32 = 0.07;
+/// Сколько подряд «тихих» snapshot (~TRACK_INTERVAL_MS), чтобы снять moving.
+const STOP_TICKS_REQUIRED: u32 = 2;
 
 #[derive(Debug, Clone)]
 pub struct PlayerSnapshot {
@@ -36,6 +46,7 @@ struct PlayerTracker {
     last_snapshot: Option<PlayerSnapshot>,
     moving: bool,
     still_ticks: u32,
+    last_is_aiming: bool,
 }
 
 static TRACKER: OnceLock<Mutex<PlayerTracker>> = OnceLock::new();
@@ -48,6 +59,7 @@ fn tracker() -> &'static Mutex<PlayerTracker> {
             last_snapshot: None,
             moving: false,
             still_ticks: 0,
+            last_is_aiming: false,
         })
     })
 }
@@ -98,7 +110,22 @@ pub fn update_main_thread() {
 
     // Отправляем network snapshot если подключены
     if crate::network::is_connected() {
-        if let Some(net_snap) = capture_network_snapshot(&player) {
+        let is_moving = guard.moving;
+        if let Some(mut net_snap) = capture_network_snapshot(&player) {
+            net_snap.is_moving = is_moving;
+            // Лог transition aim (чтобы видеть момент нажатия RMB).
+            if net_snap.is_aiming != guard.last_is_aiming {
+                guard.last_is_aiming = net_snap.is_aiming;
+                if net_snap.is_aiming {
+                    let d = net_snap.aim_dir.unwrap_or_default();
+                    logger::info(&format!(
+                        "[player-event] AimStart dir=({:.2},{:.2},{:.2})",
+                        d.x, d.y, d.z
+                    ));
+                } else {
+                    logger::info("[player-event] AimStop");
+                }
+            }
             crate::network::push_local_snapshot(net_snap);
         }
     }
@@ -147,21 +174,23 @@ fn capture_network_snapshot(player: &Player) -> Option<NetPlayerSnapshot> {
     let sub45c_state = player.get_sub45c_state()?;
     let in_vehicle = player.is_in_vehicle()?;
 
+    // Aim state — для v0 используем forward как направление прицела.
+    // (Точное aim direction берётся из камеры; forward — приемлемая
+    // аппроксимация на стороне remote proxy, тем более что
+    // SetupAimDir с ним вызывается в TickPrePhysics в любом случае)
+    // Я помечу как TODO: Наводится прицел с лагами
+    let is_aiming = player.is_aiming().unwrap_or(false);
+    let aim_dir = if is_aiming { Some(vec3_to_net(forward)) } else { None };
+
+    let movement_mode = player.get_movement_mode_byte().unwrap_or(0);
+
     let tick = NET_SNAPSHOT_TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     Some(NetPlayerSnapshot {
         tick,
         player_id,
-        position: NetVec3 {
-            x: position.x,
-            y: position.y,
-            z: position.z,
-        },
-        forward: NetVec3 {
-            x: forward.x,
-            y: forward.y,
-            z: forward.z,
-        },
+        position: vec3_to_net(position),
+        forward: vec3_to_net(forward),
         health,
         is_dead,
         state_code,
@@ -169,6 +198,10 @@ fn capture_network_snapshot(player: &Player) -> Option<NetPlayerSnapshot> {
         ctrl_style_mask,
         sub45c_state,
         in_vehicle,
+        is_aiming,
+        aim_dir,
+        is_moving: false,
+        movement_mode,
     })
 }
 
@@ -243,19 +276,21 @@ impl PlayerTracker {
                         });
                         self.moving = false;
                         self.still_ticks = 0;
-                    } else if dist >= MOVE_EPSILON {
+                    } else if dist >= MOVE_START_M {
                         if !self.moving {
                             player_events::push(PlayerEvent::MovementStarted { pos: new_pos });
                         }
                         self.moving = true;
                         self.still_ticks = 0;
-                    } else if self.moving {
+                    } else if self.moving && dist < MOVE_STOP_M {
                         self.still_ticks += 1;
                         if self.still_ticks >= STOP_TICKS_REQUIRED {
                             self.moving = false;
                             self.still_ticks = 0;
                             player_events::push(PlayerEvent::MovementStopped { pos: new_pos });
                         }
+                    } else if self.moving {
+                        self.still_ticks = 0;
                     }
                 }
                 _ => {

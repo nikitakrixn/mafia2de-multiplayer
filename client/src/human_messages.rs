@@ -3,6 +3,12 @@
 //! Модуль питается от hook'а на `M2DE_EntityMessageRegistry_Broadcast`.
 //! Мы фильтруем общий поток сообщений до локального игрока и превращаем
 //! интересные `message_id` в `PlayerEvent`.
+//!
+//! Опционально: **`M2MP_LOG_ENTITY_MSG_VTABLES=1`** — один лог на пару `(message_id, vtable)`
+//! для weapon-сообщений локального игрока
+
+use std::collections::HashSet;
+use std::sync::{LazyLock, Mutex};
 
 use sdk::{
     addresses::constants::human_messages as hm, game::Player, structures::EntityMessageHeader,
@@ -29,6 +35,34 @@ fn is_interesting_message(id: u32) -> bool {
             | hm::WEAPON_DRAW
             | hm::WEAPON_HOLSTER
     )
+}
+
+static LOGGED_MSG_VTABLES: LazyLock<Mutex<HashSet<u128>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+fn log_weapon_message_vtable_once(msg_ptr: usize, message_id: u32) {
+    if !std::env::var("M2MP_LOG_ENTITY_MSG_VTABLES")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        return;
+    }
+    let header = unsafe { &*(msg_ptr as *const EntityMessageHeader) };
+    let vt = header.vtable as usize;
+    let key = (u128::from(message_id) << 64) | u128::from(vt as u64);
+    let Ok(mut g) = LOGGED_MSG_VTABLES.lock() else {
+        return;
+    };
+    if !g.insert(key) {
+        return;
+    }
+    common::logger::info(&format!(
+        "[entity-msg] id=0x{:08X} ({}) msg_ptr=0x{:X} vtable=0x{:X}",
+        message_id,
+        message_name(message_id),
+        msg_ptr,
+        vt
+    ));
 }
 
 fn is_spam_message(id: u32) -> bool {
@@ -104,6 +138,13 @@ pub fn process_broadcast(entity_ptr: usize, msg_ptr: usize) {
 
     if entity_ptr != player.as_ptr() {
         return;
+    }
+
+    if matches!(
+        id,
+        hm::PLAYER_WEAPON_SELECT | hm::PLAYER_WEAPON_HIDE | hm::WEAPON_DRAW | hm::WEAPON_HOLSTER
+    ) {
+        log_weapon_message_vtable_once(msg_ptr, id);
     }
 
     let event = match id {

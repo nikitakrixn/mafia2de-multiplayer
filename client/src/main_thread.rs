@@ -40,6 +40,7 @@ pub fn on_main_thread_tick() {
     update_ping_if_needed();
 
     crate::multiplayer::on_main_thread_tick();
+    crate::remote_players::tick_interpolation();
     crate::hooks::try_deferred_present_hook();
     crate::overlay::state::sync_from_game();
 }

@@ -13,6 +13,7 @@ mod overlay;
 mod player_events;
 mod player_tracker;
 mod remote_players;
+mod single_instance_bypass;
 mod state;
 mod utils;
 mod vehicle_tracker;
@@ -20,7 +21,10 @@ mod vehicle_tracker;
 use common::logger;
 use std::ffi::c_void;
 use windows::Win32::Foundation::HINSTANCE;
-use windows::Win32::System::Console::AllocConsole;
+use windows::Win32::System::Console::{AllocConsole, SetConsoleTitleW};
+use windows::core::PCWSTR;
+
+const CONSOLE_TITLE: &str = "m2demp-cli\0";
 
 const DLL_PROCESS_ATTACH: u32 = 1;
 const DLL_PROCESS_DETACH: u32 = 0;
@@ -30,6 +34,8 @@ const DLL_PROCESS_DETACH: u32 = 0;
 extern "system" fn DllMain(_module: HINSTANCE, reason: u32, _reserved: *mut c_void) -> i32 {
     match reason {
         DLL_PROCESS_ATTACH => {
+            let _ = single_instance_bypass::install();
+
             std::thread::spawn(initialize);
             1
         }
@@ -45,6 +51,9 @@ extern "system" fn DllMain(_module: HINSTANCE, reason: u32, _reserved: *mut c_vo
 fn initialize() {
     unsafe {
         let _ = AllocConsole();
+
+        let wide: Vec<u16> = CONSOLE_TITLE.encode_utf16().collect();
+        let _ = SetConsoleTitleW(PCWSTR(wide.as_ptr()));
     }
 
     if let Err(e) = logger::init(
@@ -59,6 +68,8 @@ fn initialize() {
     logger::info("  Mafia II: DE Multiplayer Client");
     logger::info("  v0.1.0 | x86_64 | egui D3D11 UI");
     logger::info("======================================");
+
+    single_instance_bypass::flush_pending_logs();
 
     sdk::game::log_module_info();
 
